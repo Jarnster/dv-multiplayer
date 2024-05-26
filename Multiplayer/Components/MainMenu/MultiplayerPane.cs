@@ -59,7 +59,7 @@ public class MultiplayerPane : MonoBehaviour
                     inputUrl = "http://" + inputUrl;
                 }
 
-                bool isValidURL = Uri.TryCreate(inputUrl, UriKind.RelativeOrAbsolute, out Uri uriResult)
+                bool isValidURL = Uri.TryCreate(inputUrl, UriKind.Absolute, out Uri uriResult)
                   && (uriResult.Scheme == Uri.UriSchemeHttp || uriResult.Scheme == Uri.UriSchemeHttps);
 
 
