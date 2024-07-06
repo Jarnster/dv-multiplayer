@@ -45,7 +45,12 @@ namespace Multiplayer.Components.MainMenu
         private ButtonDV buttonRefresh;
         private ButtonDV buttonDirectIP;
 
+
         private bool serverRefreshing = false;
+        private bool autoRefresh = false;
+        private float timePassed = 0f; //time since last refresh
+        private const int AUTO_REFRESH_TIME = 30; //how often to refresh in auto
+        private const int REFRESH_MIN_TIME = 10; //Stop refresh spam
 
         //connection parameters
         private string ipAddress;
@@ -90,6 +95,24 @@ namespace Multiplayer.Components.MainMenu
             this.SetupListeners(false);
         }
 
+        private void Update()
+        {
+            
+            timePassed += Time.deltaTime;
+
+            if (autoRefresh && !serverRefreshing)
+            {              
+                if (timePassed >= AUTO_REFRESH_TIME)
+                {
+                    RefreshAction();
+                }
+                else if(timePassed >= REFRESH_MIN_TIME)
+                {
+                    buttonRefresh.ToggleInteractable(true);
+                }
+            }
+        }
+
         private void CleanUI()
         {
             GameObject.Destroy(this.FindChildByName("Text Content"));
@@ -113,7 +136,7 @@ namespace Multiplayer.Components.MainMenu
 
             GameObject serverWindow = this.FindChildByName("Save Description");
             serverWindow.GetComponentInChildren<TextMeshProUGUI>().textWrappingMode = TextWrappingModes.Normal;
-            serverWindow.GetComponentInChildren<TextMeshProUGUI>().text = "Server browser not <i>fully</i> implemented.<br><br>Dummy servers are shown for demonstration purposes only.<br><br>Press refresh to attempt loading real servers.";
+            serverWindow.GetComponentInChildren<TextMeshProUGUI>().text = "Server browser not <i>fully</i> implemented.<br><br>Dummy servers are shown for demonstration purposes only.<br><br>Press refresh to attempt loading real servers.<br>After pressing refresh, auto refresh will occur every 30 seconds.";
 
             // Update buttons on the multiplayer pane
             GameObject goDirectIP = this.gameObject.UpdateButton("ButtonTextIcon Overwrite", "ButtonTextIcon Manual", Locale.SERVER_BROWSER__MANUAL_CONNECT_KEY, null, Multiplayer.AssetIndex.multiplayerIcon);
@@ -176,13 +199,17 @@ namespace Multiplayer.Components.MainMenu
             if (serverRefreshing)
                 return;
 
-            serverRefreshing = true;
-            buttonJoin.ToggleInteractable(false);
+            
 
             if (selectedServer != null)
             {
                 serverIDOnRefresh = selectedServer.id;
             }
+
+            serverRefreshing = true;
+            autoRefresh = true;
+            buttonJoin.ToggleInteractable(false);
+            buttonRefresh.ToggleInteractable(false);
 
             StartCoroutine(GetRequest($"{Multiplayer.Settings.LobbyServerAddress}/list_game_servers"));
 
@@ -429,9 +456,12 @@ namespace Multiplayer.Components.MainMenu
                         serverIDOnRefresh = null;
                     }
 
-                    serverRefreshing = false;
+                    
                 }
             }
+
+            serverRefreshing = false;
+            timePassed = 0;
         }
 
         private static void ShowOkPopup(string text, Action onClick)
