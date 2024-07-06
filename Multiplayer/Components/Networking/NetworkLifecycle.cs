@@ -6,6 +6,7 @@ using DV.Scenarios.Common;
 using DV.Utils;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using Multiplayer.Components.Networking.UI;
 using Multiplayer.Networking.Data;
 using Multiplayer.Networking.Listeners;
 using Multiplayer.Utils;
