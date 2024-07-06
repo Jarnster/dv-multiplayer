@@ -222,7 +222,7 @@ namespace Multiplayer.Components.MainMenu
             detailsPane = textGO.GetComponent<TextMeshProUGUI>();
             detailsPane.textWrappingMode = TextWrappingModes.Normal;
             detailsPane.fontSize = 18;
-            detailsPane.text = "Server browser not  <i>fully</i> implemented.<br><br>Dummy servers are shown for demonstration purposes only.<br><br>Press refresh to attempt loading real servers.<br>After pressing refresh, auto refresh will occur every 30 seconds.";
+            detailsPane.text = "Dummy servers are shown for demonstration purposes only.<br><br>Press refresh to attempt loading real servers.<br>After pressing refresh, auto refresh will occur every 30 seconds.";
 
             // Adjust text RectTransform to fit content
             RectTransform textRT = textGO.GetComponent<RectTransform>();
