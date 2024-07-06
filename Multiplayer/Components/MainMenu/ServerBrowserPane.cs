@@ -170,6 +170,10 @@ namespace Multiplayer.Components.MainMenu
             serverName.fontSize = 22;
             serverName.text = "Server Browser Info";
 
+            /* 
+             * Setup server details
+             */
+
             // Create new ScrollRect object
             GameObject viewport = serverScroll.FindChildByName("Viewport");
             serverScroll.transform.SetParent(serverWindowGO.transform, false);
@@ -385,15 +389,17 @@ namespace Multiplayer.Components.MainMenu
                 Debug.Log("Prepping Data");
                 serverName.text = selectedServer.Name;
 
-                details = "<alpha=#50>Game mode:</color> " + LobbyServerData.GetGameModeFromInt(selectedServer.GameMode) + "<br>";
-                details += "<alpha=#50>Game difficulty:</color> " + LobbyServerData.GetDifficultyFromInt(selectedServer.Difficulty) + "<br>";
-                details += "<alpha=#50>In-game time passed:</color> " + selectedServer.TimePassed + "<br>";
-                details += "<alpha=#50>Players:</color> " + selectedServer.CurrentPlayers + '/' + selectedServer.MaxPlayers + "<br>";
-                details += "<alpha=#50>Password required:</color> " + (selectedServer.HasPassword ? "Yes" : "No") + "<br>";
-                details += "<alpha=#50>Requires mods:</color> " + (selectedServer.RequiredMods != null? "Yes" : "No") + "<br>";
+                //note: built-in localisations have a trailing colon e.g. 'Game mode:'
+
+                details  = "<alpha=#50>" + LocalizationAPI.L("launcher/game_mode", Array.Empty<string>()) + "</color> " + LobbyServerData.GetGameModeFromInt(selectedServer.GameMode) + "<br>";
+                details += "<alpha=#50>" + LocalizationAPI.L("launcher/difficulty", Array.Empty<string>()) + "</color> " + LobbyServerData.GetDifficultyFromInt(selectedServer.Difficulty) + "<br>";
+                details += "<alpha=#50>" + LocalizationAPI.L("launcher/in_game_time_passed", Array.Empty<string>()) + "</color> " + selectedServer.TimePassed + "<br>";
+                details += "<alpha=#50>" + Locale.SERVER_BROWSER__PLAYERS + ":</color> " + selectedServer.CurrentPlayers + '/' + selectedServer.MaxPlayers + "<br>";
+                details += "<alpha=#50>" + Locale.SERVER_BROWSER__PASSWORD_REQUIRED + ":</color> " + (selectedServer.HasPassword ? Locale.SERVER_BROWSER__YES : Locale.SERVER_BROWSER__NO) + "<br>";
+                details += "<alpha=#50>" + Locale.SERVER_BROWSER__MODS_REQUIRED + ":</color> " + (selectedServer.RequiredMods != null? Locale.SERVER_BROWSER__YES : Locale.SERVER_BROWSER__NO) + "<br>";
                 details += "<br>";
-                details += "<alpha=#50>Game version:</color> " + (selectedServer.GameVersion != BuildInfo.BUILD_VERSION_MAJOR.ToString() ? "<color=\"red\">" : "") + selectedServer.GameVersion + "</color><br>";
-                details += "<alpha=#50>Multiplayer version:</color> " + (selectedServer.MultiplayerVersion != Multiplayer.ModEntry.Version.ToString() ? "<color=\"red\">" : "") + selectedServer.MultiplayerVersion + "</color><br>";
+                details += "<alpha=#50>" + Locale.SERVER_BROWSER__GAME_VERSION + ":</color> " + (selectedServer.GameVersion != BuildInfo.BUILD_VERSION_MAJOR.ToString() ? "<color=\"red\">" : "") + selectedServer.GameVersion + "</color><br>";
+                details += "<alpha=#50>" + Locale.SERVER_BROWSER__MOD_VERSION + ":</color> " + (selectedServer.MultiplayerVersion != Multiplayer.ModEntry.Version.ToString() ? "<color=\"red\">" : "") + selectedServer.MultiplayerVersion + "</color><br>";
                 details += "<br>";
                 details += selectedServer.ServerDetails;
 

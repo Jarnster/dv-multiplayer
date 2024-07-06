@@ -37,6 +37,13 @@ namespace Multiplayer.Utils
                 if (values.Count == 0 || string.IsNullOrWhiteSpace(values[0]))
                     continue;
 
+                //ensure we don't have too many
+                if (values.Count > columns.Count)
+                {
+                    Multiplayer.LogWarning($"CSV Line {i + 1}: Found {values.Count} columns, expected {columns.Count}\r\n\t{line}");
+                    continue;
+                }
+
                 string key = values[0];
                 for (int j = 0; j < values.Count; j++)
                     ((Dictionary<string, string>)columns[j]).Add(key, values[j]);
