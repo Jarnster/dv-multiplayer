@@ -14,6 +14,7 @@ using UnityEngine.UI;
 using UnityEngine.Networking;
 using System.Linq;
 using Multiplayer.Networking.Data;
+using DV;
 
 
 
@@ -44,6 +45,11 @@ namespace Multiplayer.Components.MainMenu
         private ButtonDV buttonJoin;
         private ButtonDV buttonRefresh;
         private ButtonDV buttonDirectIP;
+
+        //Misc GUI Elements
+        private TextMeshProUGUI serverName;
+        private TextMeshProUGUI detailsPane;
+        private ScrollRect serverInfo;
 
 
         private bool serverRefreshing = false;
@@ -120,6 +126,8 @@ namespace Multiplayer.Components.MainMenu
             GameObject.Destroy(this.FindChildByName("HardcoreSavingBanner"));
             GameObject.Destroy(this.FindChildByName("TutorialSavingBanner"));
 
+            GameObject.Destroy(this.FindChildByName("Thumbnail"));
+
             GameObject.Destroy(this.FindChildByName("ButtonIcon OpenFolder"));
             GameObject.Destroy(this.FindChildByName("ButtonIcon Rename"));
             GameObject.Destroy(this.FindChildByName("ButtonTextIcon Load"));
@@ -134,9 +142,94 @@ namespace Multiplayer.Components.MainMenu
             titleObj.GetComponentInChildren<Localize>().key = Locale.SERVER_BROWSER__TITLE_KEY;
             titleObj.GetComponentInChildren<Localize>().UpdateLocalization();
 
-            GameObject serverWindow = this.FindChildByName("Save Description");
-            serverWindow.GetComponentInChildren<TextMeshProUGUI>().textWrappingMode = TextWrappingModes.Normal;
-            serverWindow.GetComponentInChildren<TextMeshProUGUI>().text = "Server browser not <i>fully</i> implemented.<br><br>Dummy servers are shown for demonstration purposes only.<br><br>Press refresh to attempt loading real servers.<br>After pressing refresh, auto refresh will occur every 30 seconds.";
+            //Rebuild the save description pane
+            GameObject serverWindowGO = this.FindChildByName("Save Description");
+            GameObject serverNameGO = serverWindowGO.FindChildByName("text list [noloc]");
+            GameObject scrollViewGO = this.FindChildByName("Scroll View");
+
+            //Create new objects
+            GameObject serverScroll = Instantiate(scrollViewGO, serverNameGO.transform.position, Quaternion.identity, serverWindowGO.transform);
+            
+
+            /* 
+             * Setup server name 
+             */
+            serverNameGO.name = "Server Title";
+
+            //Positioning
+            RectTransform serverNameRT = serverNameGO.GetComponent<RectTransform>();
+            serverNameRT.pivot = new Vector2(1f, 1f);
+            serverNameRT.anchorMin = new Vector2(0f, 1f);
+            serverNameRT.anchorMax = new Vector2(1f, 1f);
+            serverNameRT.SetInsetAndSizeFromParentEdge(RectTransform.Edge.Top, 0, 54);
+
+            //Text
+            serverName = serverNameGO.GetComponentInChildren<TextMeshProUGUI>();
+            serverName.alignment = TextAlignmentOptions.Center;
+            serverName.textWrappingMode = TextWrappingModes.Normal;
+            serverName.fontSize = 22;
+            serverName.text = "Server Browser Info";
+
+            // Create new ScrollRect object
+            GameObject viewport = serverScroll.FindChildByName("Viewport");
+            serverScroll.transform.SetParent(serverWindowGO.transform, false);
+
+            // Positioning ScrollRect
+            RectTransform serverScrollRT = serverScroll.GetComponent<RectTransform>();
+            serverScrollRT.pivot = new Vector2(1f, 1f);
+            serverScrollRT.anchorMin = new Vector2(0f, 1f);
+            serverScrollRT.anchorMax = new Vector2(1f, 1f);
+            serverScrollRT.localEulerAngles = Vector3.zero;
+            serverScrollRT.SetInsetAndSizeFromParentEdge(RectTransform.Edge.Top, 54, 400);
+            serverScrollRT.SetInsetAndSizeFromParentEdge(RectTransform.Edge.Left, 0, serverNameGO.GetComponent<RectTransform>().rect.width);
+
+            RectTransform viewportRT = viewport.GetComponent<RectTransform>();
+
+            // Assign Viewport to ScrollRect
+            ScrollRect scrollRect = serverScroll.GetComponent<ScrollRect>();
+            scrollRect.viewport = viewportRT;
+
+            // Create Content
+            GameObject.Destroy(serverScroll.FindChildByName("GRID VIEW").gameObject);
+            GameObject content = new GameObject("Content", typeof(RectTransform), typeof(ContentSizeFitter), typeof(VerticalLayoutGroup));
+            content.transform.SetParent(viewport.transform, false);
+            ContentSizeFitter contentSF = content.GetComponent<ContentSizeFitter>();
+            contentSF.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            VerticalLayoutGroup contentVLG = content.GetComponent<VerticalLayoutGroup>();
+            contentVLG.childControlWidth = true;
+            contentVLG.childControlHeight = true;
+            RectTransform contentRT = content.GetComponent<RectTransform>();
+            contentRT.pivot = new Vector2(0f, 1f);
+            contentRT.anchorMin = new Vector2(0f, 1f);
+            contentRT.anchorMax = new Vector2(1f, 1f);
+            contentRT.offsetMin = Vector2.zero;
+            contentRT.offsetMax = Vector2.zero;
+            scrollRect.content = contentRT;
+
+            // Create TextMeshProUGUI object
+            GameObject textContainerGO = new GameObject("Details Container", typeof(HorizontalLayoutGroup));
+            textContainerGO.transform.SetParent(content.transform, false);
+            contentRT.localPosition = new Vector3(contentRT.localPosition.x + 10, contentRT.localPosition.y, contentRT.localPosition.z);
+
+
+            GameObject textGO = new GameObject("Details Text", typeof(TextMeshProUGUI));
+            textGO.transform.SetParent(textContainerGO.transform, false);
+            HorizontalLayoutGroup textHLG = textGO.GetComponent<HorizontalLayoutGroup>();
+            detailsPane = textGO.GetComponent<TextMeshProUGUI>();
+            detailsPane.textWrappingMode = TextWrappingModes.Normal;
+            detailsPane.fontSize = 18;
+            detailsPane.text = "Server browser not  <i>fully</i> implemented.<br><br>Dummy servers are shown for demonstration purposes only.<br><br>Press refresh to attempt loading real servers.<br>After pressing refresh, auto refresh will occur every 30 seconds.";
+
+            // Adjust text RectTransform to fit content
+            RectTransform textRT = textGO.GetComponent<RectTransform>();
+            textRT.pivot = new Vector2(0.5f, 1f);
+            textRT.anchorMin = new Vector2(0, 1);
+            textRT.anchorMax = new Vector2(1, 1);
+            textRT.offsetMin = new Vector2(0, -detailsPane.preferredHeight);
+            textRT.offsetMax = new Vector2(0, 0);
+
+            // Set content size to fit text
+            contentRT.sizeDelta = new Vector2(contentRT.sizeDelta.x -50, detailsPane.preferredHeight);
 
             // Update buttons on the multiplayer pane
             GameObject goDirectIP = this.gameObject.UpdateButton("ButtonTextIcon Overwrite", "ButtonTextIcon Manual", Locale.SERVER_BROWSER__MANUAL_CONNECT_KEY, null, Multiplayer.AssetIndex.multiplayerIcon);
@@ -165,7 +258,7 @@ namespace Multiplayer.Components.MainMenu
         }
         private void SetupServerBrowser()
         {
-            GameObject GridviewGO = this.FindChildByName("GRID VIEW");
+            GameObject GridviewGO = this.FindChildByName("Scroll View").FindChildByName("GRID VIEW");
             SaveLoadGridView slgv = GridviewGO.GetComponent<SaveLoadGridView>();
 
             GridviewGO.SetActive(false);
@@ -261,7 +354,19 @@ namespace Multiplayer.Components.MainMenu
                 Debug.Log($"Selected server: {gridViewModel[gridView.SelectedModelIndex].Name}");
 
                 selectedServer = gridViewModel[gridView.SelectedModelIndex];
-                buttonJoin.ToggleInteractable(true);
+                
+                UpdateDetailsPane();
+
+                //Check if we can connect to this server
+
+                Debug.Log($"server: \"{selectedServer.GameVersion}\" \"{selectedServer.MultiplayerVersion}\"");
+                Debug.Log($"client: \"{BuildInfo.BUILD_VERSION_MAJOR.ToString()}\" \"{Multiplayer.ModEntry.Version.ToString()}\"");
+                Debug.Log($"result: \"{selectedServer.GameVersion == BuildInfo.BUILD_VERSION_MAJOR.ToString()}\" \"{selectedServer.MultiplayerVersion == Multiplayer.ModEntry.Version.ToString()}\"");
+
+                bool canConnect = selectedServer.GameVersion == BuildInfo.BUILD_VERSION_MAJOR.ToString() &&
+                                  selectedServer.MultiplayerVersion == Multiplayer.ModEntry.Version.ToString();
+
+                buttonJoin.ToggleInteractable(canConnect);
             }
             else
             {
@@ -270,6 +375,32 @@ namespace Multiplayer.Components.MainMenu
         }
 
         #endregion
+
+        private void UpdateDetailsPane()
+        {
+            string details="";
+
+            if (selectedServer != null)
+            {
+                Debug.Log("Prepping Data");
+                serverName.text = selectedServer.Name;
+
+                details = "<alpha=#50>Game mode:</color> " + LobbyServerData.GetGameModeFromInt(selectedServer.GameMode) + "<br>";
+                details += "<alpha=#50>Game difficulty:</color> " + LobbyServerData.GetDifficultyFromInt(selectedServer.Difficulty) + "<br>";
+                details += "<alpha=#50>In-game time passed:</color> " + selectedServer.TimePassed + "<br>";
+                details += "<alpha=#50>Players:</color> " + selectedServer.CurrentPlayers + '/' + selectedServer.MaxPlayers + "<br>";
+                details += "<alpha=#50>Password required:</color> " + (selectedServer.HasPassword ? "Yes" : "No") + "<br>";
+                details += "<alpha=#50>Requires mods:</color> " + (selectedServer.RequiredMods != null? "Yes" : "No") + "<br>";
+                details += "<br>";
+                details += "<alpha=#50>Game version:</color> " + (selectedServer.GameVersion != BuildInfo.BUILD_VERSION_MAJOR.ToString() ? "<color=\"red\">" : "") + selectedServer.GameVersion + "</color><br>";
+                details += "<alpha=#50>Multiplayer version:</color> " + (selectedServer.MultiplayerVersion != Multiplayer.ModEntry.Version.ToString() ? "<color=\"red\">" : "") + selectedServer.MultiplayerVersion + "</color><br>";
+                details += "<br>";
+                details += selectedServer.ServerDetails;
+
+                Debug.Log("Finished Prepping Data");
+                detailsPane.text = details;
+            }
+        }
 
         private void ShowIpPopup()
         {
@@ -404,8 +535,6 @@ namespace Multiplayer.Components.MainMenu
             // ShowConnectionFailedPopup();
         }
 
-
-
         IEnumerator GetRequest(string uri)
         {
             using (UnityWebRequest webRequest = UnityWebRequest.Get(uri))
@@ -498,6 +627,10 @@ namespace Multiplayer.Components.MainMenu
                 item.CurrentPlayers = UnityEngine.Random.Range(1, item.MaxPlayers);
                 item.Ping = UnityEngine.Random.Range(5, 1500);
                 item.HasPassword = UnityEngine.Random.Range(0, 10) > 5;
+
+                item.GameVersion = UnityEngine.Random.Range(1, 10) > 3 ? BuildInfo.BUILD_VERSION_MAJOR.ToString() : "97";
+                item.MultiplayerVersion = UnityEngine.Random.Range(1, 10) > 3 ? Multiplayer.ModEntry.Version.ToString() : "0.1.0";
+
 
                 Debug.Log(item.HasPassword);
                 gridViewModel.Add(item);
