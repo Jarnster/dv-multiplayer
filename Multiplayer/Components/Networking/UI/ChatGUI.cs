@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using DV;
 using DV.UI;
+using DV.UI.Inventory;
 using Multiplayer.Components.MainMenu;
 using Multiplayer.Utils;
 using TMPro;
@@ -15,6 +16,9 @@ namespace Multiplayer.Components.Networking.UI;
 [RequireComponent(typeof(RectTransform))]
 public class ChatGUI : MonoBehaviour
 {
+    private const float PANEL_LEFT_MARGIN = 20f;
+    private const float PANEL_BOTTOM_MARGIN = 50f;
+
     private const float MESSAGE_INSET = 15f;
     private const int MAX_MESSAGES = 50;
     private const int MESSAGE_TIMEOUT = 10;
@@ -35,83 +39,31 @@ public class ChatGUI : MonoBehaviour
     private bool showingMessage = false;
 
     private CustomFirstPersonController player;
+    private HotbarController hotbarController;
 
     private float timeOut;
 
     private void Awake()
     {
-        Debug.Log("OverlayUI Awake() called");
+        Debug.Log("ChatGUI Awake() called");
 
-        // Create a new UI Canvas
-        GameObject canvasGO = new GameObject("OverlayCanvas");
-        canvasGO.transform.SetParent(this.transform, false);
-        /*
-        Canvas canvas = canvasGO.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.worldCamera = Camera.main;
-        canvas.sortingOrder = 100; // Ensure this canvas is rendered above others
+        SetupOverlay(); //sizes and positions panel
 
-        Debug.Log("Canvas created and configured");
+        BuildUI();      //Creates input fields and scroll area
 
-        // Add a CanvasScaler and GraphicRaycaster
-        CanvasScaler canvasScaler = canvasGO.AddComponent<CanvasScaler>();
-        canvasScaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        canvasScaler.referenceResolution = new Vector2(1920, 1080);
-        canvasGO.AddComponent<GraphicRaycaster>();
+        panelGO.SetActive(false); //We don't need this to be visible when the game launches
 
-        Debug.Log("CanvasScaler and GraphicRaycaster added");
-        */
-
-        // Create a Panel
-        panelGO = new GameObject("OverlayPanel");
-        panelGO.transform.SetParent(canvasGO.transform, false);
-        RectTransform rectTransform = panelGO.AddComponent<RectTransform>();
-        rectTransform.sizeDelta = new Vector2(Screen.width * 0.3f, Screen.height * 0.3f);
-        rectTransform.anchorMin = Vector2.zero;//new Vector2(0.5f, 0.5f);
-        rectTransform.anchorMax = Vector2.zero;//new Vector2(0.5f, 0.5f);
-        rectTransform.pivot = new Vector2(0.5f, 0.5f);
-        rectTransform.anchoredPosition = Vector2.zero;
-
-       // Debug.Log("Panel created and positioned");
-
-        // Add an Image component for coloring
-        /*
-        Image image = panelGO.AddComponent<Image>();
-        image.color = new Color(1f, 0f, 0f, 0.5f);
-
-        Debug.Log("Image component added and colored");
-        */
-
-        //// Add a Text element to the panel
-        //GameObject textGO = new GameObject("TestText");
-        //textGO.transform.SetParent(panelGO.transform, false);
-        //Text text = textGO.AddComponent<Text>();
-        //text.text = "Overlay Test";
-        ////text.font = Resources.GetBuiltinResource<Font>("Arial.ttf");
-        ////text.alignment = TextAnchor.MiddleCenter;
-        //text.color = Color.white;
-        //RectTransform textRectTransform = textGO.GetComponent<RectTransform>();
-        //textRectTransform.sizeDelta = rectTransform.sizeDelta;
-        //textRectTransform.anchorMin = new Vector2(0.5f, 0.5f);
-        //textRectTransform.anchorMax = new Vector2(0.5f, 0.5f);
-        //textRectTransform.pivot = new Vector2(0.5f, 0.5f);
-        //textRectTransform.anchoredPosition = Vector2.zero;
-
-        //Debug.Log("Test text added to panel");
-
-
-        //this.GetComponent<Canvas>().worldCamera = Camera.main;
-        //this.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
-        //this.GetComponent<CanvasScaler>().uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-
-        BuildUI();
-        panelGO.SetActive(false);
-
-        //Find the player
+        //Find the player and toolbar so we can block input
         player = GameObject.FindObjectOfType<CustomFirstPersonController>();
         if(player == null)
         {
             Debug.Log("Failed to find CustomFirstPersonController");
+        }
+
+        hotbarController = GameObject.FindObjectOfType<HotbarController>();
+        if (hotbarController == null)
+        {
+            Debug.Log("Failed to find HotbarController");
         }
 
     }
@@ -129,8 +81,8 @@ public class ChatGUI : MonoBehaviour
 
     private void Update()
     {
-        //Debug.Log($"ChatGUI Update: isOpen {isOpen} Key Enter: {Input.GetKeyDown(KeyCode.Return)}");
-
+   
+        //Handle keypresses to open/close the chat window
         if (!isOpen && Input.GetKeyDown(KeyCode.Return))
         {
             isOpen = true;              //whole panel is open
@@ -139,26 +91,31 @@ public class ChatGUI : MonoBehaviour
             panelGO.SetActive(isOpen);
             textInputGO.SetActive(isOpen);
 
-            chatInputIF.ActivateInputField();
-            //InputFocusManager.Instance.TakeKeyboardFocus();
-            player.Locomotion.inputEnabled = false;
-
+            BlockInput(true);
         }
-        else if (isOpen && Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Return))
+        else if (isOpen && (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Return)))
         {
             isOpen = false;
             if (showingMessage)
             {
                 textInputGO.SetActive(isOpen);
-                //InputFocusManager.Instance.ReleaseKeyboardFocus();
-                player.Locomotion.inputEnabled = true;
             }
             else
             {
                 panelGO.SetActive(isOpen);
             }
+
+            BlockInput(false);
         }
 
+        //Maintain focus on the text input field
+        if(isOpen && !chatInputIF.isFocused)
+        {
+            chatInputIF.ActivateInputField();
+        }
+
+        //After a message is sent/received, keep displaying it for the timeout period
+        //Would be nice to add a fadeout in future
         if (showingMessage)
         {
             timeOut += Time.deltaTime;
@@ -192,6 +149,7 @@ public class ChatGUI : MonoBehaviour
         timeOut = 0;
         showingMessage = true;
         textInputGO.SetActive(false);
+        BlockInput(false);
 
         return;
     }
@@ -203,6 +161,28 @@ public class ChatGUI : MonoBehaviour
 
 
     #region UI
+
+    private void SetupOverlay()
+    {
+        //Setup the host object
+        RectTransform myRT = this.transform.GetComponent<RectTransform>();
+        myRT.sizeDelta = new Vector2(Screen.width, Screen.height);
+        myRT.anchorMin = Vector2.zero;
+        myRT.anchorMax = Vector2.zero;
+        myRT.pivot = Vector2.zero;
+        myRT.anchoredPosition = Vector2.zero;
+
+
+        // Create a Panel
+        panelGO = new GameObject("OverlayPanel");
+        panelGO.transform.SetParent(this.transform, false);
+        RectTransform rectTransform = panelGO.AddComponent<RectTransform>();
+        rectTransform.sizeDelta = new Vector2(Screen.width * 0.25f, Screen.height * 0.25f);
+        rectTransform.anchorMin = Vector2.zero;
+        rectTransform.anchorMax = Vector2.zero;
+        rectTransform.pivot = Vector2.zero;
+        rectTransform.anchoredPosition = new Vector2(PANEL_LEFT_MARGIN, PANEL_BOTTOM_MARGIN);
+    }
 
     private void BuildUI()
     {
@@ -259,8 +239,6 @@ public class ChatGUI : MonoBehaviour
             scrollViewPrefab = saveLoad.FindChildByName("Scroll View");
         }
 
-        
-        /// 
 
         if (inputPrefab == null)
         {
@@ -299,6 +277,7 @@ public class ChatGUI : MonoBehaviour
 
         //Setup input
         chatInputIF = textInputGO.GetComponent<TMP_InputField>();
+        chatInputIF.onFocusSelectAll = false;
         textInputGO.FindChildByName("text [noloc]").GetComponent<TMP_Text>().fontSize = 18;
         chatInputIF.placeholder.GetComponent<TMP_Text>().text = "Type a message and press Enter!";
 
@@ -386,12 +365,21 @@ public class ChatGUI : MonoBehaviour
         messageTM.fontSize = 18;
         messageTM.text = "Morm: Hurry up!";
     }
+
+    private void BlockInput(bool block)
+    {
+        player.Locomotion.inputEnabled = !block;
+        hotbarController.enabled = !block;
+    }
+
+
     #endregion
 }
 
 public class Message
 {
     public string text;
+    public GameObject message;
 
     public Message(string text) {
         this.text = text;
