@@ -110,6 +110,7 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundLicenseAcquiredPacket>(OnClientboundLicenseAcquiredPacket);
         netPacketProcessor.SubscribeReusable<ClientboundGarageUnlockPacket>(OnClientboundGarageUnlockPacket);
         netPacketProcessor.SubscribeReusable<ClientboundDebtStatusPacket>(OnClientboundDebtStatusPacket);
+        netPacketProcessor.SubscribeReusable<CommonChatPacket>(OnCommonChatPacket);
     }
 
     #region Net Events
@@ -317,10 +318,10 @@ public class NetworkClient : NetworkManager
         GameObject common = GameObject.Find("[MAIN]/[GameUI]/[NewCanvasController]/Auxiliary Canvas, EventSystem, Input Module");
         if (common != null)
         {
-
+            //
             GameObject chat = new GameObject("Chat GUI", typeof(ChatGUI));
             chat.transform.SetParent(common.transform, false);
-
+            chatGUI = chat.GetComponent<ChatGUI>();
         }
     }
 
@@ -606,6 +607,11 @@ public class NetworkClient : NetworkManager
     {
         CareerManagerDebtControllerPatch.HasDebt = packet.HasDebt;
     }
+    private void OnCommonChatPacket(CommonChatPacket packet)
+    {
+
+        chatGUI.ReceiveMessage(packet.message);
+    }
 
     #endregion
 
@@ -802,6 +808,15 @@ public class NetworkClient : NetworkManager
         SendPacketToServer(new ServerboundLicensePurchaseRequestPacket {
             Id = id,
             IsJobLicense = isJobLicense
+        }, DeliveryMethod.ReliableUnordered);
+    }
+
+    public void SendChat(string message, MessageType type, string whisperTo)
+    {
+        SendPacketToServer(new CommonChatPacket
+        {
+            message = message,
+            type = type,
         }, DeliveryMethod.ReliableUnordered);
     }
 

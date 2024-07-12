@@ -104,6 +104,7 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonHandbrakePositionPacket, NetPeer>(OnCommonHandbrakePositionPacket);
         netPacketProcessor.SubscribeReusable<CommonTrainPortsPacket, NetPeer>(OnCommonTrainPortsPacket);
         netPacketProcessor.SubscribeReusable<CommonTrainFusesPacket, NetPeer>(OnCommonTrainFusesPacket);
+        netPacketProcessor.SubscribeReusable<CommonChatPacket, NetPeer>(OnCommonChatPacket);
     }
 
     private void OnLoaded()
@@ -675,5 +676,15 @@ public class NetworkServer : NetworkManager
             LicenseManager.Instance.AcquireGeneralLicense(generalLicense);
     }
 
+    private void OnCommonChatPacket(CommonChatPacket packet, NetPeer peer)
+    {
+
+        if (TryGetServerPlayer(peer, out var player))
+        {
+            packet.message = "<alpha=#50>" + player.Username + ":</color> <noparse>" + packet.message + "</noparse>";
+            SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, peer);
+        }
+
+    }
     #endregion
 }

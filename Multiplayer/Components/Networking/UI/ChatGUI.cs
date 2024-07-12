@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using DV;
 using DV.UI;
 using DV.UI.Inventory;
-using Multiplayer.Components.MainMenu;
 using Multiplayer.Utils;
+using Multiplayer.Networking.Packets.Common;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using static System.Net.Mime.MediaTypeNames;
+
 
 namespace Multiplayer.Components.Networking.UI;
 
@@ -25,7 +27,7 @@ public class ChatGUI : MonoBehaviour
 
     private GameObject messagePrefab;
 
-    public List<Message> messageList = new List<Message>();
+    public List<GameObject> messageList = new List<GameObject>();
 
     private TMP_InputField chatInputIF;
     private ScrollRect scrollRect;
@@ -42,6 +44,7 @@ public class ChatGUI : MonoBehaviour
     private HotbarController hotbarController;
 
     private float timeOut;
+    private float testTimeOut;
 
     private void Awake()
     {
@@ -52,25 +55,28 @@ public class ChatGUI : MonoBehaviour
         BuildUI();      //Creates input fields and scroll area
 
         panelGO.SetActive(false); //We don't need this to be visible when the game launches
+        textInputGO.SetActive(false);
 
         //Find the player and toolbar so we can block input
         player = GameObject.FindObjectOfType<CustomFirstPersonController>();
         if(player == null)
         {
             Debug.Log("Failed to find CustomFirstPersonController");
+            return;
         }
 
         hotbarController = GameObject.FindObjectOfType<HotbarController>();
         if (hotbarController == null)
         {
             Debug.Log("Failed to find HotbarController");
+            return;
         }
 
     }
 
     private void OnEnable()
     {
-        chatInputIF.onSubmit.AddListener(SendChat);
+        chatInputIF.onSubmit.AddListener(Submit);
         
     }
 
@@ -81,9 +87,8 @@ public class ChatGUI : MonoBehaviour
 
     private void Update()
     {
-   
         //Handle keypresses to open/close the chat window
-        if (!isOpen && Input.GetKeyDown(KeyCode.Return))
+        if (!isOpen && Input.GetKeyDown(KeyCode.Return) && !AppUtil.Instance.IsPauseMenuOpen)
         {
             isOpen = true;              //whole panel is open
             showingMessage = false;     //We don't want to time out
@@ -116,7 +121,7 @@ public class ChatGUI : MonoBehaviour
 
         //After a message is sent/received, keep displaying it for the timeout period
         //Would be nice to add a fadeout in future
-        if (showingMessage)
+        if (showingMessage && !textInputGO.activeSelf)
         {
             timeOut += Time.deltaTime;
 
@@ -126,23 +131,22 @@ public class ChatGUI : MonoBehaviour
                 panelGO.SetActive(false);
             } 
         }
+
+        //testTimeOut += Time.deltaTime;
+        //if (testTimeOut >= 60)
+        //{
+        //    testTimeOut = 0;
+        //    ReceiveMessage("<alpha=#50>Morm:</color> Test TimeOut");
+        //}
     }
 
-    public void SendChat(string text)
+    public void Submit(string text)
     {
         if (text.Trim().Length > 0)
         {
-            if (messageList.Count > MAX_MESSAGES)
-            {
-                messageList.RemoveAt(0);
-            }
-
-            Message newMessage = new Message(text);
-            messageList.Add(newMessage);
-
-            GameObject messageObj = Instantiate(messagePrefab, chatPanel);
-            messageObj.GetComponent<TextMeshProUGUI>().text = text;
-
+            //add locally
+            AddMessage("<alpha=#50>You:</color> <noparse>" + text + "</noparse>");
+            NetworkLifecycle.Instance.Client.SendChat(text, MessageType.Chat,null);
         }
 
         chatInputIF.text = "";
@@ -154,9 +158,32 @@ public class ChatGUI : MonoBehaviour
         return;
     }
 
-    public void ReceiveMessage(Message received)
+    public void ReceiveMessage(string message)
     {
 
+        if (message.Trim().Length > 0)
+        {
+            //add locally
+            AddMessage(message);
+        }
+
+        timeOut = 0;
+        showingMessage = true;
+
+        panelGO.SetActive(true);   
+    }
+
+    private void AddMessage(string text)
+    {
+        if (messageList.Count > MAX_MESSAGES)
+        {
+            GameObject.Destroy(messageList[0]);
+            messageList.RemoveAt(0);
+        }
+
+        GameObject newMessage = Instantiate(messagePrefab, chatPanel);
+        newMessage.GetComponent<TextMeshProUGUI>().text = text;
+        messageList.Add(newMessage);
     }
 
 
@@ -200,7 +227,7 @@ public class ChatGUI : MonoBehaviour
         }
         else
         {
-            inputPrefab = popup.popupTextInput.FindChildByName("TextFieldTextIcon");//MainMenuThingsAndStuff.Instance.renamePopupPrefab.gameObject.FindChildByName("TextFieldTextIcon");
+            inputPrefab = popup.popupTextInput.FindChildByName("TextFieldTextIcon");
         }
 
         if (saveLoad == null)
@@ -279,6 +306,7 @@ public class ChatGUI : MonoBehaviour
         chatInputIF = textInputGO.GetComponent<TMP_InputField>();
         chatInputIF.onFocusSelectAll = false;
         textInputGO.FindChildByName("text [noloc]").GetComponent<TMP_Text>().fontSize = 18;
+        chatInputIF.placeholder.GetComponent<TMP_Text>().richText = false;
         chatInputIF.placeholder.GetComponent<TMP_Text>().text = "Type a message and press Enter!";
 
 
@@ -304,7 +332,7 @@ public class ChatGUI : MonoBehaviour
         //Setup scroll pane
         GameObject viewport = scrollViewGO.FindChildByName("Viewport");
         RectTransform viewportRT = viewport.GetComponent<RectTransform>();
-        ScrollRect scrollRect = scrollViewGO.GetComponent<ScrollRect>();
+        ScrollRect scrollRect = scrollViewGO.GetComponent<ScrollRect>(); 
 
         viewportRT.pivot = new Vector2(0.5f, 0.5f);
         viewportRT.anchorMin = Vector2.zero;
@@ -341,11 +369,7 @@ public class ChatGUI : MonoBehaviour
 
         //Realign vertical scroll bar
         RectTransform scrollBarRT = scrollRect.verticalScrollbar.transform.GetComponent<RectTransform>();
-        Vector3 origPos = scrollBarRT.localPosition;
-
-        scrollBarRT.localPosition = new Vector3(origPos.x, viewportRT.rect.height, origPos.z);
-        scrollBarRT.sizeDelta = new Vector2(scrollBarRT.sizeDelta.x, viewportRT.rect.height);
-
+        scrollBarRT.SetInsetAndSizeFromParentEdge(RectTransform.Edge.Top, 0, scrollViewRT.rect.height);
 
 
 
@@ -372,16 +396,5 @@ public class ChatGUI : MonoBehaviour
         hotbarController.enabled = !block;
     }
 
-
     #endregion
-}
-
-public class Message
-{
-    public string text;
-    public GameObject message;
-
-    public Message(string text) {
-        this.text = text;
-    }
 }
