@@ -193,12 +193,4 @@ public static class ChatManager
         return null;
 
     }
-        
-   
-        //if (NetworkLifecycle.Instance.Server.TryGetServerPlayer(peer, out var player))
-        //{
-        //    message = "<alpha=#50>" + player.Username + ":</color> <noparse>" + message + "</noparse>";
-        //    NetworkLifecycle.Instance.Server.SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, peer);
-        //}
-
 }

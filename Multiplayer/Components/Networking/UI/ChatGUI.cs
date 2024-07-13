@@ -28,15 +28,17 @@ public class ChatGUI : MonoBehaviour
     private const float PANEL_FADE_DURATION = 1f;
     private const float MESSAGE_INSET = 15f;        //How far to inset the message text from the edge of chat the window
 
-    private const int MESSAGE_MAX_HISTORY = 50;            //Maximum messages to keep in the queue
+    private const int MESSAGE_MAX_HISTORY = 50;     //Maximum messages to keep in the queue
     private const int MESSAGE_TIMEOUT = 10;         //Maximum time to show an incoming message before fade
     private const int MESSAGE_MAX_LENGTH = 500;     //Maximum length of a single message
     private const int MESSAGE_RATE_LIMIT = 10;      //Limit how quickly a user can send messages (also enforced server side)
 
+    private const int SEND_MAX_HISTORY = 10;        //How many previous messages to remember
 
     private GameObject messagePrefab;
 
-    public List<GameObject> messageList = new List<GameObject>();
+    private List<GameObject> messageList = new List<GameObject>();
+    private List<string> sendHistory = new List<string>();
 
     private TMP_InputField chatInputIF;
     private ScrollRect scrollRect;
@@ -50,17 +52,21 @@ public class ChatGUI : MonoBehaviour
     private bool isOpen = false;
     private bool showingMessage = false;
 
-    private CustomFirstPersonController player;
-    private HotbarController hotbarController;
+    private int sendHistoryIndex = -1;
+    private bool whispering = false;
+    private string lastRecipient;
 
-    private float timeOut;
-    private float testTimeOut;
+    //private CustomFirstPersonController player;
+    //private HotbarController hotbarController;
+
+    private float timeOut; //time-out counter for hiding the messages
+    //private float testTimeOut;
 
     private GameFeatureFlags.Flag denied;
 
     private void Awake()
     {
-        Debug.Log("ChatGUI Awake() called");
+        Multiplayer.Log("ChatGUI Awake() called");
 
         SetupOverlay(); //sizes and positions panel
 
@@ -70,19 +76,21 @@ public class ChatGUI : MonoBehaviour
         textInputGO.SetActive(false);
 
         //Find the player and toolbar so we can block input
+        /*
         player = GameObject.FindObjectOfType<CustomFirstPersonController>();
         if(player == null)
         {
-            Debug.Log("Failed to find CustomFirstPersonController");
+            Multiplayer.Log("Failed to find CustomFirstPersonController");
             return;
         }
 
         hotbarController = GameObject.FindObjectOfType<HotbarController>();
         if (hotbarController == null)
         {
-            Debug.Log("Failed to find HotbarController");
+            Multiplayer.Log("Failed to find HotbarController");
             return;
         }
+        */
 
     }
 
@@ -105,28 +113,53 @@ public class ChatGUI : MonoBehaviour
             isOpen = true;              //whole panel is open
             showingMessage = false;     //We don't want to time out
 
-            //panelGO.SetActive(isOpen);
             ShowPanel();
             textInputGO.SetActive(isOpen);
 
+            sendHistoryIndex = sendHistory.Count;
+
+            if (whispering)
+            {
+                chatInputIF.text = "/w " + lastRecipient + ' ';
+                chatInputIF.caretPosition = chatInputIF.text.Length;
+            }
+
             BlockInput(true);
         }
-        else if (isOpen && (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Return)))
+        else if (isOpen)
         {
-            isOpen = false;
-            if (showingMessage)
+            //Check for closing window
+            if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Return))
             {
-                textInputGO.SetActive(isOpen);
-            }
-            else
+                isOpen = false;
+                if (showingMessage)
+                {
+                    textInputGO.SetActive(isOpen);
+                }
+                else
+                {
+                    HidePanel();
+                }
+
+                BlockInput(false);
+            }else if (Input.GetKeyDown(KeyCode.UpArrow))
             {
-                //panelGO.SetActive(isOpen);
-                HidePanel();
-
+                sendHistoryIndex--;
+                if (sendHistory.Count > 0 && sendHistoryIndex < sendHistory.Count)
+                {
+                    chatInputIF.text = sendHistory[sendHistoryIndex];
+                    chatInputIF.caretPosition = chatInputIF.text.Length;
+                }
+            }else if (Input.GetKeyDown(KeyCode.DownArrow))
+            {
+                sendHistoryIndex++;
+                if (sendHistory.Count > 0 && sendHistoryIndex >= 0)
+                {
+                    chatInputIF.text = sendHistory[sendHistoryIndex];
+                    chatInputIF.caretPosition = chatInputIF.text.Length;
+                }
             }
-
-            BlockInput(false);
-        }
+        } 
 
         //Maintain focus on the text input field
         if(isOpen && !chatInputIF.isFocused)
@@ -166,17 +199,39 @@ public class ChatGUI : MonoBehaviour
             text = Regex.Replace(text, "</noparse>", string.Empty, RegexOptions.IgnoreCase);
 
             //check for whisper
-            if(CheckForWhisper(text, out string localMessage))
+            if(CheckForWhisper(text, out string localMessage, out string recipient))
             {
+                whispering = true;
+                lastRecipient = recipient;
+
+                if (lastRecipient.Contains(" "))
+                {
+                    lastRecipient = '"' + lastRecipient + '"';
+                }
+
                 AddMessage(localMessage);
             }
             else
             {
+                whispering = false;
                 AddMessage("<alpha=#50>You:</color> <noparse>" + text + "</noparse>");
             }
 
-            //add locally
-            NetworkLifecycle.Instance.Client.SendChat(text, MessageType.Chat,null);
+            //add to send history
+            if (sendHistory.Count >= SEND_MAX_HISTORY)
+            {
+                sendHistory.RemoveAt(0);
+            }
+
+            //add to the history - if already there, we'll relocate it to the end
+            int exists = sendHistory.IndexOf(text);
+            if (exists != -1)
+                sendHistory.RemoveAt(exists);
+
+            sendHistory.Add(text);
+
+            //send to server
+            NetworkLifecycle.Instance.Client.SendChat(text);
 
             //reset any timeouts
             timeOut = 0;
@@ -191,9 +246,10 @@ public class ChatGUI : MonoBehaviour
         return;
     }
 
-    private bool CheckForWhisper(string message, out string localMessage)
+    private bool CheckForWhisper(string message, out string localMessage, out string recipient)
     {
-        string peerName = "";
+        recipient = "";
+
 
         if (message.StartsWith("/"))
         {
@@ -229,16 +285,16 @@ public class ChatGUI : MonoBehaviour
                     return false;
                 }
 
-                peerName = localMessage.Substring(1, endQuote);
-                localMessage = localMessage.Substring(peerName.Length + 3);
+                recipient = localMessage.Substring(1, endQuote);
+                localMessage = localMessage.Substring(recipient.Length + 3);
             }
             else
             {
-                peerName = localMessage.Split(' ')[0];
-                localMessage = localMessage.Substring(peerName.Length + 1);
+                recipient = localMessage.Split(' ')[0];
+                localMessage = localMessage.Substring(recipient.Length + 1);
             }
 
-            localMessage = "<alpha=#50>You (<i>" + peerName + "</i>):</color> <noparse>" + localMessage + "</noparse>";
+            localMessage = "<alpha=#50>You (<i>" + recipient + "</i>):</color> <noparse>" + localMessage + "</noparse>";
             return true;
         }
 
@@ -264,7 +320,7 @@ public class ChatGUI : MonoBehaviour
 
     private void AddMessage(string text)
     {
-        if (messageList.Count > MESSAGE_MAX_HISTORY)
+        if (messageList.Count >= MESSAGE_MAX_HISTORY)
         {
             GameObject.Destroy(messageList[0]);
             messageList.RemoveAt(0);
@@ -344,7 +400,7 @@ public class ChatGUI : MonoBehaviour
 
         if (popup == null)
         {
-            Debug.Log("Could not find PopupNotificationReferences");
+            Multiplayer.Log("Could not find PopupNotificationReferences");
             return;
         }
         else
@@ -354,25 +410,25 @@ public class ChatGUI : MonoBehaviour
 
         if (saveLoad == null)
         {
-            Debug.Log("Could not find SaveLoadController, attempting to instanciate");
+            Multiplayer.Log("Could not find SaveLoadController, attempting to instanciate");
             AppUtil.Instance.PauseGame();
 
-            Debug.Log("Paused");
+            Multiplayer.Log("Paused");
 
             saveLoad = FindObjectOfType<PauseMenuController>().saveLoadController;
 
             if (saveLoad == null)
             {
-                Debug.Log("Failed to get SaveLoadController");
+                Multiplayer.Log("Failed to get SaveLoadController");
             }
             else
             {
-                Debug.Log("Made a SaveLoadController!");
+                Multiplayer.Log("Made a SaveLoadController!");
                 scrollViewPrefab = saveLoad.FindChildByName("Scroll View");
 
                 if (scrollViewPrefab == null)
                 {
-                    Debug.Log("Could not find scrollViewPrefab");
+                    Multiplayer.Log("Could not find scrollViewPrefab");
                     
                 }
                 else
@@ -391,12 +447,12 @@ public class ChatGUI : MonoBehaviour
 
         if (inputPrefab == null)
         {
-            Debug.Log("Could not find inputPrefab");
+            Multiplayer.Log("Could not find inputPrefab");
             return;
         }
         if (scrollViewPrefab == null)
         {
-            Debug.Log("Could not find scrollViewPrefab");
+            Multiplayer.Log("Could not find scrollViewPrefab");
             return;
         }
 

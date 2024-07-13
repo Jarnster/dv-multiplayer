@@ -10,13 +10,5 @@ public class CommonChatPacket
 {
 
     public string message { get; set; }
-    public MessageType type { get; set; }
 
-}
-
-public enum MessageType
-{
-    ServerMessage,
-    Chat,
-    Whisper
 }
