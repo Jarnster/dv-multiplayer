@@ -331,7 +331,17 @@ public class NetworkServer : NetworkManager
 
     private void OnServerboundClientLoginPacket(ServerboundClientLoginPacket packet, ConnectionRequest request)
     {
-        packet.Username = packet.Username.Truncate(Settings.MAX_USERNAME_LENGTH);
+        // clean up username - remove leading/trailing white space, swap spaces for underscores and truncate
+        packet.Username = packet.Username.Trim().Replace(' ', '_').Truncate(Settings.MAX_USERNAME_LENGTH);
+        string overrideUsername = packet.Username;
+
+        //ensure the username is unique
+        int uniqueName = ServerPlayers.Where(player => player.OriginalUsername.ToLower() == packet.Username.ToLower()).Count();
+
+        if (uniqueName > 0)
+        {
+            overrideUsername += uniqueName;
+        }
 
         Guid guid;
         try
@@ -398,7 +408,8 @@ public class NetworkServer : NetworkManager
 
         ServerPlayer serverPlayer = new() {
             Id = (byte)peer.Id,
-            Username = packet.Username,
+            Username = overrideUsername,
+            OriginalUsername = packet.Username,
             Guid = guid
         };
 

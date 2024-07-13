@@ -84,7 +84,7 @@ public static class ChatManager
     public static void ServerMessage(string message, NetPeer sender, NetPeer exclude = null, int commandLength =-1)
     {
         //If user is not the host, we should ignore - will require changes for dedicated server
-        if (!NetworkLifecycle.Instance.IsHost(sender))
+        if (sender !=null && !NetworkLifecycle.Instance.IsHost(sender))
             return;
 
         //Remove the command "/server" or "/s"
@@ -99,8 +99,8 @@ public static class ChatManager
 
     private static void WhisperMessage(string message, int commandLength, string senderName, NetPeer sender)
     {
-        NetPeer recipient = null;
-        string recipientName = "";
+        NetPeer recipient;
+        string recipientName;
 
         Multiplayer.Log($"Whispering: \"{message}\", sender: {senderName}, senderID: {sender?.Id}");
 
@@ -110,6 +110,7 @@ public static class ChatManager
         if (message == null || message == string.Empty)
             return;
 
+        /*
         //Check if name is in Quotes e.g. '/w "Mr Noname" my message'
         if (message.StartsWith("\""))
         {
@@ -123,12 +124,12 @@ public static class ChatManager
             message = message.Substring(recipientName.Length + 3);
         }
         else
-        {
+        {*/
             recipientName = message.Split(' ')[0];
 
             //Remove the peer name
             message = message.Substring(recipientName.Length + 1);
-        }
+        //}
 
         Multiplayer.Log($"Whispering parse 1: \"{message}\", sender: {senderName}, senderID: {sender?.Id}, peerName: {recipientName}");
 

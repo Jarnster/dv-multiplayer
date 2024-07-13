@@ -1,18 +1,17 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using DV;
 using DV.UI;
-using DV.UI.Inventory;
 using Multiplayer.Utils;
-using Multiplayer.Networking.Packets.Common;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 using System.Text.RegularExpressions;
 using DV.Common;
 using System.Collections;
-using CommandTerminal;
 using Multiplayer.Networking.Managers.Server;
+using Multiplayer.Components.Networking.Player;
 using static System.Net.Mime.MediaTypeNames;
 
 
@@ -97,12 +96,14 @@ public class ChatGUI : MonoBehaviour
     private void OnEnable()
     {
         chatInputIF.onSubmit.AddListener(Submit);
+        chatInputIF.onValueChanged.AddListener(ChatInputChange);
         
     }
 
     private void OnDisable()
     {
         chatInputIF.onSubmit.RemoveAllListeners();
+        chatInputIF.onValueChanged.RemoveAllListeners();
     }
 
     private void Update()
@@ -132,12 +133,9 @@ public class ChatGUI : MonoBehaviour
             if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Return))
             {
                 isOpen = false;
-                if (showingMessage)
+                if (!showingMessage)
                 {
                     textInputGO.SetActive(isOpen);
-                }
-                else
-                {
                     HidePanel();
                 }
 
@@ -204,12 +202,15 @@ public class ChatGUI : MonoBehaviour
                 whispering = true;
                 lastRecipient = recipient;
 
+                if (localMessage == null || localMessage == string.Empty)
+                    return;
+
                 if (lastRecipient.Contains(" "))
                 {
                     lastRecipient = '"' + lastRecipient + '"';
                 }
 
-                AddMessage(localMessage);
+                AddMessage("<alpha=#50>You (<i>" + recipient + "</i>):</color> <noparse>" + localMessage + "</noparse>");
             }
             else
             {
@@ -246,13 +247,75 @@ public class ChatGUI : MonoBehaviour
         return;
     }
 
+    private void ChatInputChange(string message)
+    {
+        Multiplayer.Log($"ChatInputChange({message})");
+
+        //allow the user to clear text
+        if(Input.GetKeyDown(KeyCode.Backspace) || Input.GetKeyDown(KeyCode.Delete))
+            return;
+        
+        if (CheckForWhisper(message, out string localMessage, out string recipient))
+        {
+            Multiplayer.Log($"ChatInputChange: message: \"{message}\", localMessage: \"{(localMessage == null ? "null" : localMessage)}" +
+                $"\", recipient: \"{(recipient == null ? "null" : recipient)}\"");
+
+            if (localMessage == null || localMessage == string.Empty)
+            {
+                
+                string closestMatch = NetworkLifecycle.Instance.Client.PlayerManager.Players
+                                                .Where(player => player.Username.ToLower().StartsWith(recipient.ToLower()))
+                                                .OrderBy(player => player.Username.Length)
+                                                .ThenByDescending(player => player.Username)
+                                                .ToList()
+                                                .FirstOrDefault().Username;
+
+                /*
+                Multiplayer.Log($"ChatInputChange: closesMatch: {(closestMatch == null? "null" : closestMatch.Username)}");
+
+                
+                if(closestMatch == null)
+                    return;
+
+                bool quoteFlag = false;
+                if (match.Contains(' '))
+                {
+                    match = '"' + match + '"';
+                    quoteFlag = true;
+                }
+
+                Multiplayer.Log($"ChatInput: recipient {recipient}, qF: {quoteFlag}, match: {match}, compare {recipient == closestMatch}");
+                */
+
+                //if we have a match, allow the client to type
+                if (closestMatch == null || recipient == closestMatch)
+                    return;
+
+                //update the textbox
+                chatInputIF.SetTextWithoutNotify("/w " + closestMatch);
+
+                //Multiplayer.Log($"ChatInput: length {chatInputIF.text.Length}, anchor: {"/w ".Length + recipient.Length + (quoteFlag ? 1 : 0)}");
+
+                //select the trailing match chars
+                chatInputIF.caretPosition = chatInputIF.text.Length; // Set caret to end of text
+                //chatInputIF.selectionAnchorPosition = chatInputIF.text.Length - "/w ".Length - recipient.Length - (quoteFlag?1:0) + 1;
+                chatInputIF.selectionAnchorPosition = "/w ".Length + recipient.Length;// + (quoteFlag?1:0);
+                
+
+            }
+        }
+
+    }
+
     private bool CheckForWhisper(string message, out string localMessage, out string recipient)
     {
         recipient = "";
+        localMessage = "";
 
 
-        if (message.StartsWith("/"))
+        if (message.StartsWith("/") && message.Length > (ChatManager.COMMAND_WHISPER_SHORT.Length + 2))
         {
+            Multiplayer.Log("CheckForWhisper() starts with /");
             string command = message.Substring(1).Split(' ')[0];
             switch (command)
             {
@@ -275,26 +338,39 @@ public class ChatGUI : MonoBehaviour
                 return false;
             }
 
+            /*
             //Check if name is in Quotes e.g. '/w "Mr Noname" my message'
             if (localMessage.StartsWith("\""))
             {
+                Multiplayer.Log("CheckForWhisper() starts with \"");
                 int endQuote = localMessage.Substring(1).IndexOf('"');
-                if (endQuote == -1 || endQuote == 0)
+                Multiplayer.Log($"CheckForWhisper() starts with \" - indexOf, eQ: {endQuote}");
+                if (endQuote <=1)
                 {
-                    localMessage = message;
-                    return false;
+                    recipient = localMessage.Substring(1);
+                    localMessage = string.Empty;//message;
+                    return true;
                 }
 
+                Multiplayer.Log("CheckForWhisper() remove quote");
                 recipient = localMessage.Substring(1, endQuote);
                 localMessage = localMessage.Substring(recipient.Length + 3);
             }
             else
             {
-                recipient = localMessage.Split(' ')[0];
+            Multiplayer.Log("CheckForWhisper() no quote");
+            */
+            recipient = localMessage.Split(' ')[0];
+            if (localMessage.Length > (recipient.Length + 2))
+            {
                 localMessage = localMessage.Substring(recipient.Length + 1);
             }
+            else
+            {
+                localMessage = "";
+            }
+            //}
 
-            localMessage = "<alpha=#50>You (<i>" + recipient + "</i>):</color> <noparse>" + localMessage + "</noparse>";
             return true;
         }
 
