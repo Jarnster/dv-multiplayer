@@ -294,6 +294,37 @@ public class NetworkServer : NetworkManager
         }, DeliveryMethod.ReliableUnordered, selfPeer);
     }
 
+    public void SendChat(string message, NetPeer exclude = null)
+    {
+
+        if (exclude != null)
+        {
+            NetworkLifecycle.Instance.Server.SendPacketToAll(new CommonChatPacket
+            {
+                message = message
+            }, DeliveryMethod.ReliableUnordered, exclude);
+        }
+        else
+        {
+            NetworkLifecycle.Instance.Server.SendPacketToAll(new CommonChatPacket
+            {
+                message = message
+            }, DeliveryMethod.ReliableUnordered);
+        }
+    }
+
+    public void SendWhisper(string message, NetPeer recipient)
+    {
+        if(message != null || recipient != null)
+        {
+            NetworkLifecycle.Instance.Server.SendPacket(recipient, new CommonChatPacket
+            {
+                message = message
+            }, DeliveryMethod.ReliableUnordered);
+        }
+
+    }
+
     #endregion
 
     #region Listeners
@@ -415,6 +446,8 @@ public class NetworkServer : NetworkManager
             Guid = serverPlayer.Guid.ToByteArray()
         };
         SendPacketToAll(clientboundPlayerJoinedPacket, DeliveryMethod.ReliableOrdered, peer);
+
+        ChatManager.ServerMessage(serverPlayer.Username + " joined the game", null, peer);
 
         Log($"Client {peer.Id} is ready. Sending world state");
 
@@ -678,13 +711,7 @@ public class NetworkServer : NetworkManager
 
     private void OnCommonChatPacket(CommonChatPacket packet, NetPeer peer)
     {
-
-        if (TryGetServerPlayer(peer, out var player))
-        {
-            packet.message = "<alpha=#50>" + player.Username + ":</color> <noparse>" + packet.message + "</noparse>";
-            SendPacketToAll(packet, DeliveryMethod.ReliableUnordered, peer);
-        }
-
+        ChatManager.ProcessMessage(packet.message,peer);
     }
     #endregion
 }

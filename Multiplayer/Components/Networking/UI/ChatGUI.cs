@@ -8,6 +8,11 @@ using Multiplayer.Networking.Packets.Common;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
+using System.Text.RegularExpressions;
+using DV.Common;
+using System.Collections;
+using CommandTerminal;
+using Multiplayer.Networking.Managers.Server;
 using static System.Net.Mime.MediaTypeNames;
 
 
@@ -18,12 +23,16 @@ namespace Multiplayer.Components.Networking.UI;
 [RequireComponent(typeof(RectTransform))]
 public class ChatGUI : MonoBehaviour
 {
-    private const float PANEL_LEFT_MARGIN = 20f;
-    private const float PANEL_BOTTOM_MARGIN = 50f;
+    private const float PANEL_LEFT_MARGIN = 20f;    //How far to inset the chat window from the left edge of the screen
+    private const float PANEL_BOTTOM_MARGIN = 50f;  //How far to inset the chat window from the bottom of the screen
+    private const float PANEL_FADE_DURATION = 1f;
+    private const float MESSAGE_INSET = 15f;        //How far to inset the message text from the edge of chat the window
 
-    private const float MESSAGE_INSET = 15f;
-    private const int MAX_MESSAGES = 50;
-    private const int MESSAGE_TIMEOUT = 10;
+    private const int MESSAGE_MAX_HISTORY = 50;            //Maximum messages to keep in the queue
+    private const int MESSAGE_TIMEOUT = 10;         //Maximum time to show an incoming message before fade
+    private const int MESSAGE_MAX_LENGTH = 500;     //Maximum length of a single message
+    private const int MESSAGE_RATE_LIMIT = 10;      //Limit how quickly a user can send messages (also enforced server side)
+
 
     private GameObject messagePrefab;
 
@@ -32,6 +41,7 @@ public class ChatGUI : MonoBehaviour
     private TMP_InputField chatInputIF;
     private ScrollRect scrollRect;
     private RectTransform chatPanel;
+    private CanvasGroup canvasGroup;
 
     private GameObject panelGO;
     private GameObject textInputGO;
@@ -45,6 +55,8 @@ public class ChatGUI : MonoBehaviour
 
     private float timeOut;
     private float testTimeOut;
+
+    private GameFeatureFlags.Flag denied;
 
     private void Awake()
     {
@@ -93,7 +105,8 @@ public class ChatGUI : MonoBehaviour
             isOpen = true;              //whole panel is open
             showingMessage = false;     //We don't want to time out
 
-            panelGO.SetActive(isOpen);
+            //panelGO.SetActive(isOpen);
+            ShowPanel();
             textInputGO.SetActive(isOpen);
 
             BlockInput(true);
@@ -107,7 +120,9 @@ public class ChatGUI : MonoBehaviour
             }
             else
             {
-                panelGO.SetActive(isOpen);
+                //panelGO.SetActive(isOpen);
+                HidePanel();
+
             }
 
             BlockInput(false);
@@ -128,11 +143,12 @@ public class ChatGUI : MonoBehaviour
             if (timeOut >= MESSAGE_TIMEOUT)
             {
                 showingMessage = false ;
-                panelGO.SetActive(false);
+                //panelGO.SetActive(false);
+                HidePanel();
             } 
         }
 
-        //testTimeOut += Time.deltaTime;
+        ////testTimeOut += Time.deltaTime;
         //if (testTimeOut >= 60)
         //{
         //    testTimeOut = 0;
@@ -142,20 +158,92 @@ public class ChatGUI : MonoBehaviour
 
     public void Submit(string text)
     {
-        if (text.Trim().Length > 0)
+        text = text.Trim();
+
+        if (text.Length > 0)
         {
+            //Strip any injected formatting
+            text = Regex.Replace(text, "</noparse>", string.Empty, RegexOptions.IgnoreCase);
+
+            //check for whisper
+            if(CheckForWhisper(text, out string localMessage))
+            {
+                AddMessage(localMessage);
+            }
+            else
+            {
+                AddMessage("<alpha=#50>You:</color> <noparse>" + text + "</noparse>");
+            }
+
             //add locally
-            AddMessage("<alpha=#50>You:</color> <noparse>" + text + "</noparse>");
             NetworkLifecycle.Instance.Client.SendChat(text, MessageType.Chat,null);
+
+            //reset any timeouts
+            timeOut = 0;
+            showingMessage = true;
         }
 
         chatInputIF.text = "";
-        timeOut = 0;
-        showingMessage = true;
+
         textInputGO.SetActive(false);
         BlockInput(false);
 
         return;
+    }
+
+    private bool CheckForWhisper(string message, out string localMessage)
+    {
+        string peerName = "";
+
+        if (message.StartsWith("/"))
+        {
+            string command = message.Substring(1).Split(' ')[0];
+            switch (command)
+            {
+                case ChatManager.COMMAND_WHISPER_SHORT:
+                    localMessage = message.Substring(ChatManager.COMMAND_WHISPER_SHORT.Length + 2);
+                    break;
+                case ChatManager.COMMAND_WHISPER:
+                    localMessage = message.Substring(ChatManager.COMMAND_WHISPER.Length + 2);
+                    break;
+
+                //allow messages that are not whispers to go through
+                default:
+                    localMessage = message;
+                    return false;
+            }
+
+            if (localMessage == null || localMessage == string.Empty)
+            { 
+                localMessage = message;
+                return false;
+            }
+
+            //Check if name is in Quotes e.g. '/w "Mr Noname" my message'
+            if (localMessage.StartsWith("\""))
+            {
+                int endQuote = localMessage.Substring(1).IndexOf('"');
+                if (endQuote == -1 || endQuote == 0)
+                {
+                    localMessage = message;
+                    return false;
+                }
+
+                peerName = localMessage.Substring(1, endQuote);
+                localMessage = localMessage.Substring(peerName.Length + 3);
+            }
+            else
+            {
+                peerName = localMessage.Split(' ')[0];
+                localMessage = localMessage.Substring(peerName.Length + 1);
+            }
+
+            localMessage = "<alpha=#50>You (<i>" + peerName + "</i>):</color> <noparse>" + localMessage + "</noparse>";
+            return true;
+        }
+
+        localMessage = message;
+        return false;
     }
 
     public void ReceiveMessage(string message)
@@ -170,12 +258,13 @@ public class ChatGUI : MonoBehaviour
         timeOut = 0;
         showingMessage = true;
 
-        panelGO.SetActive(true);   
+        ShowPanel();
+        //panelGO.SetActive(true);   
     }
 
     private void AddMessage(string text)
     {
-        if (messageList.Count > MAX_MESSAGES)
+        if (messageList.Count > MESSAGE_MAX_HISTORY)
         {
             GameObject.Destroy(messageList[0]);
             messageList.RemoveAt(0);
@@ -184,10 +273,41 @@ public class ChatGUI : MonoBehaviour
         GameObject newMessage = Instantiate(messagePrefab, chatPanel);
         newMessage.GetComponent<TextMeshProUGUI>().text = text;
         messageList.Add(newMessage);
+
+        scrollRect.verticalNormalizedPosition = 0f; //scroll to the bottom - maybe later we need some logic for this?
     }
 
 
     #region UI
+
+
+    public void ShowPanel()
+    {
+        StopCoroutine(FadeOut());
+        panelGO.SetActive(true);
+        canvasGroup.alpha = 1f;
+    }
+
+    public void HidePanel()
+    {
+        StartCoroutine(FadeOut());
+    }
+
+    private IEnumerator FadeOut()
+    {
+        float startAlpha = canvasGroup.alpha;
+        float elapsed = 0f;
+
+        while (elapsed < PANEL_FADE_DURATION)
+        {
+            elapsed += Time.deltaTime;
+            canvasGroup.alpha = Mathf.Lerp(startAlpha, 0f, elapsed / PANEL_FADE_DURATION);
+            yield return null;
+        }
+
+        canvasGroup.alpha = 0f;
+        panelGO.SetActive(false);
+    }
 
     private void SetupOverlay()
     {
@@ -209,6 +329,8 @@ public class ChatGUI : MonoBehaviour
         rectTransform.anchorMax = Vector2.zero;
         rectTransform.pivot = Vector2.zero;
         rectTransform.anchoredPosition = new Vector2(PANEL_LEFT_MARGIN, PANEL_BOTTOM_MARGIN);
+
+        canvasGroup = panelGO.AddComponent<CanvasGroup>(); // Add CanvasGroup for fade effect
     }
 
     private void BuildUI()
@@ -305,10 +427,17 @@ public class ChatGUI : MonoBehaviour
         //Setup input
         chatInputIF = textInputGO.GetComponent<TMP_InputField>();
         chatInputIF.onFocusSelectAll = false;
-        textInputGO.FindChildByName("text [noloc]").GetComponent<TMP_Text>().fontSize = 18;
+        chatInputIF.characterLimit = MESSAGE_MAX_LENGTH;
+        chatInputIF.richText=false;
+
+        //Setup placeholder
         chatInputIF.placeholder.GetComponent<TMP_Text>().richText = false;
         chatInputIF.placeholder.GetComponent<TMP_Text>().text = "Type a message and press Enter!";
-
+        //Setup input renderer
+        TMP_Text chatInputRenderer = textInputGO.FindChildByName("text [noloc]").GetComponent<TMP_Text>();
+        chatInputRenderer.fontSize = 18;
+        chatInputRenderer.richText = false;
+        chatInputRenderer.parseCtrlCharacters = false;
 
 
 
@@ -332,7 +461,7 @@ public class ChatGUI : MonoBehaviour
         //Setup scroll pane
         GameObject viewport = scrollViewGO.FindChildByName("Viewport");
         RectTransform viewportRT = viewport.GetComponent<RectTransform>();
-        ScrollRect scrollRect = scrollViewGO.GetComponent<ScrollRect>(); 
+        scrollRect = scrollViewGO.GetComponent<ScrollRect>(); 
 
         viewportRT.pivot = new Vector2(0.5f, 0.5f);
         viewportRT.anchorMin = Vector2.zero;
@@ -392,8 +521,24 @@ public class ChatGUI : MonoBehaviour
 
     private void BlockInput(bool block)
     {
-        player.Locomotion.inputEnabled = !block;
-        hotbarController.enabled = !block;
+        //player.Locomotion.inputEnabled = !block;
+        //hotbarController.enabled = !block;
+        if (block)
+        {
+            denied = GameFeatureFlags.DeniedFlags;
+
+            GameFeatureFlags.Deny(GameFeatureFlags.Flag.ALL);
+            CursorManager.Instance.RequestCursor(this, true);
+            //InputFocusManager.Instance.TakeKeyboardFocus();
+        }
+        else
+        {
+            GameFeatureFlags.Allow(GameFeatureFlags.Flag.ALL);
+            GameFeatureFlags.Deny(denied);
+            CursorManager.Instance.RequestCursor(this, false);
+
+            //InputFocusManager.Instance.ReleaseKeyboardFocus();
+        }
     }
 
     #endregion
