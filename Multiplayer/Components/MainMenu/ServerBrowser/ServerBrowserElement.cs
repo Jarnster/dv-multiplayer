@@ -28,6 +28,12 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
             goIcon = this.FindChildByName("autosave icon");
             icon = goIcon.GetComponent<Image>();
 
+            //Remove additional components
+            GameObject.Destroy(this.transform.GetComponent<HoverEffect>());
+            GameObject.Destroy(this.transform.GetComponent<MarkEffect>());
+            GameObject.Destroy(this.transform.GetComponent<ClickEffect>());
+            GameObject.Destroy(this.transform.GetComponent<PressEffect>());
+
             // Fix alignment of the player count text relative to the network name text
             Vector3 namePos = networkName.transform.position;
             Vector2 nameSize = networkName.rectTransform.sizeDelta;

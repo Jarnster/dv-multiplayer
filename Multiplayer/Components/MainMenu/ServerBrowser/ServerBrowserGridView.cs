@@ -1,9 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using DV.Common;
 using DV.UI;
 using DV.UIFramework;
 using Multiplayer.Components.MainMenu.ServerBrowser;
@@ -20,17 +15,24 @@ namespace Multiplayer.Components.MainMenu
          
         private void Awake()
         {
-            Debug.Log("serverBrowserGridview Awake");
-
-            this.dummyElementPrefab.SetActive(false);
+            Multiplayer.Log("serverBrowserGridview Awake");
 
             //swap controller
-            this.dummyElementPrefab.SetActive(false);
-            GameObject.Destroy(this.dummyElementPrefab.GetComponent<SaveLoadViewElement>());
-            this.dummyElementPrefab.AddComponent<ServerBrowserElement>();
+            this.viewElementPrefab.SetActive(false);
+            this.dummyElementPrefab = Instantiate(this.viewElementPrefab);
 
+            GameObject.Destroy(this.viewElementPrefab.GetComponent<SaveLoadViewElement>());
+            GameObject.Destroy(this.dummyElementPrefab.GetComponent<SaveLoadViewElement>());
+
+            this.viewElementPrefab.AddComponent<ServerBrowserElement>();
+            this.dummyElementPrefab.AddComponent<ServerBrowserDummyElement>();
+
+            this.viewElementPrefab.name = "prefabServerBrowserElement";
+            this.dummyElementPrefab.name = "prefabServerBrowserDummyElement";
+
+            this.viewElementPrefab.SetActive(true);
             this.dummyElementPrefab.SetActive(true);
-            this.viewElementPrefab = this.dummyElementPrefab;
+
         }
     }
 }

@@ -268,8 +268,9 @@ namespace Multiplayer.Components.MainMenu
             GridviewGO.SetActive(false);
 
             gridView = GridviewGO.AddComponent<ServerBrowserGridView>();
-            gridView.dummyElementPrefab = Instantiate(slgv.viewElementPrefab);
-            gridView.dummyElementPrefab.name = "prefabServerBrowser";
+            slgv.viewElementPrefab.SetActive(false);
+            gridView.viewElementPrefab = Instantiate(slgv.viewElementPrefab);
+            
 
             GameObject.Destroy(slgv);
 
@@ -570,6 +571,15 @@ namespace Multiplayer.Components.MainMenu
                         Debug.Log($"Name: {server.Name}\tIP: {server.ip}");
                     }
 
+                    if (response.Length == 0)
+                    {
+                        gridView.showDummyElement = true;
+                        buttonJoin.ToggleInteractable(false);
+                    }
+                    else
+                    {
+                        gridView.showDummyElement = false;
+                    }
                     gridViewModel.Clear();
                     gridView.SetModel(gridViewModel);
                     gridViewModel.AddRange(response);
@@ -618,7 +628,7 @@ namespace Multiplayer.Components.MainMenu
 
         private void FillDummyServers()
         {
-            //gridView.showDummyElement = true;
+            gridView.showDummyElement = false;
             gridViewModel.Clear();
 
 

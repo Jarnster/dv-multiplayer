@@ -62,6 +62,8 @@ namespace Multiplayer
         private const string SERVER_BROWSER__YES_KEY = $"{PREFIX_SERVER_BROWSER}/yes";
         public static string SERVER_BROWSER__NO => Get(SERVER_BROWSER__NO_KEY);
         private const string SERVER_BROWSER__NO_KEY = $"{PREFIX_SERVER_BROWSER}/no";
+        public static string SERVER_BROWSER__NO_SERVERS => Get(SERVER_BROWSER__NO_SERVERS_KEY);
+        public const string SERVER_BROWSER__NO_SERVERS_KEY = $"{PREFIX_SERVER_BROWSER}/no_servers";
         #endregion
 
         #region Server Host

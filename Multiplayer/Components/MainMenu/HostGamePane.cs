@@ -144,6 +144,12 @@ public class HostGamePane : MonoBehaviour
         titleObj.GetComponentInChildren<Localize>().key = Locale.SERVER_HOST__TITLE_KEY;
         titleObj.GetComponentInChildren<Localize>().UpdateLocalization();
 
+        //update right hand info pane (this will be used later for more settings or information
+        GameObject serverWindowGO = this.FindChildByName("Save Description");
+        GameObject serverDetailsGO = serverWindowGO.FindChildByName("text list [noloc]");
+        serverWindowGO.name = "Host Details";
+        serverDetailsGO.GetComponent<TextMeshProUGUI>().text = "";
+
 
         //Find scrolling viewport
         ScrollRect scroller = this.FindChildByName("Scroll View").GetComponent<ScrollRect>();
@@ -194,7 +200,7 @@ public class HostGamePane : MonoBehaviour
         go.name = "Password";
         password = go.GetComponent<TMP_InputField>();
         password.text = Multiplayer.Settings.Password;
-        password.contentType = TMP_InputField.ContentType.Password;
+        //password.contentType = TMP_InputField.ContentType.Password; //re-introduce later when code for toggling has been implemented
         password.placeholder.GetComponent<TMP_Text>().text = Locale.SERVER_HOST_PASSWORD;
         go.AddComponent<UIElementTooltip>();//.enabledKey = Locale.SERVER_HOST_PASSWORD__TOOLTIP_KEY;
         go.ResetTooltip();
