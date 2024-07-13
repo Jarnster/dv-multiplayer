@@ -74,6 +74,7 @@ public class NetworkServer : NetworkManager
         if (lobbyServerManager != null)
         {
             lobbyServerManager.RemoveFromLobbyServer();
+            GameObject.Destroy(lobbyServerManager);
         }
 
         base.Stop();

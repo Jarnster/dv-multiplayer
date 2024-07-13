@@ -7,39 +7,43 @@ using UnityEngine;
 using UnityEngine.Networking;
 using Multiplayer.Components.Networking;
 using DV.WeatherSystem;
-using DV.UserManagement;
 
 namespace Multiplayer.Networking.Managers.Server;
 public class LobbyServerManager : MonoBehaviour
 {
-    private const int UPDATE_TIME_BUFFER = 10;
-    private const int UPDATE_TIME = 120 - UPDATE_TIME_BUFFER; //how often to update the lobby server
-    private const int PLAYER_CHANGE_TIME = 5; //update server early if the number of players has changed in this time frame
+    //API endpoints
+    private const string ENDPOINT_ADD_SERVER    = "add_game_server";
+    private const string ENDPOINT_UPDATE_SERVER = "update_game_server";
+    private const string ENDPOINT_REMOVE_SERVER = "remove_game_server";
+
+    private const int REDIRECT_MAX = 5;
+
+    private const int UPDATE_TIME_BUFFER = 10;                  //We don't want to miss our update, let's phone in just a little early
+    private const int UPDATE_TIME = 120 - UPDATE_TIME_BUFFER;   //How often to update the lobby server - this should match the lobby server's time-out period
+    private const int PLAYER_CHANGE_TIME = 5;                   //Update server early if the number of players has changed in this time frame
 
     private NetworkServer server;
     public string server_id { get; set; }
     public string private_key { get; set; }
 
     private bool sendUpdates = false;
-
-
     private float timePassed = 0f;
 
     private void Awake()
     {
-        this.server = NetworkLifecycle.Instance.Server;
+        server = NetworkLifecycle.Instance.Server;
 
-        Debug.Log($"LobbyServerManager New({server != null})");
-        Debug.Log($"StartingCoroutine {Multiplayer.Settings.LobbyServerAddress}/add_game_server\")");
-        StartCoroutine(this.RegisterWithLobbyServer($"{Multiplayer.Settings.LobbyServerAddress}/add_game_server"));
+        Multiplayer.Log($"LobbyServerManager New({server != null})");
+        Multiplayer.Log($"StartingCoroutine {Multiplayer.Settings.LobbyServerAddress}/{ENDPOINT_ADD_SERVER}");
+        StartCoroutine(RegisterWithLobbyServer($"{Multiplayer.Settings.LobbyServerAddress}/{ENDPOINT_ADD_SERVER}"));
     }
 
     private void OnDestroy()
     {
-        Debug.Log($"LobbyServerManager OnDestroy()");
+        Multiplayer.Log($"LobbyServerManager OnDestroy()");
         sendUpdates = false;
-        this.StopAllCoroutines();
-        StartCoroutine(this.RemoveFromLobbyServer($"{Multiplayer.Settings.LobbyServerAddress}/remove_game_server"));
+        StopAllCoroutines();
+        StartCoroutine(RemoveFromLobbyServer($"{Multiplayer.Settings.LobbyServerAddress}/{ENDPOINT_REMOVE_SERVER}"));
     }
 
     private void Update()
@@ -48,128 +52,135 @@ public class LobbyServerManager : MonoBehaviour
         {
             timePassed += Time.deltaTime;
 
-            if(timePassed > UPDATE_TIME || (server.serverData.CurrentPlayers != server.PlayerCount && timePassed > PLAYER_CHANGE_TIME)){
+            if (timePassed > UPDATE_TIME || (server.serverData.CurrentPlayers != server.PlayerCount && timePassed > PLAYER_CHANGE_TIME))
+            {
                 timePassed = 0f;
                 server.serverData.CurrentPlayers = server.PlayerCount;
-                StartCoroutine(this.UpdateLobbyServer($"{Multiplayer.Settings.LobbyServerAddress}/update_game_server"));
+                StartCoroutine(UpdateLobbyServer($"{Multiplayer.Settings.LobbyServerAddress}/{ENDPOINT_UPDATE_SERVER}"));
             }
         }
     }
+
     public void RemoveFromLobbyServer()
     {
-        Debug.Log($"RemoveFromLobbyServer OnDestroy()");
+        Multiplayer.Log($"RemoveFromLobbyServer OnDestroy()");
         sendUpdates = false;
-        this.StopAllCoroutines();
-        StartCoroutine(this.RemoveFromLobbyServer($"{Multiplayer.Settings.LobbyServerAddress}/remove_game_server"));
+        StopAllCoroutines();
+        StartCoroutine(RemoveFromLobbyServer($"{Multiplayer.Settings.LobbyServerAddress}/{ENDPOINT_REMOVE_SERVER}"));
     }
 
-
-    IEnumerator RegisterWithLobbyServer(string uri)
+    private IEnumerator RegisterWithLobbyServer(string uri)
     {
-        JsonSerializerSettings jsonSettings = new JsonSerializerSettings();
-        jsonSettings.NullValueHandling = NullValueHandling.Ignore;
-
+        JsonSerializerSettings jsonSettings = new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore };
         string json = JsonConvert.SerializeObject(server.serverData, jsonSettings);
-        Debug.Log($"JsonRequest: {json}");
+        Multiplayer.LogDebug(()=>$"JsonRequest: {json}");
 
-        using (UnityWebRequest webRequest = UnityWebRequest.Post(uri, json))
-        {
-            UploadHandler customUploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
-            customUploadHandler.contentType = "application/json";
-            webRequest.uploadHandler = customUploadHandler;
-
-            // Request and wait for the desired page.
-            yield return webRequest.SendWebRequest();
-
-            string[] pages = uri.Split('/');
-            int page = pages.Length - 1;
-
-            if (webRequest.isNetworkError || webRequest.isHttpError)
+        yield return SendWebRequest(
+            uri,
+            json,
+            webRequest =>
             {
-                Debug.Log(pages[page] + ": Error: " + webRequest.error + "\r\n" + webRequest.downloadHandler.text);
-            }
-            else
-            {
-                Debug.Log(pages[page] + ":\nReceived: " + webRequest.downloadHandler.text);
-
-                LobbyServerResponseData response;
-
-                response = JsonConvert.DeserializeObject<LobbyServerResponseData>(webRequest.downloadHandler.text);
-
+                LobbyServerResponseData response = JsonConvert.DeserializeObject<LobbyServerResponseData>(webRequest.downloadHandler.text);
                 if (response != null)
                 {
-                    this.private_key = response.private_key;
-                    this.server_id = response.game_server_id;
-                    this.sendUpdates = true;
+                    private_key = response.private_key;
+                    server_id = response.game_server_id;
+                    sendUpdates = true;
                 }
-            }
-        }
+            },
+            webRequest => Multiplayer.LogError("Failed to register with lobby server")
+        );
     }
 
-    IEnumerator RemoveFromLobbyServer(string uri)
+    private IEnumerator RemoveFromLobbyServer(string uri)
     {
-        JsonSerializerSettings jsonSettings = new JsonSerializerSettings();
-        jsonSettings.NullValueHandling = NullValueHandling.Ignore;
+        JsonSerializerSettings jsonSettings = new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore };
+        string json = JsonConvert.SerializeObject(new LobbyServerResponseData(server_id, private_key), jsonSettings);
+        Multiplayer.LogDebug(() => $"JsonRequest: {json}");
 
-        string json = JsonConvert.SerializeObject(new LobbyServerResponseData(this.server_id, this.private_key), jsonSettings);
-        Debug.Log($"JsonRequest: {json}");
-
-        using (UnityWebRequest webRequest = UnityWebRequest.Post(uri, json))
-        {
-            UploadHandler customUploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
-            customUploadHandler.contentType = "application/json";
-            webRequest.uploadHandler = customUploadHandler;
-
-            // Request and wait for the desired page.
-            yield return webRequest.SendWebRequest();
-
-            string[] pages = uri.Split('/');
-            int page = pages.Length - 1;
-
-            if (webRequest.isNetworkError || webRequest.isHttpError)
-            {
-                Debug.Log(pages[page] + ": Error: " + webRequest.error + "\r\n" + webRequest.downloadHandler.text);
-            }
-            else
-            {
-                Debug.Log(pages[page] + ":\nReceived: " + webRequest.downloadHandler.text);
-            }
-        }
+        yield return SendWebRequest(
+            uri,
+            json,
+            webRequest => Multiplayer.Log("Successfully removed from lobby server"),
+            webRequest => Multiplayer.LogError("Failed to remove from lobby server")
+        );
     }
 
-    IEnumerator UpdateLobbyServer(string uri)
+    private IEnumerator UpdateLobbyServer(string uri)
     {
-        JsonSerializerSettings jsonSettings = new JsonSerializerSettings();
-        jsonSettings.NullValueHandling = NullValueHandling.Ignore;
+        JsonSerializerSettings jsonSettings = new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore };
 
         DateTime start = AStartGameData.BaseTimeAndDate;
         DateTime current = WeatherDriver.Instance.manager.DateTime;
-
         TimeSpan inGame = current - start;
-        
 
-        string json = JsonConvert.SerializeObject(new LobbyServerUpdateData(this.server_id, this.private_key, inGame.ToString("d\\d\\ hh\\h\\ mm\\m\\ ss\\s"), server.serverData.CurrentPlayers), jsonSettings);
-        Debug.Log($"UpdateLobbyServer JsonRequest: {json}");
+        string json = JsonConvert.SerializeObject(new LobbyServerUpdateData(
+                                                                                server_id,
+                                                                                private_key,
+                                                                                inGame.ToString("d\\d\\ hh\\h\\ mm\\m\\ ss\\s"),
+                                                                                server.serverData.CurrentPlayers),
+                                                                                jsonSettings
+                                                                            );
+        Multiplayer.LogDebug(() => $"UpdateLobbyServer JsonRequest: {json}");
+
+        yield return SendWebRequest(
+            uri,
+            json,
+            webRequest => Multiplayer.Log("Successfully updated lobby server"),
+            webRequest =>
+            {
+                Multiplayer.LogError("Failed to update lobby server, attempting to re-register");
+
+                //cleanup
+                sendUpdates = false;
+                private_key = null;
+                server_id = null;
+
+                //Attempt to re-register
+                StartCoroutine(RegisterWithLobbyServer($"{Multiplayer.Settings.LobbyServerAddress}/{ENDPOINT_ADD_SERVER}"));
+            }
+        );
+    }
+    private IEnumerator SendWebRequest(string uri, string json, Action<UnityWebRequest> onSuccess, Action<UnityWebRequest> onError, int depth=0)
+    {
+        if (depth > REDIRECT_MAX)
+        {
+            Multiplayer.LogError($"Reached maximum redirects: {uri}");
+            yield break;
+        }
 
         using (UnityWebRequest webRequest = UnityWebRequest.Post(uri, json))
         {
-            UploadHandler customUploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json));
-            customUploadHandler.contentType = "application/json";
-            webRequest.uploadHandler = customUploadHandler;
+            webRequest.redirectLimit = 0;
 
-            // Request and wait for the desired page.
+            webRequest.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json)){contentType = "application/json"};
+            webRequest.downloadHandler = new DownloadHandlerBuffer();
+
             yield return webRequest.SendWebRequest();
 
-            string[] pages = uri.Split('/');
-            int page = pages.Length - 1;
-
-            if (webRequest.isNetworkError || webRequest.isHttpError)
+            //check for redirect
+            if (webRequest.responseCode >= 300 && webRequest.responseCode < 400)
             {
-                Debug.Log(pages[page] + ": Error: " + webRequest.error + "\r\n" + webRequest.downloadHandler.text);
+                string redirectUrl = webRequest.GetResponseHeader("Location");
+                Multiplayer.LogWarning($"Lobby Server redirected, check address is up to date: '{redirectUrl}'");
+
+                if (redirectUrl != null && redirectUrl.StartsWith("https://") && redirectUrl.Replace("https://", "http://") == uri)
+                {
+                    yield return SendWebRequest(redirectUrl, json, onSuccess, onError, ++depth);
+                }
             }
             else
             {
-                Debug.Log(pages[page] + ":\nReceived: " + webRequest.downloadHandler.text);
+                if (webRequest.isNetworkError || webRequest.isHttpError)
+                {
+                    Multiplayer.LogError($"Error: {webRequest.error}\r\n{webRequest.downloadHandler.text}");
+                    onError?.Invoke(webRequest);
+                }
+                else
+                {
+                    Multiplayer.Log($"Received: {webRequest.downloadHandler.text}");
+                    onSuccess?.Invoke(webRequest);
+                }
             }
         }
     }
