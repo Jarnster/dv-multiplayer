@@ -17,7 +17,7 @@ namespace Multiplayer.Utils
         {
             // Split the input data into lines
             string[] separators = new string[] { "\r\n", "\n" };
-            string[] lines = data.Split(separators, StringSplitOptions.None);
+            string[] lines = data.Split(separators, StringSplitOptions.RemoveEmptyEntries);
 
             // Use an OrderedDictionary to preserve the insertion order of keys
             var columns = new OrderedDictionary();
@@ -31,7 +31,6 @@ namespace Multiplayer.Utils
             }
 
             // Iterate through the remaining lines (rows)
-
             for (int i = 1; i < lines.Length; i++)
             {
                 string line = lines[i];
@@ -41,13 +40,6 @@ namespace Multiplayer.Utils
                     continue;
 
                 string rowKey = values[0];
-              
-               //ensure we don't have too many
-                if (values.Count > columns.Count)
-                {
-                    Multiplayer.LogWarning($"CSV Line {i + 1}: Found {values.Count} columns, expected {columns.Count}\r\n\t{line}");
-                    continue;
-                }
 
                 // Add the row values to the appropriate column dictionaries
                 for (int j = 0; j < values.Count && j < keys.Count; j++)
@@ -75,7 +67,6 @@ namespace Multiplayer.Utils
             List<string> values = new();
             StringBuilder builder = new();
 
-            // Helper method to add the current value to the list and reset the builder
             void FinishValue()
             {
                 values.Add(builder.ToString());
@@ -151,10 +142,11 @@ namespace Multiplayer.Utils
                         result.Append(',');
                     }
                 }
+
                 result.Remove(result.Length - 1, 1);
                 result.Append('\n');
             }
-          
+
             return result.ToString();
         }
     }
