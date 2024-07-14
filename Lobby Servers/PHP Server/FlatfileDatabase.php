@@ -28,7 +28,8 @@ class FlatfileDatabase implements DatabaseInterface {
         
         return json_encode([
             "game_server_id" => $data['game_server_id'],
-            "private_key" => $data['private_key']
+            "private_key" => $data['private_key'],
+            "ipv4_request" => !isset($data['ipv4'])
         ]);
     }
 
@@ -41,6 +42,11 @@ class FlatfileDatabase implements DatabaseInterface {
                 $server['current_players'] = $data['current_players'];
                 $server['time_passed'] = $data['time_passed'];
                 $server['last_update'] = time(); // Update with current time
+                
+                if(isset($data['ipv4']) && filter_var($data['ipv4'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4) && (!isset($server['ipv4']) || $server['ipv4'] === '')){
+                    $server['ipv4']  = $data['ipv4'];
+                }
+
                 $updated = true;
                 break;
             }
@@ -84,8 +90,6 @@ class FlatfileDatabase implements DatabaseInterface {
         return json_encode($active_servers);
     }
     
-    
-
     public function getGameServer($game_server_id) {
         $servers = $this->readData();
         foreach ($servers as $server) {

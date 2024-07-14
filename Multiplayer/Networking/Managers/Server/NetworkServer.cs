@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net;
 using DV;
 using DV.InventorySystem;
 using DV.Logic.Job;
@@ -29,7 +28,6 @@ using Multiplayer.Networking.Packets.Serverbound;
 using Multiplayer.Utils;
 using UnityEngine;
 using UnityModManagerNet;
-using Unity.Jobs;
 
 namespace Multiplayer.Networking.Listeners;
 
@@ -519,6 +517,7 @@ public class NetworkServer : NetworkManager
             SendPacket(peer, ClientboundSpawnTrainSetPacket.FromTrainSet(set), DeliveryMethod.ReliableOrdered);
         }
 
+        /* Temp for stable release
         //send jobs - do we need a job manager/job IDs to make this easier?
         foreach(StationController station in StationController.allStations)
         {
@@ -541,7 +540,7 @@ public class NetworkServer : NetworkManager
                         DeliveryMethod.ReliableOrdered
                     );
                 
-        }
+        }*/
 
 
         // Send existing players
@@ -781,8 +780,10 @@ public class NetworkServer : NetworkManager
             LicenseManager.Instance.AcquireGeneralLicense(generalLicense);
     }
 
+
     private void OnServerboundJobTakeRequestPacket(ServerboundJobTakeRequestPacket packet, NetPeer peer)
     {
+        /* Temp for stable release
         NetworkedJob networkedJob;
 
         if (!NetworkedJob.Get(packet.netId, out networkedJob))
@@ -813,6 +814,7 @@ public class NetworkServer : NetworkManager
             SendPacket(peer, new ClientboundJobTakeResponsePacket { netId = packet.netId, granted = true, playerId = player.Id }, DeliveryMethod.ReliableOrdered);
 
         }
+        */
     }
 
     private void OnCommonChatPacket(CommonChatPacket packet, NetPeer peer)

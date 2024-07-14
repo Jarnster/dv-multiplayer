@@ -12,7 +12,7 @@ using System.Collections;
 using Unity.Jobs;
 using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
-
+/* Temp for stable release
 namespace Multiplayer.Patches.Jobs;
 //public void HandleUse(ItemUseTarget target)
 [HarmonyPatch(typeof(JobOverviewUse), nameof(JobOverviewUse.HandleUse))]
@@ -64,3 +64,4 @@ public static class JobOverviewUse_HandleUse_Patch
     }
 }
 
+*/

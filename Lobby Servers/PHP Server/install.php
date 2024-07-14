@@ -27,7 +27,8 @@ try {
     CREATE TABLE IF NOT EXISTS game_servers (
         game_server_id VARCHAR(50) PRIMARY KEY,
         private_key VARCHAR(255) NOT NULL,
-        ip VARCHAR(45) NOT NULL,
+        ipv4 VARCHAR(45) NOT NULL,
+        ipv6 VARCHAR(45) NOT NULL,
         port INT NOT NULL,
         server_name VARCHAR(100) NOT NULL,
         password_protected BOOLEAN NOT NULL,

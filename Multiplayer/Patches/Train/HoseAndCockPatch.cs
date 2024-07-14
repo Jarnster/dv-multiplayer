@@ -13,8 +13,12 @@ public static class HoseAndCock_SetCock_Patch
     {
         if (UnloadWatcher.isUnloading || NetworkLifecycle.Instance.IsProcessingPacket)
             return;
+
         Coupler coupler = NetworkedTrainCar.GetCoupler(__instance);
-        NetworkedTrainCar networkedTrainCar = coupler.train.Networked();
+
+        if (coupler == null || !coupler.train.TryNetworked(out NetworkedTrainCar networkedTrainCar))
+            return;
+
         if (networkedTrainCar.IsDestroying)
             return;
         NetworkLifecycle.Instance.Client?.SendCockState(networkedTrainCar.NetId, coupler, open);

@@ -43,10 +43,10 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         return hoseToCoupler[hoseAndCock];
     }
 
-    public static NetworkedTrainCar GetFromTrainCar(TrainCar trainCar)
-    {
-        return trainCarsToNetworkedTrainCars[trainCar];
-    }
+    //public static NetworkedTrainCar GetFromTrainCar(TrainCar trainCar)
+    //{
+    //    return trainCarsToNetworkedTrainCars[trainCar];
+    //}
     public static bool GetFromTrainId(string carId, out NetworkedTrainCar networkedTrainCar)
     {
         return trainCarIdToNetworkedTrainCars.TryGetValue(carId, out networkedTrainCar);

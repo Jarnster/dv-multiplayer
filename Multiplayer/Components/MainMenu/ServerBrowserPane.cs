@@ -15,7 +15,6 @@ using UnityEngine.Networking;
 using System.Linq;
 using Multiplayer.Networking.Data;
 using DV;
-using Multiplayer.Components.Networking.UI;
 using System.Net;
 
 namespace Multiplayer.Components.MainMenu

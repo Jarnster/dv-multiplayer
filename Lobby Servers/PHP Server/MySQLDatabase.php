@@ -10,12 +10,13 @@ class MySQLDatabase implements DatabaseInterface {
     }
 
     public function addGameServer($data) {
-        $stmt = $this->pdo->prepare("INSERT INTO game_servers (game_server_id, private_key, ip, port, server_name, password_protected, game_mode, difficulty, time_passed, current_players, max_players, required_mods, game_version, multiplayer_version, server_info, last_update) 
+        $stmt = $this->pdo->prepare("INSERT INTO game_servers (game_server_id, private_key, ipv4, ipv6, port, server_name, password_protected, game_mode, difficulty, time_passed, current_players, max_players, required_mods, game_version, multiplayer_version, server_info, last_update) 
                                      VALUES (:game_server_id, :private_key, :ip, :port, :server_name, :password_protected, :game_mode, :difficulty, :time_passed, :current_players, :max_players, :required_mods, :game_version, :multiplayer_version, :server_info, :last_update)");
         $stmt->execute([
             ':game_server_id' => $data['game_server_id'],
             ':private_key' => $data['private_key'],
-            ':ip' => $data['ip'],
+            ':ipv4' => isset($data['ipv4']) ? $data['ipv4'] : '',
+            ':ipv6' => isset($data['ipv6']) ? $data['ipv6'] : '',
             ':port' => $data['port'],
             ':server_name' => $data['server_name'],
             ':password_protected' => $data['password_protected'],
@@ -32,7 +33,8 @@ class MySQLDatabase implements DatabaseInterface {
         ]);
         return json_encode([
             "game_server_id" => $data['game_server_id'],
-            "private_key" => $data['private_key']
+            "private_key" => $data['private_key'],
+            "ipv4_request" => !isset($data['ipv4'])
         ]);
     }
 

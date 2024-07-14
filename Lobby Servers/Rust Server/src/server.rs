@@ -2,7 +2,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Serialize, Deserialize, Clone)]
 pub struct ServerInfo {
-    pub ip: String,
+    pub ipv4: String,
+    pub ipv6: String,
     pub port: u16,
     pub server_name: String,
     pub password_protected: bool,
@@ -43,6 +44,7 @@ pub struct PublicServerInfo {
 pub struct AddServerResponse {
     pub game_server_id: String,
     pub private_key: String,
+    pub ipv4_request: bool,
 }
 
 pub fn validate_server_info(info: &ServerInfo) -> Result<(), &'static str> {

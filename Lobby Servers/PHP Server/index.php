@@ -46,23 +46,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 function add_game_server($db, $data) {
     if (!validate_server_info($data)) {
-        http_response_code(500);
         return json_encode(["error" => "Invalid server information"]);
     }
 
-    if (!isset($data['ip']) || !filter_var($data['ip'], FILTER_VALIDATE_IP)) {
-        $data['ip'] = $_SERVER['REMOTE_ADDR'];
+    if(filter_var($_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)){
+        $data['ipv4'] = $_SERVER['REMOTE_ADDR'];
+    }elseif(filter_var($_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)){
+        $data['ipv6'] = $_SERVER['REMOTE_ADDR'];
     }
 
     $data['game_server_id'] = uuid_create();
     $data['private_key'] = generate_private_key();
 
-    return $db->addGameServer($data);
+    
+    return $response = $db->addGameServer($data);
 }
 
 function update_game_server($db, $data) {
     if (!validate_server_update($db, $data)) {
-        http_response_code(500);
         return json_encode(["error" => "Invalid game server ID or private key"]);
     }
 
@@ -72,7 +73,6 @@ function update_game_server($db, $data) {
 
 function remove_game_server($db, $data) {
     if (!validate_server_update($db, $data)) {
-        http_response_code(500);
         return json_encode(["error" => "Invalid game server ID or private key"]);
     }
 
@@ -81,10 +81,34 @@ function remove_game_server($db, $data) {
 
 function list_game_servers($db) {
     $servers = json_decode($db->listGameServers(), true);
+
     // Remove private keys from the servers before returning
+    // and select the correct protocol version for the requestor
     foreach ($servers as &$server) {
         unset($server['private_key']);
         unset($server['last_update']);
+
+        if(filter_var($_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)){
+            if(!isset($server['ipv4'])){
+                $server['ip'] = '';
+            }else{
+                $server['ip'] = $server['ipv4'];
+            }
+            
+            unset($server['ipv4']);
+            unset($server['ipv6']);
+
+        }elseif(filter_var($_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)){
+            if(!isset($server['ipv6'])){
+                $server['ip'] = $server['ipv4'];
+            }else{
+                $server['ip'] = $server['ipv6'];
+                unset($server['ipv6']);
+            }
+
+            unset($server['ipv4']);
+            unset($server['ipv6']); 
+        }
     }
     return json_encode($servers);
 }

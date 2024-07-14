@@ -3,6 +3,7 @@ using DV;
 using DV.InventorySystem;
 using HarmonyLib;
 using Multiplayer.Components.Networking;
+using Multiplayer.Components.Networking.Train;
 using Multiplayer.Utils;
 using UnityEngine;
 
@@ -21,7 +22,8 @@ public static class CommsRadioCarDeleterPatch
             return true;
         if (Inventory.Instance.PlayerMoney < __instance.removePrice)
             return true;
-        if (__instance.carToDelete.Networked().HasPlayers)
+
+        if (__instance.carToDelete.TryNetworked(out NetworkedTrainCar networkedTrainCar) && networkedTrainCar.HasPlayers)
         {
             CommsRadioController.PlayAudioFromRadio(__instance.cancelSound, __instance.transform);
             __instance.ClearFlags();
@@ -57,7 +59,7 @@ public static class CommsRadioCarDeleterPatch
         if (!Physics.Raycast(__instance.signalOrigin.position, __instance.signalOrigin.forward, out __instance.hit, CommsRadioCarDeleter.SIGNAL_RANGE, __instance.trainCarMask))
             return true;
         TrainCar car = TrainCar.Resolve(__instance.hit.transform.root);
-        if (car != null && !car.Networked().HasPlayers)
+        if (car != null && car.TryNetworked(out NetworkedTrainCar networkedTrainCar) && !networkedTrainCar.HasPlayers)
             return true;
         __instance.PointToCar(null);
         return false;

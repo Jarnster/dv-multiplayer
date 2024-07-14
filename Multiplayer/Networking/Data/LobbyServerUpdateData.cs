@@ -1,10 +1,5 @@
-using Multiplayer.Components.MainMenu;
 using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+
 
 namespace Multiplayer.Networking.Data
 {
@@ -21,13 +16,16 @@ namespace Multiplayer.Networking.Data
         [JsonProperty("current_players")]
         public int CurrentPlayers { get; set; }
 
+        [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+        public string ipv4 { get; set; }
 
-        public LobbyServerUpdateData(string game_server_id, string private_key, string timePassed,int currentPlayers)
+        public LobbyServerUpdateData(string game_server_id, string private_key, string timePassed,int currentPlayers, string ipv4 = null)
         {
             this.game_server_id = game_server_id;
             this.private_key = private_key;
             this.TimePassed = timePassed;
             this.CurrentPlayers = currentPlayers;
+            this.ipv4 = ipv4;
         }
 
 

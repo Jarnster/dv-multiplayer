@@ -3,6 +3,7 @@ using DV;
 using DV.InventorySystem;
 using HarmonyLib;
 using Multiplayer.Components.Networking;
+using Multiplayer.Components.Networking.Train;
 using Multiplayer.Components.Networking.World;
 using Multiplayer.Utils;
 using UnityEngine;
@@ -57,7 +58,7 @@ public static class RerailControllerPatch
         if (!Physics.Raycast(__instance.signalOrigin.position, __instance.signalOrigin.forward, out __instance.hit, RerailController.SIGNAL_RANGE, __instance.trainCarMask))
             return true;
         TrainCar car = TrainCar.Resolve(__instance.hit.transform.root);
-        if (car != null && car.IsRerailAllowed && !car.Networked().HasPlayers)
+        if (car != null && car.IsRerailAllowed && car.TryNetworked(out NetworkedTrainCar networkedTrainCar) && !networkedTrainCar.HasPlayers)
             return true;
         __instance.PointToCar(null);
         return false;

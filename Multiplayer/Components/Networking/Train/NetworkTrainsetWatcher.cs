@@ -71,14 +71,14 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
         for (int i = 0; i < set.cars.Count; i++)
         {
             TrainCar trainCar = set.cars[i];
-            if (!trainCar.TryNetworked(out NetworkedTrainCar _))
+            if (!trainCar.TryNetworked(out NetworkedTrainCar networkedTrainCar))
             {
                 Multiplayer.LogDebug(() => $"TrainCar UNKNOWN is not networked! Is active? {trainCar.gameObject.activeInHierarchy}");
                 Multiplayer.LogDebug(() => $"TrainCar {trainCar.ID} is not networked! Is active? {trainCar.gameObject.activeInHierarchy}");
                 continue;
             }
 
-            NetworkedTrainCar networkedTrainCar = trainCar.Networked();
+            //NetworkedTrainCar networkedTrainCar = trainCar.Networked();
             anyTracksDirty |= networkedTrainCar.BogieTracksDirty;
 
             if (trainCar.derailed)
@@ -117,7 +117,10 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
         }
 
         for (int i = 0; i < packet.TrainsetParts.Length; i++)
-            set.cars[i].Networked().Client_ReceiveTrainPhysicsUpdate(in packet.TrainsetParts[i], packet.Tick);
+        {
+            if(set.cars[i].TryNetworked(out NetworkedTrainCar networkedTrainCar))
+                networkedTrainCar.Client_ReceiveTrainPhysicsUpdate(in packet.TrainsetParts[i], packet.Tick);
+        }
     }
 
     #endregion

@@ -37,15 +37,14 @@ The difficulty field in the request body for adding a game server must be one of
 - **Request Body:**
   ```json
   {
-      "ip": "string",
-      "port": "integer",
+    "port": "integer",
 	  "server_name": "string",
-      "password_protected": "boolean",
+    "password_protected": "boolean",
 	  "game_mode": "integer",
 	  "difficulty": "integer",
 	  "time_passed": "string",
-      "current_players": "integer",
-      "max_players": "integer",
+    "current_players": "integer",
+    "max_players": "integer",
 	  "required_mods": "string",
 	  "game_version": "string",
 	  "multiplayer_version": "string",
@@ -53,7 +52,6 @@ The difficulty field in the request body for adding a game server must be one of
   }
   ```
 	- **Fields:**
-		- ip (optional string): The IP address of the game server. If not supplied, the requestor's IP shall be used.
 		- port (integer): The port number of the game server.
 		- server_name (string): The name of the game server (maximum 25 characters).
 		- password_protected (boolean): Indicates if the server is password-protected.
@@ -73,12 +71,14 @@ The difficulty field in the request body for adding a game server must be one of
     - **Content:** 
       ```json
 	  {
-	      "game_server_id": "string",
-		  "private_key": "string"
+	    "game_server_id": "string",
+		  "private_key": "string",
+      "ipv4_request": "bool"
 	  }
 	  ```
 		- game_server_id (string): A GUID assigned to the game server. This GUID uniquely identifies the game server and is used when updating the lobby server.
 		- private_key (string): A shared secret between the lobby server and the game server. Must be supplied when updating the lobby server.
+    - ipv4_request (bool): A request to provide an IPV4 address. If `true`, the game server's IPV4 address should be provided via a call to the Update Server end point.
   - **Error:**
     - **Code:** 500 Internal Server Error
     - **Content:** `"Failed to add server"`
@@ -91,17 +91,19 @@ The difficulty field in the request body for adding a game server must be one of
 - **Request Body:**
   ```json
   {
-      "game_server_id": "string",
+    "game_server_id": "string",
 	  "private_key": "string",
-      "current_players": "integer",
-	  "time_passed": "string"
+    "current_players": "integer",
+	  "time_passed": "string",
+    "ipv4": "string"
   }
   ```
-  	- **Fields:**
+  - **Fields:**
 		- game_server_id (string): The GUID assigned to the game server (returned from `add_game_server`).
 		- private_key (string): The shared secret between the lobby server and the game server (returned from `add_game_server`).
 		- current_players (integer): The current number of players on the server (0 - max_players).
 		- time_passed (string): The in-game time passed since the game/session was started.
+    - ipv4 (optional string): The game server's public IPV4 address (if exists). Only provide if `ipv4_request` is `true`.
 - **Response:**
   - **Success:**
     - **Code:** 200 OK
@@ -122,7 +124,7 @@ The difficulty field in the request body for adding a game server must be one of
 	  "private_key": "string"
   }
   ```
-   	- **Fields:**
+  - **Fields:**
 		- game_server_id (string): The GUID assigned to the game server (returned from `add_game_server`).
 		- private_key (string): The shared secret between the lobby server and the game server (returned from `add_game_server`).
 - **Response:**
@@ -151,17 +153,36 @@ The difficulty field in the request body for adding a game server must be one of
 			  "password_protected": "boolean",
 			  "game_mode": "integer",
 			  "difficulty": "integer",
-			  "time_passed": "string"
+			  "time_passed": "string",
 			  "current_players": "integer",
 			  "max_players": "integer",
 			  "required_mods": "string",
 			  "game_version": "string",
 			  "multiplayer_version": "string",
-			  "server_info": "string"
+			  "server_info": "string",
+        "game_server_id": "string"
           },
           ...
       ]
       ```
+      - **Fields:**
+        - ip (string): The IP address of the game server.
+          Note: if the server has both an IPV4 and IPV6, the returned IP will depend on the IP version of the requestor.
+          If the end point request is made using IPV4 and the game server does not have an IPV4 address, the server will return an empty string.
+          If the end point request is made using IPV6 and the game server does not have an IPV6 address, the server will return an IPV4 address.
+        - port (integer): The port number of the game server.
+        - server_name (string): The name of the game server (maximum 25 characters).
+        - password_protected (boolean): Indicates if the server is password-protected.
+        - game_mode (integer): The game mode (see [Game Modes](#game-modes)).
+        - difficulty (integer): The difficulty level (see [Difficulty Levels](#difficulty-levels)).
+        - time_passed (string): The in-game time passed since the game/session was started.
+        - current_players (integer): The current number of players on the server (0 - max_players).
+        - max_players (integer): The maximum number of players allowed on the server (>= 1).
+        - required_mods (string): The required mods for the server, supplied as a JSON string.
+        - game_version (string): The game version the server is running.
+        - multiplayer_version (string): The Multiplayer Mod version the server is running.
+        - server_info (string): Additional information about the server (maximum 500 characters).
+        - game_server_id (string): The GUID assigned to the game server.
   - **Error:**
     - **Code:** 500 Internal Server Error
     - **Content:** `"Failed to retrieve servers"`
@@ -172,12 +193,12 @@ The difficulty field in the request body for adding a game server must be one of
 Example request:
 ```bash
 curl -X POST -H "Content-Type: application/json" -d '{
-    "ip": "127.0.0.1",
-    "port": 7777,
+  "ip": "127.0.0.1",
+  "port": 7777,
 	"server_name": "My Derail Valley Server",
-    "password_protected": false,
-    "current_players": 1,
-    "max_players": 10,
+  "password_protected": false,
+  "current_players": 1,
+  "max_players": 10,
 	"game_mode": 0,
 	"difficulty": 0,
 	"time_passed": "0d 10h 45m 12s",
@@ -199,10 +220,10 @@ Example response:
 Example request:
 ```bash
 curl -X POST -H "Content-Type: application/json" -d '{
-    "game_server_id": "0e1759fd-ba6e-4476-ace2-f173af9db342",
+  "game_server_id": "0e1759fd-ba6e-4476-ace2-f173af9db342",
 	"private_key": "6fca6e1499dab0358f79dc0b251b4e23",
-    "current_players": 2,
-    "time_passed": "0d 10h 47m 12s"
+  "current_players": 2,
+  "time_passed": "0d 10h 47m 12s"
 }' http://<lobby-server-address>/update_game_server
 ```
 Example response:
@@ -215,7 +236,7 @@ Example response:
 Example request:
 ```bash
 curl -X POST -H "Content-Type: application/json" -d '{
-    "game_server_id": "0e1759fd-ba6e-4476-ace2-f173af9db342",
+  "game_server_id": "0e1759fd-ba6e-4476-ace2-f173af9db342",
 	"private_key": "6fca6e1499dab0358f79dc0b251b4e23"
 }' http://<lobby-server-address>/remove_game_server
 ```

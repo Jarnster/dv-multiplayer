@@ -118,9 +118,9 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundLicenseAcquiredPacket>(OnClientboundLicenseAcquiredPacket);
         netPacketProcessor.SubscribeReusable<ClientboundGarageUnlockPacket>(OnClientboundGarageUnlockPacket);
         netPacketProcessor.SubscribeReusable<ClientboundDebtStatusPacket>(OnClientboundDebtStatusPacket);
-        netPacketProcessor.SubscribeReusable<ClientboundJobsPacket>(OnClientboundJobsPacket);
-        netPacketProcessor.SubscribeReusable<ClientboundJobCreatePacket>(OnClientboundJobCreatePacket);
-        netPacketProcessor.SubscribeReusable<ClientboundJobTakeResponsePacket>(OnClientboundJobTakeResponsePacket);
+        //netPacketProcessor.SubscribeReusable<ClientboundJobsPacket>(OnClientboundJobsPacket);
+        //netPacketProcessor.SubscribeReusable<ClientboundJobCreatePacket>(OnClientboundJobCreatePacket);
+        //netPacketProcessor.SubscribeReusable<ClientboundJobTakeResponsePacket>(OnClientboundJobTakeResponsePacket);
         netPacketProcessor.SubscribeReusable<CommonChatPacket>(OnCommonChatPacket);
     }
 
@@ -624,6 +624,7 @@ public class NetworkClient : NetworkManager
         chatGUI.ReceiveMessage(packet.message);
     }
 
+    /* Temp for stable release
     private void OnClientboundJobCreatePacket(ClientboundJobCreatePacket packet)
     {
         if (NetworkLifecycle.Instance.IsHost())
@@ -732,7 +733,7 @@ public class NetworkClient : NetworkManager
         networkedJob.jobValidator = null;
         networkedJob.jobOverview = null;
     }
-
+    */
     #endregion
 
     #region Senders
@@ -951,6 +952,7 @@ public class NetworkClient : NetworkManager
         }, DeliveryMethod.ReliableUnordered);
     }
 
+    /* Temp for stable release
     public void SendJobTakeRequest(ushort netId)
     {
         SendPacketToServer(new ServerboundJobTakeRequestPacket
@@ -958,7 +960,7 @@ public class NetworkClient : NetworkManager
             netId = netId
         }, DeliveryMethod.ReliableUnordered);
     }
-
+*/
     public void SendChat(string message)
     {
         SendPacketToServer(new CommonChatPacket

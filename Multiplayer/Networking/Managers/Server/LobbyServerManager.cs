@@ -7,6 +7,7 @@ using UnityEngine;
 using UnityEngine.Networking;
 using Multiplayer.Components.Networking;
 using DV.WeatherSystem;
+using System.Text.RegularExpressions;
 
 namespace Multiplayer.Networking.Managers.Server;
 public class LobbyServerManager : MonoBehaviour
@@ -16,6 +17,9 @@ public class LobbyServerManager : MonoBehaviour
     private const string ENDPOINT_UPDATE_SERVER = "update_game_server";
     private const string ENDPOINT_REMOVE_SERVER = "remove_game_server";
 
+    //RegEx
+    private readonly Regex IPv4Match = new Regex(@"\b(?:(?:2[0-5]{2}|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:2[0-5]{2}|1[0-9]{2}|[1-9]?[0-9])\b");
+
     private const int REDIRECT_MAX = 5;
 
     private const int UPDATE_TIME_BUFFER = 10;                  //We don't want to miss our update, let's phone in just a little early
@@ -23,8 +27,11 @@ public class LobbyServerManager : MonoBehaviour
     private const int PLAYER_CHANGE_TIME = 5;                   //Update server early if the number of players has changed in this time frame
 
     private NetworkServer server;
-    public string server_id { get; set; }
-    public string private_key { get; set; }
+    private string server_id { get; set; }
+    private string private_key { get; set; }
+    private string myIPv4 { get; set; }
+    private bool updateIPv4 { get; set; } = false;
+    
 
     private bool sendUpdates = false;
     private float timePassed = 0f;
@@ -85,6 +92,14 @@ public class LobbyServerManager : MonoBehaviour
                 {
                     private_key = response.private_key;
                     server_id = response.game_server_id;
+
+                    //Check if we are using IPv6 to talk to the lobby server
+                    if(response.ipv4_request == true)
+                    {
+                        //We are using IPv6, so now we will need to make a request to an IPv4 service, then update the lobby server with our IPv4 IP
+                        StartCoroutine(GetIPv4($"{Multiplayer.Settings.Ipv4AddressCheck}"));
+                    }
+
                     sendUpdates = true;
                 }
             },
@@ -114,13 +129,21 @@ public class LobbyServerManager : MonoBehaviour
         DateTime current = WeatherDriver.Instance.manager.DateTime;
         TimeSpan inGame = current - start;
 
-        string json = JsonConvert.SerializeObject(new LobbyServerUpdateData(
-                                                                                server_id,
-                                                                                private_key,
-                                                                                inGame.ToString("d\\d\\ hh\\h\\ mm\\m\\ ss\\s"),
-                                                                                server.serverData.CurrentPlayers),
-                                                                                jsonSettings
-                                                                            );
+        LobbyServerUpdateData reqData = new LobbyServerUpdateData(
+                                                                    server_id,
+                                                                    private_key,
+                                                                    inGame.ToString("d\\d\\ hh\\h\\ mm\\m\\ ss\\s"),
+                                                                    server.serverData.CurrentPlayers
+                                                                  );
+
+        //do we need to provide our IPv4?
+        if(updateIPv4 && myIPv4 != null && myIPv4 != string.Empty)
+        {
+            reqData.ipv4 = myIPv4;
+            updateIPv4 = false;
+        }
+
+        string json = JsonConvert.SerializeObject(reqData, jsonSettings);
         Multiplayer.LogDebug(() => $"UpdateLobbyServer JsonRequest: {json}");
 
         yield return SendWebRequest(
@@ -141,6 +164,36 @@ public class LobbyServerManager : MonoBehaviour
             }
         );
     }
+
+    private IEnumerator GetIPv4(string uri)
+    {
+ 
+        Multiplayer.Log("Preparing to get IPv4");
+
+        yield return SendWebRequest(
+            uri,
+            string.Empty,
+            webRequest =>
+            {
+                Match match = IPv4Match.Match(webRequest.downloadHandler.text);
+                if (match != null)
+                {
+                    Multiplayer.Log($"IPv4 address extracted: {match.Value}");
+                    myIPv4 = match.Value;
+                    updateIPv4 = true;
+                    StopAllCoroutines();
+                    StartCoroutine(UpdateLobbyServer($"{Multiplayer.Settings.LobbyServerAddress}/{ENDPOINT_UPDATE_SERVER}"));
+                }
+                else
+                {
+                    Multiplayer.LogError($"Failed to find IPv4 address. Server will only be available via IPv6");
+                }
+
+            },
+            webRequest => Multiplayer.LogError("Failed to remove from lobby server")
+        );
+    }
+
     private IEnumerator SendWebRequest(string uri, string json, Action<UnityWebRequest> onSuccess, Action<UnityWebRequest> onError, int depth=0)
     {
         if (depth > REDIRECT_MAX)
@@ -153,7 +206,10 @@ public class LobbyServerManager : MonoBehaviour
         {
             webRequest.redirectLimit = 0;
 
-            webRequest.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json)){contentType = "application/json"};
+            if (json != null && json.Length > 0)
+            {
+                webRequest.uploadHandler = new UploadHandlerRaw(System.Text.Encoding.UTF8.GetBytes(json)) { contentType = "application/json" };
+            }
             webRequest.downloadHandler = new DownloadHandlerBuffer();
 
             yield return webRequest.SendWebRequest();
