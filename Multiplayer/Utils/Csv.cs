@@ -40,6 +40,13 @@ namespace Multiplayer.Utils
                     continue;
 
                 string rowKey = values[0];
+              
+                //ensure we don't have too many columns
+                if (values.Count > columns.Count)
+                {
+                    Multiplayer.LogWarning($"CSV Line {i + 1}: Found {values.Count} columns, expected {columns.Count}\r\n\t{line}");
+                    continue;
+                }
 
                 // Add the row values to the appropriate column dictionaries
                 for (int j = 0; j < values.Count && j < keys.Count; j++)
