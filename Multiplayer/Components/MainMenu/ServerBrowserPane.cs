@@ -16,8 +16,7 @@ using System.Linq;
 using Multiplayer.Networking.Data;
 using DV;
 using Multiplayer.Components.Networking.UI;
-
-
+using System.Net;
 
 namespace Multiplayer.Components.MainMenu
 {
@@ -60,7 +59,7 @@ namespace Multiplayer.Components.MainMenu
         private const int REFRESH_MIN_TIME = 10; //Stop refresh spam
 
         //connection parameters
-        private string ipAddress;
+        private string address;
         private int portNumber;
         string password = null;
         bool direct = false;
@@ -71,44 +70,7 @@ namespace Multiplayer.Components.MainMenu
 
         private void Awake()
         {
-            Multiplayer.Log("MultiplayerPane Awake()");
-            /*
-             * 
-             * Temp testing code
-             * 
-             */
-
-            //GameObject chat = new GameObject("ChatUI", typeof(ChatGUI));
-            //chat.transform.SetParent(GameObject.Find("MenuOpeningScene").transform,false);
-
-            //////////Debug.Log("Instantiating Overlay");
-            //////////GameObject overlay = new GameObject("Overlay", typeof(ChatGUI));
-            //////////GameObject parent = GameObject.Find("MenuOpeningScene");
-            //////////if (parent != null)
-            //////////{
-            //////////    overlay.transform.SetParent(parent.transform, false);
-            //////////    Debug.Log("Overlay parent set to MenuOpeningScene");
-            //////////}
-            //////////else
-            //////////{
-            //////////    Debug.LogError("MenuOpeningScene not found");
-            //////////}
-
-            //////////Debug.Log("Overlay instantiated with components:");
-            //////////foreach (Transform child in overlay.transform)
-            //////////{
-            //////////    Debug.Log("Child: " + child.name);
-            //////////    foreach (Transform grandChild in child)
-            //////////    {
-            //////////        Debug.Log("GrandChild: " + grandChild.name);
-            //////////    }
-            //////////}
-
-            /*
-             * 
-             * End Temp testing code
-             * 
-             */
+            //Multiplayer.Log("MultiplayerPane Awake()");
             CleanUI();
             BuildUI();
 
@@ -119,12 +81,12 @@ namespace Multiplayer.Components.MainMenu
 
         private void OnEnable()
         {
-            Multiplayer.Log("MultiplayerPane OnEnable()");
+            //Multiplayer.Log("MultiplayerPane OnEnable()");
             if (!this.parentScroller)
             {
-                Multiplayer.Log("Find ScrollRect");
+                //Multiplayer.Log("Find ScrollRect");
                 this.parentScroller = this.gridView.GetComponentInParent<ScrollRect>();
-                Multiplayer.Log("Found ScrollRect");
+                //Multiplayer.Log("Found ScrollRect");
             }
             this.SetupListeners(true);
             this.serverIDOnRefresh = "";
@@ -361,7 +323,8 @@ namespace Multiplayer.Components.MainMenu
                 {
                     //not making a direct connection
                     direct = false;
-                    ipAddress = selectedServer.ip;
+
+                    address = selectedServer.ip;
                     portNumber = selectedServer.port;
 
                     ShowPasswordPopup();
@@ -376,7 +339,7 @@ namespace Multiplayer.Components.MainMenu
 
         private void DirectAction()
         {
-            Debug.Log($"DirectAction()");
+            //Debug.Log($"DirectAction()");
             buttonDirectIP.ToggleInteractable(false);
             buttonJoin.ToggleInteractable(false)    ;
 
@@ -388,23 +351,22 @@ namespace Multiplayer.Components.MainMenu
 
         private void IndexChanged(AGridView<IServerBrowserGameDetails> gridView)
         {
-            Debug.Log($"Index: {gridView.SelectedModelIndex}");
+            //Debug.Log($"Index: {gridView.SelectedModelIndex}");
             if (serverRefreshing)
                 return;
 
             if (gridView.SelectedModelIndex >= 0)
             {
-                Debug.Log($"Selected server: {gridViewModel[gridView.SelectedModelIndex].Name}");
+                //Multiplayer.Log($"Selected server: {gridViewModel[gridView.SelectedModelIndex].Name}");
 
                 selectedServer = gridViewModel[gridView.SelectedModelIndex];
                 
                 UpdateDetailsPane();
 
                 //Check if we can connect to this server
-
-                Debug.Log($"server: \"{selectedServer.GameVersion}\" \"{selectedServer.MultiplayerVersion}\"");
-                Debug.Log($"client: \"{BuildInfo.BUILD_VERSION_MAJOR.ToString()}\" \"{Multiplayer.ModEntry.Version.ToString()}\"");
-                Debug.Log($"result: \"{selectedServer.GameVersion == BuildInfo.BUILD_VERSION_MAJOR.ToString()}\" \"{selectedServer.MultiplayerVersion == Multiplayer.ModEntry.Version.ToString()}\"");
+                Multiplayer.Log($"Server: \"{selectedServer.GameVersion}\" \"{selectedServer.MultiplayerVersion}\"");
+                Multiplayer.Log($"Client: \"{BuildInfo.BUILD_VERSION_MAJOR.ToString()}\" \"{Multiplayer.ModEntry.Version.ToString()}\"");
+                Multiplayer.Log($"Result: \"{selectedServer.GameVersion == BuildInfo.BUILD_VERSION_MAJOR.ToString()}\" \"{selectedServer.MultiplayerVersion == Multiplayer.ModEntry.Version.ToString()}\"");
 
                 bool canConnect = selectedServer.GameVersion == BuildInfo.BUILD_VERSION_MAJOR.ToString() &&
                                   selectedServer.MultiplayerVersion == Multiplayer.ModEntry.Version.ToString();
@@ -425,7 +387,7 @@ namespace Multiplayer.Components.MainMenu
 
             if (selectedServer != null)
             {
-                Debug.Log("Prepping Data");
+                //Multiplayer.Log("Prepping Data");
                 serverName.text = selectedServer.Name;
 
                 //note: built-in localisations have a trailing colon e.g. 'Game mode:'
@@ -442,14 +404,13 @@ namespace Multiplayer.Components.MainMenu
                 details += "<br>";
                 details += selectedServer.ServerDetails;
 
-                Debug.Log("Finished Prepping Data");
+                //Multiplayer.Log("Finished Prepping Data");
                 detailsPane.text = details;
             }
         }
 
         private void ShowIpPopup()
         {
-            Debug.Log("In ShowIpPpopup");
             var popup = MainMenuThingsAndStuff.Instance.ShowRenamePopup();
             if (popup == null)
             {
@@ -471,11 +432,46 @@ namespace Multiplayer.Components.MainMenu
 
                 if (!IPv4Regex.IsMatch(result.data) && !IPv6Regex.IsMatch(result.data))
                 {
+                    string inputUrl = result.data;
+
+                    if (!inputUrl.StartsWith("http://") && !inputUrl.StartsWith("https://"))
+                    {
+                        inputUrl = "http://" + inputUrl;
+                    }
+
+                    bool isValidURL = Uri.TryCreate(inputUrl, UriKind.Absolute, out Uri uriResult)
+                      && (uriResult.Scheme == Uri.UriSchemeHttp || uriResult.Scheme == Uri.UriSchemeHttps);
+
+                    if (isValidURL)
+                    {
+                        string domainName = ExtractDomainName(result.data);
+                        try
+                        {
+                            IPHostEntry hostEntry = Dns.GetHostEntry(domainName);
+                            IPAddress[] addresses = hostEntry.AddressList;
+
+                            if (addresses.Length > 0)
+                            {
+                                string address2 = addresses[0].ToString();
+
+                                address = address2;
+                                Multiplayer.Log(address);
+
+                                ShowPortPopup();
+                                return;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Multiplayer.LogError($"An error occurred: {ex.Message}");
+                        }
+                    }
+
                     ShowOkPopup(Locale.SERVER_BROWSER__IP_INVALID, ShowIpPopup);
                 }
                 else
                 {
-                    ipAddress = result.data;
+                    address = result.data;
                     ShowPortPopup();
                 }
             };
@@ -550,13 +546,13 @@ namespace Multiplayer.Components.MainMenu
                 if (direct)
                 {
                     //store params for later
-                    Multiplayer.Settings.LastRemoteIP = ipAddress;
+                    Multiplayer.Settings.LastRemoteIP = address;
                     Multiplayer.Settings.LastRemotePort = portNumber;
                     Multiplayer.Settings.LastRemotePassword = result.data;
 
                 }
 
-                SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(ipAddress, portNumber, result.data, false);
+                SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, result.data, false);
 
                 //ShowConnectingPopup(); // Show a connecting message
                 //SingletonBehaviour<NetworkLifecycle>.Instance.ConnectionFailed += HandleConnectionFailed;
@@ -568,7 +564,7 @@ namespace Multiplayer.Components.MainMenu
         private void HandleConnectionEstablished()
         {
             // Connection established, handle the UI or game state accordingly
-            Debug.Log("Connection established!");
+            Multiplayer.Log("Connection established!");
             // HideConnectingPopup(); // Hide the connecting message
         }
 
@@ -576,7 +572,7 @@ namespace Multiplayer.Components.MainMenu
         private void HandleConnectionFailed()
         {
             // Connection failed, show an error message or handle the failure scenario
-            Debug.LogError("Connection failed!");
+            Multiplayer.LogError("Connection failed!");
             // ShowConnectionFailedPopup();
         }
 
@@ -592,21 +588,21 @@ namespace Multiplayer.Components.MainMenu
 
                 if (webRequest.isNetworkError)
                 {
-                    Debug.Log(pages[page] + ": Error: " + webRequest.error);
+                    Multiplayer.LogError(pages[page] + ": Error: " + webRequest.error);
                 }
                 else
                 {
-                    Debug.Log(pages[page] + ":\nReceived: " + webRequest.downloadHandler.text);
+                    Multiplayer.Log(pages[page] + ":\nReceived: " + webRequest.downloadHandler.text);
 
                     LobbyServerData[] response;
 
                     response = Newtonsoft.Json.JsonConvert.DeserializeObject<LobbyServerData[]>(webRequest.downloadHandler.text);
 
-                    Debug.Log($"servers: {response.Length}");
+                    Multiplayer.Log($"Serverbrowser servers: {response.Length}");
 
                     foreach (LobbyServerData server in response)
                     {
-                        Debug.Log($"Name: {server.Name}\tIP: {server.ip}");
+                        Multiplayer.Log($"Server name: {server.Name}\tIP: {server.ip}");
                     }
 
                     if (response.Length == 0)
@@ -685,14 +681,30 @@ namespace Multiplayer.Components.MainMenu
                 item.GameVersion = UnityEngine.Random.Range(1, 10) > 3 ? BuildInfo.BUILD_VERSION_MAJOR.ToString() : "97";
                 item.MultiplayerVersion = UnityEngine.Random.Range(1, 10) > 3 ? Multiplayer.ModEntry.Version.ToString() : "0.1.0";
 
-
-                Debug.Log(item.HasPassword);
                 gridViewModel.Add(item);
             }
 
             gridView.SetModel(gridViewModel);
         }
-    }
 
-   
+        private string ExtractDomainName(string input)
+        {
+            if (input.StartsWith("http://"))
+            {
+                input = input.Substring(7);
+            }
+            else if (input.StartsWith("https://"))
+            {
+                input = input.Substring(8);
+            }
+
+            int portIndex = input.IndexOf(':');
+            if (portIndex != -1)
+            {
+                input = input.Substring(0, portIndex);
+            }
+
+            return input;
+        }
+    }
 }

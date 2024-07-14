@@ -8,8 +8,6 @@ using System.Reflection;
 using TMPro;
 using UnityEngine;
 
-
-
 namespace Multiplayer.Patches.MainMenu
 {
     [HarmonyPatch(typeof(RightPaneController), "OnEnable")]
@@ -62,8 +60,6 @@ namespace Multiplayer.Patches.MainMenu
             // Activate the multiplayer button
             MainMenuController_Awake_Patch.multiplayerButton.SetActive(true);
             Multiplayer.LogError("At end!");
-
-
 
             // Check if the host pane already exists
             if (__instance.HasChildWithName("PaneRight Host"))

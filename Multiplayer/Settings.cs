@@ -34,7 +34,6 @@ public class Settings : UnityModManager.ModSettings, IDrawable
     [Draw("Details", Tooltip = "Details shown in the server browser")]
     public string Details = "";
 
-
     [Space(10)]
     [Header("Lobby Server")]
     [Draw("Lobby Server address", Tooltip = "Address of lobby server for finding multiplayer games")]
@@ -46,8 +45,7 @@ public class Settings : UnityModManager.ModSettings, IDrawable
     public int LastRemotePort = 7777;
     [Draw("Last Remote Password", Tooltip = "The password for the last server connected to by IP.")]
     public string LastRemotePassword = "";
-
-
+    
     [Space(10)]
     [Header("Preferences")]
     [Draw("Show Name Tags", Tooltip = "Whether to show player names above their heads.")]
