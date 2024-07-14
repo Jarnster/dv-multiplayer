@@ -16,6 +16,7 @@ namespace Multiplayer
 
         private const string PREFIX_MAIN_MENU = $"{PREFIX}mm";
         private const string PREFIX_SERVER_BROWSER = $"{PREFIX}sb";
+        private const string PREFIX_SERVER_HOST = $"{PREFIX}host";
         private const string PREFIX_DISCONN_REASON = $"{PREFIX}dr";
         private const string PREFIX_CAREER_MANAGER = $"{PREFIX}carman";
         private const string PREFIX_PLAYER_LIST = $"{PREFIX}plist";
@@ -29,35 +30,61 @@ namespace Multiplayer
         #region Server Browser
         public static string SERVER_BROWSER__TITLE => Get(SERVER_BROWSER__TITLE_KEY);
         public const string SERVER_BROWSER__TITLE_KEY = $"{PREFIX_SERVER_BROWSER}/title";
-
         public static string SERVER_BROWSER__MANUAL_CONNECT => Get(SERVER_BROWSER__MANUAL_CONNECT_KEY);
-        public const string SERVER_BROWSER__MANUAL_CONNECT_KEY = $"{PREFIX_SERVER_BROWSER}/manual_connect";
-
+        public const string SERVER_BROWSER__MANUAL_CONNECT_KEY = $"{PREFIX_SERVER_BROWSER}/manual_connect";        
         public static string SERVER_BROWSER__HOST => Get(SERVER_BROWSER__HOST_KEY);
-        public const string SERVER_BROWSER__HOST_KEY = $"{PREFIX_SERVER_BROWSER}/host";
-                
+        public const string SERVER_BROWSER__HOST_KEY = $"{PREFIX_SERVER_BROWSER}/host";                
         public static string SERVER_BROWSER__REFRESH => Get(SERVER_BROWSER__REFRESH_KEY);
         public const string SERVER_BROWSER__REFRESH_KEY = $"{PREFIX_SERVER_BROWSER}/refresh";
-
         public static string SERVER_BROWSER__JOIN => Get(SERVER_BROWSER__JOIN_KEY);
         public const string SERVER_BROWSER__JOIN_KEY = $"{PREFIX_SERVER_BROWSER}/join_game";
-
         public static string SERVER_BROWSER__IP => Get(SERVER_BROWSER__IP_KEY);
         private const string SERVER_BROWSER__IP_KEY = $"{PREFIX_SERVER_BROWSER}/ip";
-
         public static string SERVER_BROWSER__IP_INVALID => Get(SERVER_BROWSER__IP_INVALID_KEY);
         private const string SERVER_BROWSER__IP_INVALID_KEY = $"{PREFIX_SERVER_BROWSER}/ip_invalid";
-
         public static string SERVER_BROWSER__PORT => Get(SERVER_BROWSER__PORT_KEY);
         private const string SERVER_BROWSER__PORT_KEY = $"{PREFIX_SERVER_BROWSER}/port";
-
         public static string SERVER_BROWSER__PORT_INVALID => Get(SERVER_BROWSER__PORT_INVALID_KEY);
         private const string SERVER_BROWSER__PORT_INVALID_KEY = $"{PREFIX_SERVER_BROWSER}/port_invalid";
-
         public static string SERVER_BROWSER__PASSWORD => Get(SERVER_BROWSER__PASSWORD_KEY);
         private const string SERVER_BROWSER__PASSWORD_KEY = $"{PREFIX_SERVER_BROWSER}/password";
+        public static string SERVER_BROWSER__PLAYERS => Get(SERVER_BROWSER__PLAYERS_KEY);
+        private const string SERVER_BROWSER__PLAYERS_KEY = $"{PREFIX_SERVER_BROWSER}/players";
+        public static string SERVER_BROWSER__PASSWORD_REQUIRED => Get(SERVER_BROWSER__PASSWORD_REQUIRED_KEY);
+        private const string SERVER_BROWSER__PASSWORD_REQUIRED_KEY = $"{PREFIX_SERVER_BROWSER}/password_required";
+        public static string SERVER_BROWSER__MODS_REQUIRED => Get(SERVER_BROWSER__MODS_REQUIRED_KEY);
+        private const string SERVER_BROWSER__MODS_REQUIRED_KEY = $"{PREFIX_SERVER_BROWSER}/mods_required";
+        public static string SERVER_BROWSER__GAME_VERSION => Get(SERVER_BROWSER__GAME_VERSION_KEY);
+        private const string SERVER_BROWSER__GAME_VERSION_KEY = $"{PREFIX_SERVER_BROWSER}/game_version";
+        public static string SERVER_BROWSER__MOD_VERSION => Get(SERVER_BROWSER__MOD_VERSION_KEY);
+        private const string SERVER_BROWSER__MOD_VERSION_KEY = $"{PREFIX_SERVER_BROWSER}/mod_version";
+        public static string SERVER_BROWSER__YES => Get(SERVER_BROWSER__YES_KEY);
+        private const string SERVER_BROWSER__YES_KEY = $"{PREFIX_SERVER_BROWSER}/yes";
+        public static string SERVER_BROWSER__NO => Get(SERVER_BROWSER__NO_KEY);
+        private const string SERVER_BROWSER__NO_KEY = $"{PREFIX_SERVER_BROWSER}/no";
+        public static string SERVER_BROWSER__NO_SERVERS => Get(SERVER_BROWSER__NO_SERVERS_KEY);
+        public const string SERVER_BROWSER__NO_SERVERS_KEY = $"{PREFIX_SERVER_BROWSER}/no_servers";
         #endregion
 
+        #region Server Host
+        public static string SERVER_HOST__TITLE => Get(SERVER_HOST__TITLE_KEY);
+        public const string SERVER_HOST__TITLE_KEY = $"{PREFIX_SERVER_HOST}/title";
+        public static string SERVER_HOST_PASSWORD => Get(SERVER_HOST_PASSWORD_KEY);
+        public const string SERVER_HOST_PASSWORD_KEY = $"{PREFIX_SERVER_HOST}/password";
+        public static string SERVER_HOST_NAME => Get(SERVER_HOST_NAME_KEY);
+        public const string SERVER_HOST_NAME_KEY = $"{PREFIX_SERVER_HOST}/name";
+        public static string SERVER_HOST_PUBLIC => Get(SERVER_HOST_PUBLIC_KEY);
+        public const string SERVER_HOST_PUBLIC_KEY = $"{PREFIX_SERVER_HOST}/public";
+        public static string SERVER_HOST_DETAILS => Get(SERVER_HOST_DETAILS_KEY);
+        public const string SERVER_HOST_DETAILS_KEY = $"{PREFIX_SERVER_HOST}/details";
+        public static string SERVER_HOST_MAX_PLAYERS => Get(SERVER_HOST_MAX_PLAYERS_KEY);
+        public const string SERVER_HOST_MAX_PLAYERS_KEY = $"{PREFIX_SERVER_HOST}/max_players";
+        public static string SERVER_HOST_START => Get(SERVER_HOST_START_KEY);
+        public const string SERVER_HOST_START_KEY = $"{PREFIX_SERVER_HOST}/start";
+
+
+
+        #endregion
         #region Disconnect Reason
         public static string DISCONN_REASON__INVALID_PASSWORD => Get(DISCONN_REASON__INVALID_PASSWORD_KEY);
         public const string DISCONN_REASON__INVALID_PASSWORD_KEY = $"{PREFIX_DISCONN_REASON}/invalid_password";
