@@ -950,6 +950,7 @@ public class NetworkClient : NetworkManager
             IsJobLicense = isJobLicense
         }, DeliveryMethod.ReliableUnordered);
     }
+
     public void SendJobTakeRequest(ushort netId)
     {
         SendPacketToServer(new ServerboundJobTakeRequestPacket
@@ -957,7 +958,6 @@ public class NetworkClient : NetworkManager
             netId = netId
         }, DeliveryMethod.ReliableUnordered);
     }
-
 
     public void SendChat(string message)
     {

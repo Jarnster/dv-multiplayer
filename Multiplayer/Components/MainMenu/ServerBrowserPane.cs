@@ -16,8 +16,7 @@ using System.Linq;
 using Multiplayer.Networking.Data;
 using DV;
 using Multiplayer.Components.Networking.UI;
-
-
+using System.Net;
 
 namespace Multiplayer.Components.MainMenu
 {
@@ -60,7 +59,7 @@ namespace Multiplayer.Components.MainMenu
         private const int REFRESH_MIN_TIME = 10; //Stop refresh spam
 
         //connection parameters
-        private string ipAddress;
+        private string address;
         private int portNumber;
         string password = null;
         bool direct = false;
@@ -72,7 +71,6 @@ namespace Multiplayer.Components.MainMenu
         private void Awake()
         {
             //Multiplayer.Log("MultiplayerPane Awake()");
-
             CleanUI();
             BuildUI();
 
@@ -325,7 +323,8 @@ namespace Multiplayer.Components.MainMenu
                 {
                     //not making a direct connection
                     direct = false;
-                    ipAddress = selectedServer.ip;
+
+                    address = selectedServer.ip;
                     portNumber = selectedServer.port;
 
                     ShowPasswordPopup();
@@ -358,14 +357,13 @@ namespace Multiplayer.Components.MainMenu
 
             if (gridView.SelectedModelIndex >= 0)
             {
-                //Debug.Log($"Selected server: {gridViewModel[gridView.SelectedModelIndex].Name}");
+                //Multiplayer.Log($"Selected server: {gridViewModel[gridView.SelectedModelIndex].Name}");
 
                 selectedServer = gridViewModel[gridView.SelectedModelIndex];
                 
                 UpdateDetailsPane();
 
                 //Check if we can connect to this server
-
                 Multiplayer.Log($"Server: \"{selectedServer.GameVersion}\" \"{selectedServer.MultiplayerVersion}\"");
                 Multiplayer.Log($"Client: \"{BuildInfo.BUILD_VERSION_MAJOR.ToString()}\" \"{Multiplayer.ModEntry.Version.ToString()}\"");
                 Multiplayer.Log($"Result: \"{selectedServer.GameVersion == BuildInfo.BUILD_VERSION_MAJOR.ToString()}\" \"{selectedServer.MultiplayerVersion == Multiplayer.ModEntry.Version.ToString()}\"");
@@ -413,7 +411,6 @@ namespace Multiplayer.Components.MainMenu
 
         private void ShowIpPopup()
         {
-            Multiplayer.Log("In ShowIpPpopup");
             var popup = MainMenuThingsAndStuff.Instance.ShowRenamePopup();
             if (popup == null)
             {
@@ -435,11 +432,46 @@ namespace Multiplayer.Components.MainMenu
 
                 if (!IPv4Regex.IsMatch(result.data) && !IPv6Regex.IsMatch(result.data))
                 {
+                    string inputUrl = result.data;
+
+                    if (!inputUrl.StartsWith("http://") && !inputUrl.StartsWith("https://"))
+                    {
+                        inputUrl = "http://" + inputUrl;
+                    }
+
+                    bool isValidURL = Uri.TryCreate(inputUrl, UriKind.Absolute, out Uri uriResult)
+                      && (uriResult.Scheme == Uri.UriSchemeHttp || uriResult.Scheme == Uri.UriSchemeHttps);
+
+                    if (isValidURL)
+                    {
+                        string domainName = ExtractDomainName(result.data);
+                        try
+                        {
+                            IPHostEntry hostEntry = Dns.GetHostEntry(domainName);
+                            IPAddress[] addresses = hostEntry.AddressList;
+
+                            if (addresses.Length > 0)
+                            {
+                                string address2 = addresses[0].ToString();
+
+                                address = address2;
+                                Multiplayer.Log(address);
+
+                                ShowPortPopup();
+                                return;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Multiplayer.LogError($"An error occurred: {ex.Message}");
+                        }
+                    }
+
                     ShowOkPopup(Locale.SERVER_BROWSER__IP_INVALID, ShowIpPopup);
                 }
                 else
                 {
-                    ipAddress = result.data;
+                    address = result.data;
                     ShowPortPopup();
                 }
             };
@@ -514,13 +546,13 @@ namespace Multiplayer.Components.MainMenu
                 if (direct)
                 {
                     //store params for later
-                    Multiplayer.Settings.LastRemoteIP = ipAddress;
+                    Multiplayer.Settings.LastRemoteIP = address;
                     Multiplayer.Settings.LastRemotePort = portNumber;
                     Multiplayer.Settings.LastRemotePassword = result.data;
 
                 }
 
-                SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(ipAddress, portNumber, result.data, false);
+                SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, result.data, false);
 
                 //ShowConnectingPopup(); // Show a connecting message
                 //SingletonBehaviour<NetworkLifecycle>.Instance.ConnectionFailed += HandleConnectionFailed;
@@ -649,14 +681,30 @@ namespace Multiplayer.Components.MainMenu
                 item.GameVersion = UnityEngine.Random.Range(1, 10) > 3 ? BuildInfo.BUILD_VERSION_MAJOR.ToString() : "97";
                 item.MultiplayerVersion = UnityEngine.Random.Range(1, 10) > 3 ? Multiplayer.ModEntry.Version.ToString() : "0.1.0";
 
-
-                //Debug.Log(item.HasPassword);
                 gridViewModel.Add(item);
             }
 
             gridView.SetModel(gridViewModel);
         }
-    }
 
-   
+        private string ExtractDomainName(string input)
+        {
+            if (input.StartsWith("http://"))
+            {
+                input = input.Substring(7);
+            }
+            else if (input.StartsWith("https://"))
+            {
+                input = input.Substring(8);
+            }
+
+            int portIndex = input.IndexOf(':');
+            if (portIndex != -1)
+            {
+                input = input.Substring(0, portIndex);
+            }
+
+            return input;
+        }
+    }
 }
