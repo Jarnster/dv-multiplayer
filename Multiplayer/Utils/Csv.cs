@@ -17,6 +17,7 @@ namespace Multiplayer.Utils
         {
             // Split the input data into lines
             string[] separators = new string[] { "\r\n", "\n" };
+
             string[] lines = data.Split(separators, StringSplitOptions.RemoveEmptyEntries);
 
             // Use an OrderedDictionary to preserve the insertion order of keys

@@ -34,7 +34,6 @@ public class Settings : UnityModManager.ModSettings, IDrawable
     [Draw("Details", Tooltip = "Details shown in the server browser")]
     public string Details = "";
 
-
     [Space(10)]
     [Header("Lobby Server")]
     [Draw("Lobby Server address", Tooltip = "Address of lobby server for finding multiplayer games")]

@@ -967,5 +967,13 @@ public class NetworkClient : NetworkManager
         }, DeliveryMethod.ReliableUnordered);
     }
 
+    public void SendChat(string message)
+    {
+        SendPacketToServer(new CommonChatPacket
+        {
+            message = message
+        }, DeliveryMethod.ReliableUnordered);
+    }
+
     #endregion
 }

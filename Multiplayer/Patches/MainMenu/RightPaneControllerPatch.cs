@@ -61,8 +61,6 @@ namespace Multiplayer.Patches.MainMenu
             MainMenuController_Awake_Patch.multiplayerButton.SetActive(true);
             Multiplayer.LogError("At end!");
 
-
-
             // Check if the host pane already exists
             if (__instance.HasChildWithName("PaneRight Host"))
                 return;

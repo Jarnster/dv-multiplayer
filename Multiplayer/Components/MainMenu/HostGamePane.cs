@@ -332,6 +332,7 @@ private void SetupListeners(bool on)
         startButton.ToggleInteractable(valid);
 
         //Multiplayer.Log($"HostPane validated: {valid}");
+
     }
 
 
@@ -391,6 +392,7 @@ private void SetupListeners(bool on)
 
 
         var ContinueGameRequested  = lcInstance.GetType().GetMethod("OnRunClicked", BindingFlags.NonPublic | BindingFlags.Instance);
+
         //Multiplayer.Log($"OnRunClicked exists: {ContinueGameRequested != null}");
         ContinueGameRequested?.Invoke(lcInstance, null);
     }

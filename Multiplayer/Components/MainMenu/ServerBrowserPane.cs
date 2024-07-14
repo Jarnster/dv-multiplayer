@@ -18,8 +18,6 @@ using DV;
 using Multiplayer.Components.Networking.UI;
 using System.Net;
 
-
-
 namespace Multiplayer.Components.MainMenu
 {
     public class ServerBrowserPane : MonoBehaviour
@@ -73,7 +71,6 @@ namespace Multiplayer.Components.MainMenu
         private void Awake()
         {
             //Multiplayer.Log("MultiplayerPane Awake()");
-
             CleanUI();
             BuildUI();
 
@@ -326,6 +323,7 @@ namespace Multiplayer.Components.MainMenu
                 {
                     //not making a direct connection
                     direct = false;
+
                     address = selectedServer.ip;
                     portNumber = selectedServer.port;
 
@@ -359,14 +357,13 @@ namespace Multiplayer.Components.MainMenu
 
             if (gridView.SelectedModelIndex >= 0)
             {
-                //Debug.Log($"Selected server: {gridViewModel[gridView.SelectedModelIndex].Name}");
+                //Multiplayer.Log($"Selected server: {gridViewModel[gridView.SelectedModelIndex].Name}");
 
                 selectedServer = gridViewModel[gridView.SelectedModelIndex];
                 
                 UpdateDetailsPane();
 
                 //Check if we can connect to this server
-
                 Multiplayer.Log($"Server: \"{selectedServer.GameVersion}\" \"{selectedServer.MultiplayerVersion}\"");
                 Multiplayer.Log($"Client: \"{BuildInfo.BUILD_VERSION_MAJOR.ToString()}\" \"{Multiplayer.ModEntry.Version.ToString()}\"");
                 Multiplayer.Log($"Result: \"{selectedServer.GameVersion == BuildInfo.BUILD_VERSION_MAJOR.ToString()}\" \"{selectedServer.MultiplayerVersion == Multiplayer.ModEntry.Version.ToString()}\"");
@@ -684,8 +681,6 @@ namespace Multiplayer.Components.MainMenu
                 item.GameVersion = UnityEngine.Random.Range(1, 10) > 3 ? BuildInfo.BUILD_VERSION_MAJOR.ToString() : "97";
                 item.MultiplayerVersion = UnityEngine.Random.Range(1, 10) > 3 ? Multiplayer.ModEntry.Version.ToString() : "0.1.0";
 
-
-                //Debug.Log(item.HasPassword);
                 gridViewModel.Add(item);
             }
 
@@ -712,6 +707,4 @@ namespace Multiplayer.Components.MainMenu
             return input;
         }
     }
-
-   
 }
