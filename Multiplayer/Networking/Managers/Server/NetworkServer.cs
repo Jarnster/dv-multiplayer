@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
 using DV;
 using DV.InventorySystem;
 using DV.Logic.Job;
@@ -15,6 +16,7 @@ using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Train;
 using Multiplayer.Components.Networking.World;
 using Multiplayer.Networking.Data;
+using Multiplayer.Networking.Managers.Server;
 using Multiplayer.Networking.Packets.Clientbound;
 using Multiplayer.Networking.Packets.Clientbound.SaveGame;
 using Multiplayer.Networking.Packets.Clientbound.Train;
@@ -36,6 +38,11 @@ public class NetworkServer : NetworkManager
     private readonly Dictionary<byte, ServerPlayer> serverPlayers = new();
     private readonly Dictionary<byte, NetPeer> netPeers = new();
 
+    private LobbyServerManager lobbyServerManager;
+    public bool isPublic;
+    public bool isSinglePlayer;
+    public LobbyServerData serverData;
+
     public IReadOnlyCollection<ServerPlayer> ServerPlayers => serverPlayers.Values;
     public int PlayerCount => netManager.ConnectedPeersCount;
 
@@ -46,8 +53,12 @@ public class NetworkServer : NetworkManager
     public readonly IDifficulty Difficulty;
     private bool IsLoaded;
 
-    public NetworkServer(IDifficulty difficulty, Settings settings) : base(settings)
+    public NetworkServer(IDifficulty difficulty, Settings settings, bool isPublic, bool isSinglePlayer, LobbyServerData serverData) : base(settings)
     {
+        this.isPublic = isPublic;
+        this.isSinglePlayer = isSinglePlayer;
+        this.serverData = serverData;
+
         Difficulty = difficulty;
         serverMods = ModInfo.FromModEntries(UnityModManager.modEntries);
     }
@@ -56,6 +67,17 @@ public class NetworkServer : NetworkManager
     {
         WorldStreamingInit.LoadingFinished += OnLoaded;
         return netManager.Start(port);
+    }
+
+    public override void Stop()
+    {
+        if (lobbyServerManager != null)
+        {
+            lobbyServerManager.RemoveFromLobbyServer();
+            GameObject.Destroy(lobbyServerManager);
+        }
+
+        base.Stop();
     }
 
     protected override void Subscribe()
@@ -83,10 +105,17 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonHandbrakePositionPacket, NetPeer>(OnCommonHandbrakePositionPacket);
         netPacketProcessor.SubscribeReusable<CommonTrainPortsPacket, NetPeer>(OnCommonTrainPortsPacket);
         netPacketProcessor.SubscribeReusable<CommonTrainFusesPacket, NetPeer>(OnCommonTrainFusesPacket);
+        netPacketProcessor.SubscribeReusable<CommonChatPacket, NetPeer>(OnCommonChatPacket);
     }
 
     private void OnLoaded()
     {
+        Debug.Log($"Server loaded, isSinglePlayer: {isSinglePlayer} isPublic: {isPublic}");
+        if (!isSinglePlayer && isPublic)
+        {
+            lobbyServerManager = NetworkLifecycle.Instance.GetOrAddComponent<LobbyServerManager>();
+        }
+
         Log($"Server loaded, processing {joinQueue.Count} queued players");
         IsLoaded = true;
         while (joinQueue.Count > 0)
@@ -266,13 +295,54 @@ public class NetworkServer : NetworkManager
         }, DeliveryMethod.ReliableUnordered, selfPeer);
     }
 
+    public void SendChat(string message, NetPeer exclude = null)
+    {
+
+        if (exclude != null)
+        {
+            NetworkLifecycle.Instance.Server.SendPacketToAll(new CommonChatPacket
+            {
+                message = message
+            }, DeliveryMethod.ReliableUnordered, exclude);
+        }
+        else
+        {
+            NetworkLifecycle.Instance.Server.SendPacketToAll(new CommonChatPacket
+            {
+                message = message
+            }, DeliveryMethod.ReliableUnordered);
+        }
+    }
+
+    public void SendWhisper(string message, NetPeer recipient)
+    {
+        if(message != null || recipient != null)
+        {
+            NetworkLifecycle.Instance.Server.SendPacket(recipient, new CommonChatPacket
+            {
+                message = message
+            }, DeliveryMethod.ReliableUnordered);
+        }
+
+    }
+
     #endregion
 
     #region Listeners
 
     private void OnServerboundClientLoginPacket(ServerboundClientLoginPacket packet, ConnectionRequest request)
     {
-        packet.Username = packet.Username.Truncate(Settings.MAX_USERNAME_LENGTH);
+        // clean up username - remove leading/trailing white space, swap spaces for underscores and truncate
+        packet.Username = packet.Username.Trim().Replace(' ', '_').Truncate(Settings.MAX_USERNAME_LENGTH);
+        string overrideUsername = packet.Username;
+
+        //ensure the username is unique
+        int uniqueName = ServerPlayers.Where(player => player.OriginalUsername.ToLower() == packet.Username.ToLower()).Count();
+
+        if (uniqueName > 0)
+        {
+            overrideUsername += uniqueName;
+        }
 
         Guid guid;
         try
@@ -310,7 +380,7 @@ public class NetworkServer : NetworkManager
             return;
         }
 
-        if (netManager.ConnectedPeersCount >= Multiplayer.Settings.MaxPlayers)
+        if (netManager.ConnectedPeersCount >= Multiplayer.Settings.MaxPlayers || isSinglePlayer && netManager.ConnectedPeersCount >= 1)
         {
             LogWarning("Denied login due to server being full!");
             ClientboundServerDenyPacket denyPacket = new() {
@@ -339,7 +409,8 @@ public class NetworkServer : NetworkManager
 
         ServerPlayer serverPlayer = new() {
             Id = (byte)peer.Id,
-            Username = packet.Username,
+            Username = overrideUsername,
+            OriginalUsername = packet.Username,
             Guid = guid
         };
 
@@ -387,6 +458,8 @@ public class NetworkServer : NetworkManager
             Guid = serverPlayer.Guid.ToByteArray()
         };
         SendPacketToAll(clientboundPlayerJoinedPacket, DeliveryMethod.ReliableOrdered, peer);
+
+        ChatManager.ServerMessage(serverPlayer.Username + " joined the game", null, peer);
 
         Log($"Client {peer.Id} is ready. Sending world state");
 
@@ -648,5 +721,9 @@ public class NetworkServer : NetworkManager
             LicenseManager.Instance.AcquireGeneralLicense(generalLicense);
     }
 
+    private void OnCommonChatPacket(CommonChatPacket packet, NetPeer peer)
+    {
+        ChatManager.ProcessMessage(packet.message,peer);
+    }
     #endregion
 }
