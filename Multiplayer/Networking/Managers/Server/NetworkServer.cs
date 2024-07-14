@@ -105,6 +105,7 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonHandbrakePositionPacket, NetPeer>(OnCommonHandbrakePositionPacket);
         netPacketProcessor.SubscribeReusable<CommonTrainPortsPacket, NetPeer>(OnCommonTrainPortsPacket);
         netPacketProcessor.SubscribeReusable<CommonTrainFusesPacket, NetPeer>(OnCommonTrainFusesPacket);
+        netPacketProcessor.SubscribeReusable<CommonChatPacket, NetPeer>(OnCommonChatPacket);
     }
 
     private void OnLoaded()
@@ -294,13 +295,54 @@ public class NetworkServer : NetworkManager
         }, DeliveryMethod.ReliableUnordered, selfPeer);
     }
 
+    public void SendChat(string message, NetPeer exclude = null)
+    {
+
+        if (exclude != null)
+        {
+            NetworkLifecycle.Instance.Server.SendPacketToAll(new CommonChatPacket
+            {
+                message = message
+            }, DeliveryMethod.ReliableUnordered, exclude);
+        }
+        else
+        {
+            NetworkLifecycle.Instance.Server.SendPacketToAll(new CommonChatPacket
+            {
+                message = message
+            }, DeliveryMethod.ReliableUnordered);
+        }
+    }
+
+    public void SendWhisper(string message, NetPeer recipient)
+    {
+        if(message != null || recipient != null)
+        {
+            NetworkLifecycle.Instance.Server.SendPacket(recipient, new CommonChatPacket
+            {
+                message = message
+            }, DeliveryMethod.ReliableUnordered);
+        }
+
+    }
+
     #endregion
 
     #region Listeners
 
     private void OnServerboundClientLoginPacket(ServerboundClientLoginPacket packet, ConnectionRequest request)
     {
-        packet.Username = packet.Username.Truncate(Settings.MAX_USERNAME_LENGTH);
+        // clean up username - remove leading/trailing white space, swap spaces for underscores and truncate
+        packet.Username = packet.Username.Trim().Replace(' ', '_').Truncate(Settings.MAX_USERNAME_LENGTH);
+        string overrideUsername = packet.Username;
+
+        //ensure the username is unique
+        int uniqueName = ServerPlayers.Where(player => player.OriginalUsername.ToLower() == packet.Username.ToLower()).Count();
+
+        if (uniqueName > 0)
+        {
+            overrideUsername += uniqueName;
+        }
 
         Guid guid;
         try
@@ -367,7 +409,8 @@ public class NetworkServer : NetworkManager
 
         ServerPlayer serverPlayer = new() {
             Id = (byte)peer.Id,
-            Username = packet.Username,
+            Username = overrideUsername,
+            OriginalUsername = packet.Username,
             Guid = guid
         };
 
@@ -415,6 +458,8 @@ public class NetworkServer : NetworkManager
             Guid = serverPlayer.Guid.ToByteArray()
         };
         SendPacketToAll(clientboundPlayerJoinedPacket, DeliveryMethod.ReliableOrdered, peer);
+
+        ChatManager.ServerMessage(serverPlayer.Username + " joined the game", null, peer);
 
         Log($"Client {peer.Id} is ready. Sending world state");
 
@@ -676,5 +721,9 @@ public class NetworkServer : NetworkManager
             LicenseManager.Instance.AcquireGeneralLicense(generalLicense);
     }
 
+    private void OnCommonChatPacket(CommonChatPacket packet, NetPeer peer)
+    {
+        ChatManager.ProcessMessage(packet.message,peer);
+    }
     #endregion
 }

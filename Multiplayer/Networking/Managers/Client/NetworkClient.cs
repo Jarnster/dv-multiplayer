@@ -14,6 +14,7 @@ using LiteNetLib;
 using Multiplayer.Components.MainMenu;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Train;
+using Multiplayer.Components.Networking.UI;
 using Multiplayer.Components.Networking.World;
 using Multiplayer.Components.SaveGame;
 using Multiplayer.Networking.Data;
@@ -44,12 +45,15 @@ public class NetworkClient : NetworkManager
     public int Ping { get; private set; }
     private NetPeer serverPeer;
 
+    private ChatGUI chatGUI;
+    public bool isSinglePlayer;
+
     public NetworkClient(Settings settings) : base(settings)
     {
         PlayerManager = new ClientPlayerManager();
     }
 
-    public void Start(string address, int port, string password)
+    public void Start(string address, int port, string password, bool isSinglePlayer)
     {
         netManager.Start();
         ServerboundClientLoginPacket serverboundClientLoginPacket = new() {
@@ -106,6 +110,7 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundLicenseAcquiredPacket>(OnClientboundLicenseAcquiredPacket);
         netPacketProcessor.SubscribeReusable<ClientboundGarageUnlockPacket>(OnClientboundGarageUnlockPacket);
         netPacketProcessor.SubscribeReusable<ClientboundDebtStatusPacket>(OnClientboundDebtStatusPacket);
+        netPacketProcessor.SubscribeReusable<CommonChatPacket>(OnCommonChatPacket);
     }
 
     #region Net Events
@@ -308,6 +313,16 @@ public class NetworkClient : NetworkManager
         }
 
         displayLoadingInfo.OnLoadingFinished();
+
+        //if not single player, add in chat
+        GameObject common = GameObject.Find("[MAIN]/[GameUI]/[NewCanvasController]/Auxiliary Canvas, EventSystem, Input Module");
+        if (common != null)
+        {
+            //
+            GameObject chat = new GameObject("Chat GUI", typeof(ChatGUI));
+            chat.transform.SetParent(common.transform, false);
+            chatGUI = chat.GetComponent<ChatGUI>();
+        }
     }
 
     private void OnClientboundTimeAdvancePacket(ClientboundTimeAdvancePacket packet)
@@ -592,6 +607,11 @@ public class NetworkClient : NetworkManager
     {
         CareerManagerDebtControllerPatch.HasDebt = packet.HasDebt;
     }
+    private void OnCommonChatPacket(CommonChatPacket packet)
+    {
+
+        chatGUI.ReceiveMessage(packet.message);
+    }
 
     #endregion
 
@@ -788,6 +808,14 @@ public class NetworkClient : NetworkManager
         SendPacketToServer(new ServerboundLicensePurchaseRequestPacket {
             Id = id,
             IsJobLicense = isJobLicense
+        }, DeliveryMethod.ReliableUnordered);
+    }
+
+    public void SendChat(string message)
+    {
+        SendPacketToServer(new CommonChatPacket
+        {
+            message = message
         }, DeliveryMethod.ReliableUnordered);
     }
 
