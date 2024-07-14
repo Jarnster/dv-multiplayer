@@ -14,9 +14,9 @@
     A <a href="https://store.steampowered.com/app/588030">Derail Valley</a> mod that adds multiplayer.
     <br />
     <br />
-    <a href="https://github.com/Insprill/dv-multiplayer/issues">Report Bug</a>
+    <a href="https://github.com/ACMacro/dv-multiplayer/issues">Report Bug</a>
     ·
-    <a href="https://github.com/Insprill/dv-multiplayer/issues">Request Feature</a>
+    <a href="https://github.com/ACMacro/dv-multiplayer/issues">Request Feature</a>
   </p>
 </div>
 
@@ -46,6 +46,7 @@ Multiplayer is a Derail Valley mod that adds multiplayer to the game, allowing y
 
 It works by having one player host a game, and then other players can join that game.
 
+Forked from https://github.com/Insprill/dv-multiplayer/
 
 
 
@@ -95,16 +96,16 @@ See [LICENSE][license-url] for more information.
 <!-- MARKDOWN LINKS & IMAGES -->
 <!-- https://www.markdownguide.org/basic-syntax/#reference-style-links -->
 
-[contributors-shield]: https://img.shields.io/github/contributors/Insprill/dv-multiplayer.svg?style=for-the-badge
-[contributors-url]: https://github.com/Insprill/dv-multiplayer/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/Insprill/dv-multiplayer.svg?style=for-the-badge
-[forks-url]: https://github.com/Insprill/dv-multiplayer/network/members
-[stars-shield]: https://img.shields.io/github/stars/Insprill/dv-multiplayer.svg?style=for-the-badge
-[stars-url]: https://github.com/Insprill/dv-multiplayer/stargazers
+[contributors-shield]: https://img.shields.io/github/contributors/ACMacro/dv-multiplayer.svg?style=for-the-badge
+[contributors-url]: https://github.com/ACMacro/dv-multiplayer/graphs/contributors
+[forks-shield]: https://img.shields.io/github/forks/ACMacro/dv-multiplayer.svg?style=for-the-badge
+[forks-url]: https://github.com/ACMacro/dv-multiplayer/network/members
+[stars-shield]: https://img.shields.io/github/stars/ACMacro/dv-multiplayer.svg?style=for-the-badge
+[stars-url]: https://github.com/ACMacro/dv-multiplayer/stargazers
 [issues-shield]: https://img.shields.io/github/issues/AMacro/dv-multiplayer.svg?style=for-the-badge
 [issues-url]: https://github.com/AMacro/dv-multiplayer/issues
-[license-shield]: https://img.shields.io/github/license/Insprill/dv-multiplayer.svg?style=for-the-badge
-[license-url]: https://github.com/Insprill/dv-multiplayer/blob/master/LICENSE
+[license-shield]: https://img.shields.io/github/license/ACMacro/dv-multiplayer.svg?style=for-the-badge
+[license-url]: https://github.com/ACMacro/dv-multiplayer/blob/master/LICENSE
 [altfuture-support-email-url]: mailto:support@altfuture.gg
 [contributing-quickstart-url]: https://docs.github.com/en/get-started/quickstart/contributing-to-projects
 [asset-studio-url]: https://github.com/Perfare/AssetStudio
