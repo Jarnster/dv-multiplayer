@@ -46,6 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 function add_game_server($db, $data) {
     if (!validate_server_info($data)) {
+        http_response_code(500);
         return json_encode(["error" => "Invalid server information"]);
     }
 
@@ -61,6 +62,7 @@ function add_game_server($db, $data) {
 
 function update_game_server($db, $data) {
     if (!validate_server_update($db, $data)) {
+        http_response_code(500);
         return json_encode(["error" => "Invalid game server ID or private key"]);
     }
 
@@ -70,6 +72,7 @@ function update_game_server($db, $data) {
 
 function remove_game_server($db, $data) {
     if (!validate_server_update($db, $data)) {
+        http_response_code(500);
         return json_encode(["error" => "Invalid game server ID or private key"]);
     }
 
