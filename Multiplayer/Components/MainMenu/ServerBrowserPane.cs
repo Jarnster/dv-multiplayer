@@ -15,6 +15,7 @@ using UnityEngine.Networking;
 using System.Linq;
 using Multiplayer.Networking.Data;
 using DV;
+using Multiplayer.Components.Networking.UI;
 
 
 
@@ -71,6 +72,43 @@ namespace Multiplayer.Components.MainMenu
         private void Awake()
         {
             Multiplayer.Log("MultiplayerPane Awake()");
+            /*
+             * 
+             * Temp testing code
+             * 
+             */
+
+            //GameObject chat = new GameObject("ChatUI", typeof(ChatGUI));
+            //chat.transform.SetParent(GameObject.Find("MenuOpeningScene").transform,false);
+
+            //////////Debug.Log("Instantiating Overlay");
+            //////////GameObject overlay = new GameObject("Overlay", typeof(ChatGUI));
+            //////////GameObject parent = GameObject.Find("MenuOpeningScene");
+            //////////if (parent != null)
+            //////////{
+            //////////    overlay.transform.SetParent(parent.transform, false);
+            //////////    Debug.Log("Overlay parent set to MenuOpeningScene");
+            //////////}
+            //////////else
+            //////////{
+            //////////    Debug.LogError("MenuOpeningScene not found");
+            //////////}
+
+            //////////Debug.Log("Overlay instantiated with components:");
+            //////////foreach (Transform child in overlay.transform)
+            //////////{
+            //////////    Debug.Log("Child: " + child.name);
+            //////////    foreach (Transform grandChild in child)
+            //////////    {
+            //////////        Debug.Log("GrandChild: " + grandChild.name);
+            //////////    }
+            //////////}
+
+            /*
+             * 
+             * End Temp testing code
+             * 
+             */
             CleanUI();
             BuildUI();
 
@@ -332,7 +370,7 @@ namespace Multiplayer.Components.MainMenu
                 }
 
                 //No password, just connect
-                SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(selectedServer.ip, selectedServer.port, null);
+                SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(selectedServer.ip, selectedServer.port, null, false);
             }
         }
 
@@ -518,7 +556,7 @@ namespace Multiplayer.Components.MainMenu
 
                 }
 
-                SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(ipAddress, portNumber, result.data);
+                SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(ipAddress, portNumber, result.data, false);
 
                 //ShowConnectingPopup(); // Show a connecting message
                 //SingletonBehaviour<NetworkLifecycle>.Instance.ConnectionFailed += HandleConnectionFailed;

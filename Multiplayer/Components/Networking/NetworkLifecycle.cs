@@ -6,6 +6,7 @@ using DV.Scenarios.Common;
 using DV.Utils;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using Multiplayer.Components.Networking.UI;
 using Multiplayer.Networking.Data;
 using Multiplayer.Networking.Listeners;
 using Multiplayer.Utils;
@@ -146,16 +147,16 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
         if (!server.Start(port))
             return false;
         Server = server;
-        StartClient("localhost", port, Multiplayer.Settings.Password);
+        StartClient("localhost", port, Multiplayer.Settings.Password, isSinglePlayer);
         return true;
     }
 
-    public void StartClient(string address, int port, string password)
+    public void StartClient(string address, int port, string password, bool isSinglePlayer)
     {
         if (Client != null)
             throw new InvalidOperationException("NetworkManager already exists!");
         NetworkClient client = new(Multiplayer.Settings);
-        client.Start(address, port, password);
+        client.Start(address, port, password, isSinglePlayer);
         Client = client;
         OnSettingsUpdated(Multiplayer.Settings); // Show stats if enabled
     }

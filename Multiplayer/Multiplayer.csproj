@@ -78,7 +78,9 @@
         <Reference Include="UnityEngine.PhysicsModule" />
         <Reference Include="UnityEngine.UI" />
         <Reference Include="UnityEngine.UIModule" />
+        <Reference Include="UnityEngine.TextRenderingModule" />
         <Reference Include="UnityEngine.UnityWebRequestModule" />
+        <Reference Include="UnityEngine.InputLegacyModule" />
     </ItemGroup>
 
     <Target Name="PostBuild" AfterTargets="PostBuildEvent">
