@@ -16,7 +16,7 @@ namespace Multiplayer.Utils
         public static ReadOnlyDictionary<string, Dictionary<string, string>> Parse(string data)
         {
             // Split the input data into lines
-            string[] separators = new string[] { "\r\n" };
+            string[] separators = new string[] { "\r\n", "\n" };
             string[] lines = data.Split(separators, StringSplitOptions.None);
 
             // Use an OrderedDictionary to preserve the insertion order of keys
