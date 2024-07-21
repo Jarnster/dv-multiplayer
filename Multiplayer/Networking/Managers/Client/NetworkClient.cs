@@ -46,7 +46,7 @@ public class NetworkClient : NetworkManager
     protected override string LogPrefix => "[Client]";
 
     public NetPeer selfPeer { get; private set; }
-    public readonly ClientPlayerManager PlayerManager;
+    public readonly ClientPlayerManager ClientPlayerManager;
 
     // One way ping in milliseconds
     public int Ping { get; private set; }
@@ -403,6 +403,20 @@ public class NetworkClient : NetworkManager
     {
         if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
             return;
+
+        //Protect myself from getting deleted in race conditions
+        if (PlayerManager.Car == networkedTrainCar.TrainCar)
+        {
+            Multiplayer.LogWarning($"Server attempted to delete car I'm on: {PlayerManager.Car.ID}, net ID: {packet.NetId}");
+            PlayerManager.SetCar(null);
+        }
+
+        //Protect other players from getting deleted in race conditions - this should be a temporary fix, if another playe's game object is deleted we should just recreate it
+        NetworkedPlayer[] componentsInChildren = networkedTrainCar.GetComponentsInChildren<NetworkedPlayer>();
+        foreach (NetworkedPlayer networkedPlayer in componentsInChildren)
+        {
+            networkedPlayer.UpdateCar(0);
+        }
 
         CarSpawner.Instance.DeleteCar(networkedTrainCar.TrainCar);
     }

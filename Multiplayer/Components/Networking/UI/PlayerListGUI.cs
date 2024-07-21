@@ -38,7 +38,7 @@ public class PlayerListGUI : MonoBehaviour
         if (!NetworkLifecycle.Instance.IsClientRunning)
             return new[] { "Not in game" };
 
-        IReadOnlyCollection<NetworkedPlayer> players = NetworkLifecycle.Instance.Client.PlayerManager.Players;
+        IReadOnlyCollection<NetworkedPlayer> players = NetworkLifecycle.Instance.Client.ClientPlayerManager.Players;
         string[] playerList = new string[players.Count + 1];
         int i = 0;
         foreach (NetworkedPlayer player in players)

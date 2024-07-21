@@ -263,7 +263,7 @@ public class ChatGUI : MonoBehaviour
             if (localMessage == null || localMessage == string.Empty)
             {
                 
-                string closestMatch = NetworkLifecycle.Instance.Client.PlayerManager.Players
+                string closestMatch = NetworkLifecycle.Instance.Client.ClientPlayerManager.Players
                                                 .Where(player => player.Username.ToLower().StartsWith(recipient.ToLower()))
                                                 .OrderBy(player => player.Username.Length)
                                                 .ThenByDescending(player => player.Username)

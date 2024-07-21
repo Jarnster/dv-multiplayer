@@ -37,6 +37,8 @@ The difficulty field in the request body for adding a game server must be one of
 - **Request Body:**
   ```json
   {
+    "ipv4": "string",
+    "ipv6": "string",
     "port": "integer",
 	  "server_name": "string",
     "password_protected": "boolean",
@@ -52,7 +54,9 @@ The difficulty field in the request body for adding a game server must be one of
   }
   ```
 	- **Fields:**
-		- port (integer): The port number of the game server.
+		- ipv4 (optional string): The publically accessible IPv4 address of the game server - if this is not supplied, then the IPv6 address must be.
+    - ipv6 (optional string): The publically accessible IPv4 address of the game server - if this is not supplied, then the IPv4 address must be..
+    - port (integer): The port number of the game server.
 		- server_name (string): The name of the game server (maximum 25 characters).
 		- password_protected (boolean): Indicates if the server is password-protected.
 		- game_mode (integer): The game mode (see [Game Modes](#game-modes)).
@@ -72,13 +76,11 @@ The difficulty field in the request body for adding a game server must be one of
       ```json
 	  {
 	    "game_server_id": "string",
-		  "private_key": "string",
-      "ipv4_request": "bool"
+		  "private_key": "string"
 	  }
 	  ```
 		- game_server_id (string): A GUID assigned to the game server. This GUID uniquely identifies the game server and is used when updating the lobby server.
 		- private_key (string): A shared secret between the lobby server and the game server. Must be supplied when updating the lobby server.
-    - ipv4_request (bool): A request to provide an IPV4 address. If `true`, the game server's IPV4 address should be provided via a call to the Update Server end point.
   - **Error:**
     - **Code:** 500 Internal Server Error
     - **Content:** `"Failed to add server"`
@@ -95,7 +97,6 @@ The difficulty field in the request body for adding a game server must be one of
 	  "private_key": "string",
     "current_players": "integer",
 	  "time_passed": "string",
-    "ipv4": "string"
   }
   ```
   - **Fields:**
@@ -103,7 +104,6 @@ The difficulty field in the request body for adding a game server must be one of
 		- private_key (string): The shared secret between the lobby server and the game server (returned from `add_game_server`).
 		- current_players (integer): The current number of players on the server (0 - max_players).
 		- time_passed (string): The in-game time passed since the game/session was started.
-    - ipv4 (optional string): The game server's public IPV4 address (if exists). Only provide if `ipv4_request` is `true`.
 - **Response:**
   - **Success:**
     - **Code:** 200 OK
@@ -147,7 +147,8 @@ The difficulty field in the request body for adding a game server must be one of
       ```json
       [
           {
-			  "ip": "string",
+			  "ipv4": "string",
+        "ipv6": "string",
 			  "port": "integer",
 			  "server_name": "string",
 			  "password_protected": "boolean",
@@ -166,10 +167,8 @@ The difficulty field in the request body for adding a game server must be one of
       ]
       ```
       - **Fields:**
-        - ip (string): The IP address of the game server.
-          Note: if the server has both an IPV4 and IPV6, the returned IP will depend on the IP version of the requestor.
-          If the end point request is made using IPV4 and the game server does not have an IPV4 address, the server will return an empty string.
-          If the end point request is made using IPV6 and the game server does not have an IPV6 address, the server will return an IPV4 address.
+        - ipv4 (optional string): The IPv4 address of the game server, if known.
+        - ipv6 (optional string): The IPv6 address of the game server, if known and if the end point request is made using IPv6, i.e. IPv4 clients will not be provided with the ``ipv6`` field.
         - port (integer): The port number of the game server.
         - server_name (string): The name of the game server (maximum 25 characters).
         - password_protected (boolean): Indicates if the server is password-protected.
@@ -193,7 +192,8 @@ The difficulty field in the request body for adding a game server must be one of
 Example request:
 ```bash
 curl -X POST -H "Content-Type: application/json" -d '{
-  "ip": "127.0.0.1",
+  "ipv4": "127.0.0.1",
+  "ipv6": "::1",
   "port": 7777,
 	"server_name": "My Derail Valley Server",
   "password_protected": false,
