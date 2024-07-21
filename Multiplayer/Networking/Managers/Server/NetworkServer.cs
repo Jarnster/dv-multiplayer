@@ -311,11 +311,11 @@ public class NetworkServer : NetworkManager
         }, DeliveryMethod.ReliableUnordered, selfPeer);
     }
 
-    public void SendJobCreatePacket(NetworkedJob job)
-    {
-        Multiplayer.Log("Sending JobCreatePacket with netId: " + job.NetId + ", Job ID: " + job.job.ID);
-        SendPacketToAll(ClientboundJobCreatePacket.FromNetworkedJob(job),DeliveryMethod.ReliableSequenced);
-    }
+    //public void SendJobCreatePacket(NetworkedJob job)
+    //{
+    //    Multiplayer.Log("Sending JobCreatePacket with netId: " + job.NetId + ", Job ID: " + job.job.ID);
+    //    SendPacketToAll(ClientboundJobCreatePacket.FromNetworkedJob(job),DeliveryMethod.ReliableSequenced);
+    //}
 
     public void SendChat(string message, NetPeer exclude = null)
     {

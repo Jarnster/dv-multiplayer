@@ -1,5 +1,5 @@
 <?php
-include 'config.php';
+include '/home/andrewcr/private/derailvalley/config.php';
 
 // Determine the database type and include the appropriate module
 switch ($dbConfig['type']) {
@@ -46,24 +46,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 function add_game_server($db, $data) {
     if (!validate_server_info($data)) {
+        http_response_code(500);
         return json_encode(["error" => "Invalid server information"]);
-    }
-
-    if(filter_var($_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)){
-        $data['ipv4'] = $_SERVER['REMOTE_ADDR'];
-    }elseif(filter_var($_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)){
-        $data['ipv6'] = $_SERVER['REMOTE_ADDR'];
     }
 
     $data['game_server_id'] = uuid_create();
     $data['private_key'] = generate_private_key();
-
     
-    return $response = $db->addGameServer($data);
+    return $db->addGameServer($data);
 }
 
 function update_game_server($db, $data) {
     if (!validate_server_update($db, $data)) {
+        http_response_code(500);
         return json_encode(["error" => "Invalid game server ID or private key"]);
     }
 
@@ -88,35 +83,51 @@ function list_game_servers($db) {
         unset($server['private_key']);
         unset($server['last_update']);
 
+        if(!isset($server['ipv4'])){
+            $server['ipv4'] = '';
+        }
+
+        if(!isset($server['ipv6'])){
+            $server['ipv6'] = '';
+        }
+
         if(filter_var($_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)){
-            if(!isset($server['ipv4'])){
-                $server['ip'] = '';
-            }else{
-                $server['ip'] = $server['ipv4'];
-            }
-            
-            unset($server['ipv4']);
+            //Host made a request on IPv4, remove IPv6 address as we assume they don't support it.
             unset($server['ipv6']);
 
-        }elseif(filter_var($_SERVER['REMOTE_ADDR'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)){
-            if(!isset($server['ipv6'])){
-                $server['ip'] = $server['ipv4'];
-            }else{
-                $server['ip'] = $server['ipv6'];
-                unset($server['ipv6']);
-            }
-
-            unset($server['ipv4']);
-            unset($server['ipv6']); 
         }
     }
     return json_encode($servers);
 }
 
 function validate_server_info($data) {
-    if (strlen($data['server_name']) > 25 || strlen($data['server_info']) > 500 || $data['current_players'] > $data['max_players'] || $data['max_players'] < 1) {
+
+    if(!isset($data['ipv4']) || !filter_var($data['ipv4'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)){
+        $data['ipv4'] = '';
+    }elseif(!isset($data['ipv6']) || !filter_var($data['ipv6'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)){
+        $data['ipv6'] = '';
+    }
+
+    if (
+            //make sure we have at lease one IP
+            $data['ipv4'] == '' && $data['ipv6'] == '' ||   
+
+            //Make sure we have all required fields
+            !isset($data['server_name']) ||
+            !isset($data['server_info']) ||
+            !isset($data['current_players']) ||
+            !isset($data['max_players']) ||
+
+            //Validate fields
+            strlen($data['server_name']) > 25 ||
+            strlen($data['server_info']) > 500 ||
+            $data['current_players'] > $data['max_players'] ||
+            $data['max_players'] < 1
+        ){
+
         return false;
     }
+
     return true;
 }
 

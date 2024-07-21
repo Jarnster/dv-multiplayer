@@ -15,12 +15,13 @@ namespace Multiplayer.Components.MainMenu
          
         private void Awake()
         {
-            Multiplayer.Log("serverBrowserGridview Awake");
+            Multiplayer.Log("serverBrowserGridview Awake()");
 
-            //swap controller
+            //copy the copy
             this.viewElementPrefab.SetActive(false);
             this.dummyElementPrefab = Instantiate(this.viewElementPrefab);
 
+            //swap controllers
             GameObject.Destroy(this.viewElementPrefab.GetComponent<SaveLoadViewElement>());
             GameObject.Destroy(this.dummyElementPrefab.GetComponent<SaveLoadViewElement>());
 

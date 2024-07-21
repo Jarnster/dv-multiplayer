@@ -44,9 +44,9 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
             loc.key = Locale.SERVER_BROWSER__NO_SERVERS_KEY ;
             loc.UpdateLocalization();
 
-            this.GetOrAddComponent<UIElementTooltip>().enabled = true;//.enabledKey = Locale.SERVER_HOST_PASSWORD__TOOLTIP_KEY;
+            this.GetOrAddComponent<UIElementTooltip>().enabled = true;
             this.gameObject.ResetTooltip();
-            //networkName.text = "No servers found. Refresh or start your own!";
+
         }
 
         public override void SetData(IServerBrowserGameDetails data, AGridView<IServerBrowserGameDetails> _)

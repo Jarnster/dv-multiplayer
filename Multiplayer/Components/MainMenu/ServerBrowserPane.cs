@@ -262,17 +262,24 @@ namespace Multiplayer.Components.MainMenu
         private void SetupServerBrowser()
         {
             GameObject GridviewGO = this.FindChildByName("Scroll View").FindChildByName("GRID VIEW");
-            SaveLoadGridView slgv = GridviewGO.GetComponent<SaveLoadGridView>();
 
+            //Disable before we make any changes
             GridviewGO.SetActive(false);
 
+
+            //load our custom controller
+            SaveLoadGridView slgv = GridviewGO.GetComponent<SaveLoadGridView>();
             gridView = GridviewGO.AddComponent<ServerBrowserGridView>();
+
+            //grab the original prefab
             slgv.viewElementPrefab.SetActive(false);
             gridView.viewElementPrefab = Instantiate(slgv.viewElementPrefab);
-            
+            slgv.viewElementPrefab.SetActive(true);
 
+            //Remove original controller
             GameObject.Destroy(slgv);
 
+            //Don't forget to re-enable!
             GridviewGO.SetActive(true);
         }
         private void SetupListeners(bool on)
