@@ -325,12 +325,19 @@ namespace Multiplayer.Components.MainMenu
                 buttonDirectIP.ToggleInteractable(false);
                 buttonJoin.ToggleInteractable(false);
 
+                //TODO: Add logic to allow IPv6 addresses to be used
+                if (selectedServer.ipv4 != null &&
+                    selectedServer.ipv4 != string.Empty &&
+                    IPv4Regex.IsMatch(selectedServer.ipv4))
+                {
+                    address = selectedServer.ipv4;
+                }
+
                 if (selectedServer.HasPassword)
                 {
                     //not making a direct connection
                     direct = false;
 
-                    address = selectedServer.ip;
                     portNumber = selectedServer.port;
 
                     ShowPasswordPopup();
@@ -339,7 +346,7 @@ namespace Multiplayer.Components.MainMenu
                 }
 
                 //No password, just connect
-                SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(selectedServer.ip, selectedServer.port, null, false);
+                SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, selectedServer.port, null, false);
             }
         }
 
@@ -608,7 +615,7 @@ namespace Multiplayer.Components.MainMenu
 
                     foreach (LobbyServerData server in response)
                     {
-                        Multiplayer.Log($"Server name: {server.Name}\tIP: {server.ip}");
+                        Multiplayer.Log($"Server name: \"{server.Name}\", IPv4: {server.ipv4}, IPv6: {server.ipv6}, Port: {server.port}");
                     }
 
                     if (response.Length == 0)

@@ -229,13 +229,14 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
         if (UnloadWatcher.isUnloading)
             return;
 
-        Server_SendNewJob();
+        //Server_SendNewJob();
         //Server_SendJobStatus();
         //Server_SendTaskStatus();
         //Server_SendJobDestroy();
 
     }
 
+    /*
     private void Server_SendNewJob()
     {
         if (!isJobNew)
@@ -244,6 +245,7 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
         isJobNew = false;
         NetworkLifecycle.Instance.Server.SendJobCreatePacket(this);
     }
+    */
     /*
     private void Server_SendJobStatus()
     {

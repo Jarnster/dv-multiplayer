@@ -14,7 +14,8 @@ namespace Multiplayer.Components.MainMenu
     public interface IServerBrowserGameDetails : IDisposable
     {
         string id { get; set; }
-        string ip { get; set; }
+        string ipv6 { get; set; }
+        string ipv4 { get; set; }
         int port { get; set; }
         string Name { get; set; }
         bool HasPassword { get; set; }

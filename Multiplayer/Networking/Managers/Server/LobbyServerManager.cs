@@ -8,6 +8,8 @@ using UnityEngine.Networking;
 using Multiplayer.Components.Networking;
 using DV.WeatherSystem;
 using System.Text.RegularExpressions;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
 
 namespace Multiplayer.Networking.Managers.Server;
 public class LobbyServerManager : MonoBehaviour
@@ -29,9 +31,10 @@ public class LobbyServerManager : MonoBehaviour
     private NetworkServer server;
     private string server_id { get; set; }
     private string private_key { get; set; }
-    private string myIPv4 { get; set; }
-    private bool updateIPv4 { get; set; } = false;
-    
+
+    private bool initialised = false;
+
+
 
     private bool sendUpdates = false;
     private float timePassed = 0f;
@@ -41,8 +44,21 @@ public class LobbyServerManager : MonoBehaviour
         server = NetworkLifecycle.Instance.Server;
 
         Multiplayer.Log($"LobbyServerManager New({server != null})");
-        Multiplayer.Log($"StartingCoroutine {Multiplayer.Settings.LobbyServerAddress}/{ENDPOINT_ADD_SERVER}");
-        StartCoroutine(RegisterWithLobbyServer($"{Multiplayer.Settings.LobbyServerAddress}/{ENDPOINT_ADD_SERVER}"));
+    }
+
+    private IEnumerator Start()
+    {
+        server.serverData.ipv6 = GetStaticIPv6Address();
+        StartCoroutine(GetIPv4(Multiplayer.Settings.Ipv4AddressCheck));
+
+        yield return new WaitUntil(() => initialised);
+
+        Multiplayer.Log("Public IPv4: " + server.serverData.ipv4);
+        Multiplayer.Log("Public IPv6: " + server.serverData.ipv6);
+
+        Multiplayer.Log("Registering server at: " + Multiplayer.Settings.LobbyServerAddress + "/add_game_server");
+
+        StartCoroutine(RegisterWithLobbyServer(Multiplayer.Settings.LobbyServerAddress + "/add_game_server"));
     }
 
     private void OnDestroy()
@@ -93,13 +109,6 @@ public class LobbyServerManager : MonoBehaviour
                     private_key = response.private_key;
                     server_id = response.game_server_id;
 
-                    //Check if we are using IPv6 to talk to the lobby server
-                    if(response.ipv4_request == true)
-                    {
-                        //We are using IPv6, so now we will need to make a request to an IPv4 service, then update the lobby server with our IPv4 IP
-                        StartCoroutine(GetIPv4($"{Multiplayer.Settings.Ipv4AddressCheck}"));
-                    }
-
                     sendUpdates = true;
                 }
             },
@@ -136,13 +145,6 @@ public class LobbyServerManager : MonoBehaviour
                                                                     server.serverData.CurrentPlayers
                                                                   );
 
-        //do we need to provide our IPv4?
-        if(updateIPv4 && myIPv4 != null && myIPv4 != string.Empty)
-        {
-            reqData.ipv4 = myIPv4;
-            updateIPv4 = false;
-        }
-
         string json = JsonConvert.SerializeObject(reqData, jsonSettings);
         Multiplayer.LogDebug(() => $"UpdateLobbyServer JsonRequest: {json}");
 
@@ -168,7 +170,7 @@ public class LobbyServerManager : MonoBehaviour
     private IEnumerator GetIPv4(string uri)
     {
  
-        Multiplayer.Log("Preparing to get IPv4");
+        Multiplayer.Log("Preparing to get IPv4: " + uri);
 
         yield return SendWebRequest(
             uri,
@@ -179,18 +181,21 @@ public class LobbyServerManager : MonoBehaviour
                 if (match != null)
                 {
                     Multiplayer.Log($"IPv4 address extracted: {match.Value}");
-                    myIPv4 = match.Value;
-                    updateIPv4 = true;
-                    StopAllCoroutines();
-                    StartCoroutine(UpdateLobbyServer($"{Multiplayer.Settings.LobbyServerAddress}/{ENDPOINT_UPDATE_SERVER}"));
+                    server.serverData.ipv4 = match.Value;     
                 }
                 else
                 {
                     Multiplayer.LogError($"Failed to find IPv4 address. Server will only be available via IPv6");
                 }
 
+                initialised = true;
+
             },
-            webRequest => Multiplayer.LogError("Failed to remove from lobby server")
+            webRequest =>
+            {
+                Multiplayer.LogError("Failed to find IPv4 address. Server will only be available via IPv6");
+                initialised = true;
+            }
         );
     }
 
@@ -239,5 +244,29 @@ public class LobbyServerManager : MonoBehaviour
                 }
             }
         }
+    }
+
+    private string GetStaticIPv6Address()
+    {
+        foreach (NetworkInterface networkInterface in NetworkInterface.GetAllNetworkInterfaces())
+        {
+            bool flag = !networkInterface.Supports(NetworkInterfaceComponent.IPv6) || networkInterface.OperationalStatus != OperationalStatus.Up || networkInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback || networkInterface.NetworkInterfaceType == NetworkInterfaceType.Tunnel;
+            if (!flag)
+            {
+                foreach (UnicastIPAddressInformation unicastIPAddressInformation in networkInterface.GetIPProperties().UnicastAddresses)
+                {
+                    bool flag2 = unicastIPAddressInformation.Address.AddressFamily == AddressFamily.InterNetworkV6;
+                    if (flag2)
+                    {
+                        bool flag3 = !unicastIPAddressInformation.Address.IsIPv6LinkLocal && !unicastIPAddressInformation.Address.IsIPv6SiteLocal && unicastIPAddressInformation.IsDnsEligible;
+                        if (flag3)
+                        {
+                            return unicastIPAddressInformation.Address.ToString();
+                        }
+                    }
+                }
+            }
+        }
+        return null;
     }
 }

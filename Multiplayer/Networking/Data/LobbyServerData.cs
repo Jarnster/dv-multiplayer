@@ -13,7 +13,8 @@ namespace Multiplayer.Networking.Data
  
         public string id { get; set; }
  
-        public string ip { get; set; }
+        public string ipv4 { get; set; }
+        public string ipv6 { get; set; }
         public int port { get; set; }
 
         [JsonProperty("server_name")]
