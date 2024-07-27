@@ -224,19 +224,19 @@ public class NetworkServer : NetworkManager
         SendPacketToAll(ClientboundSpawnTrainCarPacket.FromTrainCar(networkedTrainCar), DeliveryMethod.ReliableOrdered, selfPeer);
     }
 
-    public void SendDestroyTrainCar(TrainCar trainCar)
+    public void SendDestroyTrainCar(ushort netId)
     {
-        ushort netID = trainCar.GetNetId();
+        //ushort netID = trainCar.GetNetId();
 
-        if (netID == 0)
+        if (netId == 0)
         {
-            Multiplayer.LogWarning($"SendDestroyTrainCar failed. TrainCar: {trainCar.name} {netID}");
+            Multiplayer.LogWarning($"SendDestroyTrainCar failed. netId {netId}");
             return;
         }
 
         SendPacketToAll(new ClientboundDestroyTrainCarPacket
         {
-            NetId = trainCar.GetNetId()
+            NetId = netId,
         }, DeliveryMethod.ReliableOrdered, selfPeer);
     }
 

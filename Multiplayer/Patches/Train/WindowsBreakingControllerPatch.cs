@@ -39,7 +39,16 @@ public static class WindowsBreakingController_BreakWindowsFromCollision_Patch
     {
         if (!NetworkLifecycle.Instance.IsHost())
             return;
-        ushort netId = TrainCar.Resolve(__instance.transform).GetNetId();
+
+        TrainCar car = TrainCar.Resolve(__instance.transform);
+        ushort netId = car.GetNetId();
+
+        if (netId == 0)
+        {
+            Multiplayer.LogWarning($"RepairWindows failed, {car.name}");
+            return;
+        }
+
         NetworkLifecycle.Instance.Server.SendWindowsRepaired(netId);
     }
 }

@@ -15,6 +15,6 @@ public static class CarSpawner_PrepareTrainCarForDeleting_Patch
         if (!trainCar.TryNetworked(out NetworkedTrainCar networkedTrainCar))
             return;
         networkedTrainCar.IsDestroying = true;
-        NetworkLifecycle.Instance.Server?.SendDestroyTrainCar(trainCar);
+        NetworkLifecycle.Instance.Server?.SendDestroyTrainCar(networkedTrainCar.NetId);
     }
 }

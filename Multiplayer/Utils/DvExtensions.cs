@@ -23,9 +23,9 @@ public static class DvExtensions
 
         if (car != null && car.TryNetworked(out NetworkedTrainCar networkedTrainCar))
             netId = networkedTrainCar.NetId;
-
+/*
         if (netId == 0)
-            Multiplayer.LogWarning($"NetId for {car.carLivery.id} ({car.ID}) isn't initialized!\r\n" + new System.Diagnostics.StackTrace());
+            Multiplayer.LogWarning($"NetId for {car.carLivery.id} ({car.ID}) isn't initialized!\r\n" + (Multiplayer.Settings.DebugLogging ? new System.Diagnostics.StackTrace() : ""));*/
             //throw new InvalidOperationException($"NetId for {car.carLivery.id} ({car.ID}) isn't initialized!");
         return netId;
     }
