@@ -326,12 +326,18 @@ namespace Multiplayer.Components.MainMenu
                 buttonJoin.ToggleInteractable(false);
 
                 //TODO: Add logic to allow IPv6 addresses to be used
-                if (selectedServer.ipv4 != null &&
+                if (selectedServer.ipv6 != null &&
+                    selectedServer.ipv6 != string.Empty &&
+                    IPv6Regex.IsMatch(selectedServer.ipv6))
+                {
+                    address = selectedServer.ipv6;
+                }else if (selectedServer.ipv4 != null &&
                     selectedServer.ipv4 != string.Empty &&
                     IPv4Regex.IsMatch(selectedServer.ipv4))
                 {
                     address = selectedServer.ipv4;
                 }
+                Multiplayer.Log($"Selected IP address is: {address}");
 
                 if (selectedServer.HasPassword)
                 {

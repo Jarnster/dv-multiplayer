@@ -28,6 +28,7 @@ using Multiplayer.Networking.Packets.Serverbound;
 using Multiplayer.Utils;
 using UnityEngine;
 using UnityModManagerNet;
+using System.Net;
 
 namespace Multiplayer.Networking.Listeners;
 
@@ -67,6 +68,16 @@ public class NetworkServer : NetworkManager
     public bool Start(int port)
     {
         WorldStreamingInit.LoadingFinished += OnLoaded;
+
+        //Try to get our static IPv6 Address we will need this for IPv6 NAT punching to be reliable
+        if(IPAddress.TryParse(LobbyServerManager.GetStaticIPv6Address(), out IPAddress ipv6Address))
+        {
+            Multiplayer.Log($"Starting server, will listen to IPv6: {ipv6Address.ToString()}");
+            //start the connection, IPv4 messages can come from anywhere, IPv6 messages need to specifically come from the static IPv6
+            return netManager.Start(IPAddress.Any, ipv6Address,port);
+        }
+
+        //we're not running IPv6, start as normal
         return netManager.Start(port);
     }
 

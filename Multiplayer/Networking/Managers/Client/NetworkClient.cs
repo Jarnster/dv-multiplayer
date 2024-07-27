@@ -57,7 +57,7 @@ public class NetworkClient : NetworkManager
 
     public NetworkClient(Settings settings) : base(settings)
     {
-        PlayerManager = new ClientPlayerManager();
+        ClientPlayerManager = new ClientPlayerManager();
     }
 
     public void Start(string address, int port, string password, bool isSinglePlayer)
@@ -217,30 +217,30 @@ public class NetworkClient : NetworkManager
     private void OnClientboundPlayerJoinedPacket(ClientboundPlayerJoinedPacket packet)
     {
         Guid guid = new(packet.Guid);
-        PlayerManager.AddPlayer(packet.Id, packet.Username, guid);
-        PlayerManager.UpdateCar(packet.Id, packet.TrainCar);
-        PlayerManager.UpdatePosition(packet.Id, packet.Position, Vector3.zero, packet.Rotation, false, packet.TrainCar != 0);
+        ClientPlayerManager.AddPlayer(packet.Id, packet.Username, guid);
+        ClientPlayerManager.UpdateCar(packet.Id, packet.TrainCar);
+        ClientPlayerManager.UpdatePosition(packet.Id, packet.Position, Vector3.zero, packet.Rotation, false, packet.TrainCar != 0);
     }
 
     private void OnClientboundPlayerDisconnectPacket(ClientboundPlayerDisconnectPacket packet)
     {
         Log($"Received player disconnect packet (Id: {packet.Id})");
-        PlayerManager.RemovePlayer(packet.Id);
+        ClientPlayerManager.RemovePlayer(packet.Id);
     }
 
     private void OnClientboundPlayerPositionPacket(ClientboundPlayerPositionPacket packet)
     {
-        PlayerManager.UpdatePosition(packet.Id, packet.Position, packet.MoveDir, packet.RotationY, packet.IsJumping, packet.IsOnCar);
+        ClientPlayerManager.UpdatePosition(packet.Id, packet.Position, packet.MoveDir, packet.RotationY, packet.IsJumping, packet.IsOnCar);
     }
 
     private void OnClientboundPlayerCarPacket(ClientboundPlayerCarPacket packet)
     {
-        PlayerManager.UpdateCar(packet.Id, packet.CarId);
+        ClientPlayerManager.UpdateCar(packet.Id, packet.CarId);
     }
 
     private void OnClientboundPingUpdatePacket(ClientboundPingUpdatePacket packet)
     {
-        PlayerManager.UpdatePing(packet.Id, packet.Ping);
+        ClientPlayerManager.UpdatePing(packet.Id, packet.Ping);
     }
 
     private void OnClientboundTickSyncPacket(ClientboundTickSyncPacket packet)

@@ -246,7 +246,7 @@ public class LobbyServerManager : MonoBehaviour
         }
     }
 
-    private string GetStaticIPv6Address()
+    public static string GetStaticIPv6Address()
     {
         foreach (NetworkInterface networkInterface in NetworkInterface.GetAllNetworkInterfaces())
         {

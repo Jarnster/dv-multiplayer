@@ -8,6 +8,7 @@ namespace Multiplayer.Patches.Jobs;
 [HarmonyPatch(typeof(StationJobGenerationRange), nameof(StationJobGenerationRange.PlayerSqrDistanceFromStationCenter), MethodType.Getter)]
 public static class StationJobGenerationRange_PlayerSqrDistanceFromStationCenter_Patch
 {
+    private static int frameCount = 0;
     private static bool Prefix(StationJobGenerationRange __instance, ref float __result)
     {
         if (!NetworkLifecycle.Instance.IsHost())
@@ -23,6 +24,25 @@ public static class StationJobGenerationRange_PlayerSqrDistanceFromStationCenter
             float sqDist = (serverPlayer.WorldPosition - anchor).sqrMagnitude;
             if (sqDist < __result)
                 __result = sqDist;
+
+            if (frameCount == 60)
+            {
+                Multiplayer.LogDebug(() => $"PlayerSqrDistanceFromStationCenter:\r\n\t" +
+                                            $"player: '{serverPlayer.Username}',\r\n\t\t" +
+                                                $"absPos: {serverPlayer.AbsoluteWorldPosition.ToString()},\r\n\t\t" +
+                                                $"rawPos: {serverPlayer.RawPosition.ToString()},\r\n\t\t" +
+                                                $"worldPos: {serverPlayer.WorldPosition.ToString()},\r\n\t" +
+                                            $"station name: '{__instance.name}',\r\n\t\t" +
+                                                $"anchor: {anchor.ToString()},\r\n\t" +
+                                            $"sqDist: {sqDist}");
+            }
+        }
+
+        frameCount++;
+        if (frameCount > 60)
+        {
+            frameCount = 0;
+
         }
 
         return false;
