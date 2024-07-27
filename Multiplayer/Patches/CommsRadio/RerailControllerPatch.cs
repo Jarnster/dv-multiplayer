@@ -26,8 +26,19 @@ public static class RerailControllerPatch
         if (Inventory.Instance.PlayerMoney < __instance.rerailPrice)
             return true;
 
+        __instance.carToRerail.TryNetworked(out NetworkedTrainCar networkedTrainCar);
+
+        if (networkedTrainCar == null || networkedTrainCar != null && networkedTrainCar.NetId == 0)
+        {
+            Multiplayer.LogDebug(() => $"RerailController unable to rerail car: {__instance.carToRerail.name}, netId {networkedTrainCar?.NetId} ");
+            //CommsRadioController.PlayAudioFromRadio(__instance.cancelSound, __instance.transform);
+            __instance.ClearFlags();
+            return false;
+        }
+
+
         NetworkLifecycle.Instance.Client.SendTrainRerailRequest(
-            __instance.carToRerail.GetNetId(),
+            networkedTrainCar.NetId,
             NetworkedRailTrack.GetFromRailTrack(__instance.rerailTrack).NetId,
             __instance.rerailPointWorldAbsPosition,
             __instance.rerailPointWorldForward

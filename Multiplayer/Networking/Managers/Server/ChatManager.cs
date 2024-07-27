@@ -15,6 +15,8 @@ public static class ChatManager
     public const string COMMAND_WHISPER_SHORT = "w";
     public const string COMMAND_HELP_SHORT = "?";
     public const string COMMAND_HELP = "help";
+    public const string COMMAND_LOG = "log";
+    public const string COMMAND_LOG_SHORT = "l";
 
     public const string MESSAGE_COLOUR_SERVER = "9CDCFE";
     public const string MESSAGE_COLOUR_HELP = "00FF00";
@@ -56,6 +58,13 @@ public static class ChatManager
                     break;
                 case COMMAND_HELP:
                     HelpMessage(sender);
+                    break;
+
+                case COMMAND_LOG_SHORT:
+                    Multiplayer.specLog = !Multiplayer.specLog;
+                    break;
+                case COMMAND_LOG:
+                    Multiplayer.specLog = !Multiplayer.specLog;
                     break;
 
                 //allow messages that are not commands to go through

@@ -226,6 +226,14 @@ public class NetworkServer : NetworkManager
 
     public void SendDestroyTrainCar(TrainCar trainCar)
     {
+        ushort netID = trainCar.GetNetId();
+
+        if (netID == 0)
+        {
+            Multiplayer.LogWarning($"SendDestroyTrainCar failed. TrainCar: {trainCar.name} {netID}");
+            return;
+        }
+
         SendPacketToAll(new ClientboundDestroyTrainCarPacket
         {
             NetId = trainCar.GetNetId()
@@ -602,7 +610,12 @@ public class NetworkServer : NetworkManager
             return;
 
         if (TryGetServerPlayer(peer, out ServerPlayer player))
+        {
             player.CarId = packet.CarId;
+            player.RawPosition = packet.Position;
+            player.RawRotationY = packet.RotationY;
+
+        }
 
         ClientboundPlayerCarPacket clientboundPacket = new()
         {

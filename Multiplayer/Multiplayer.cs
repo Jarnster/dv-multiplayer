@@ -22,6 +22,8 @@ public static class Multiplayer
     private static AssetBundle assetBundle;
     public static AssetIndex AssetIndex { get; private set; }
 
+    public static bool specLog = false;
+
     [UsedImplicitly]
     private static bool Load(UnityModManager.ModEntry modEntry)
     {

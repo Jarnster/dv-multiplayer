@@ -39,8 +39,23 @@ public static class CustomFirstPersonControllerPatch
 
     private static void OnCarChanged(TrainCar trainCar)
     {
+        //Multiplayer.LogDebug(() => $"OnCarChanged isOnCar: {isOnCar}, car: {trainCar?.name}");
+
         isOnCar = trainCar != null;
-        NetworkLifecycle.Instance.Client.SendPlayerCar(!isOnCar ? (ushort)0 : trainCar.GetNetId());
+
+        //Multiplayer.LogDebug(() => $"OnCarChanged isOnCar: {isOnCar}, car: {trainCar?.name}");
+
+        Vector3 position = isOnCar ? PlayerManager.PlayerTransform.localPosition : PlayerManager.GetWorldAbsolutePlayerPosition();
+        float rotationY = (isOnCar ? PlayerManager.PlayerTransform.localEulerAngles : PlayerManager.PlayerTransform.eulerAngles).y;
+
+        //Multiplayer.LogDebug(() => $"OnCarChanged isOnCar: {isOnCar}, car: {trainCar?.name}, lastPosition: {lastPosition}, lastRotation: {lastRotationY},  position: {position}, rotation: {rotationY}");
+
+        lastPosition = position;
+        lastRotationY = rotationY;
+
+
+
+        NetworkLifecycle.Instance.Client.SendPlayerCar(!isOnCar ? (ushort)0 : trainCar.GetNetId(), lastPosition, PlayerManager.PlayerTransform.InverseTransformDirection(fps.m_MoveDir), lastRotationY, isJumping);
     }
 
     private static void OnTick(uint tick)

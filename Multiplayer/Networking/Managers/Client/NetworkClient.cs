@@ -779,11 +779,15 @@ public class NetworkClient : NetworkManager
         }, reliable ? DeliveryMethod.ReliableOrdered : DeliveryMethod.Sequenced);
     }
 
-    public void SendPlayerCar(ushort carId)
+    public void SendPlayerCar(ushort carId,Vector3 position, Vector3 moveDir, float rotationY, bool isJumping)
     {
         SendPacketToServer(new ServerboundPlayerCarPacket
         {
-            CarId = carId
+            CarId = carId,
+            Position = position,
+            MoveDir = moveDir,
+            RotationY=rotationY,
+ 
         }, DeliveryMethod.ReliableOrdered);
     }
 
@@ -816,11 +820,20 @@ public class NetworkClient : NetworkManager
 
     public void SendTrainCouple(Coupler coupler, Coupler otherCoupler, bool playAudio, bool viaChainInteraction)
     {
+        ushort couplerNetId = coupler.train.GetNetId();
+        ushort otherCouplerNetId = otherCoupler.train.GetNetId();
+
+        if (couplerNetId == 0 || otherCouplerNetId == 0)
+        {
+            Multiplayer.LogWarning($"SendTrainCouple failed. Coupler: {coupler.name} {couplerNetId}, OtherCoupler: {otherCoupler.name} {otherCouplerNetId}");
+            return;
+        }
+
         SendPacketToServer(new CommonTrainCouplePacket
         {
-            NetId = coupler.train.GetNetId(),
+            NetId = couplerNetId, //coupler.train.GetNetId(),
             IsFrontCoupler = coupler.isFrontCoupler,
-            OtherNetId = otherCoupler.train.GetNetId(),
+            OtherNetId = otherCouplerNetId, //otherCoupler.train.GetNetId(),
             OtherCarIsFrontCoupler = otherCoupler.isFrontCoupler,
             PlayAudio = playAudio,
             ViaChainInteraction = viaChainInteraction
@@ -829,9 +842,17 @@ public class NetworkClient : NetworkManager
 
     public void SendTrainUncouple(Coupler coupler, bool playAudio, bool dueToBrokenCouple, bool viaChainInteraction)
     {
+        ushort couplerNetId = coupler.train.GetNetId();
+
+        if (couplerNetId == 0)
+        {
+            Multiplayer.LogWarning($"SendTrainUncouple failed. Coupler: {coupler.name} {couplerNetId}");
+            return;
+        }
+
         SendPacketToServer(new CommonTrainUncouplePacket
         {
-            NetId = coupler.train.GetNetId(),
+            NetId = couplerNetId,
             IsFrontCoupler = coupler.isFrontCoupler,
             PlayAudio = playAudio,
             ViaChainInteraction = viaChainInteraction,
@@ -841,11 +862,20 @@ public class NetworkClient : NetworkManager
 
     public void SendHoseConnected(Coupler coupler, Coupler otherCoupler, bool playAudio)
     {
+        ushort couplerNetId = coupler.train.GetNetId();
+        ushort otherCouplerNetId = otherCoupler.train.GetNetId();
+
+        if (couplerNetId == 0 || otherCouplerNetId == 0)
+        {
+            Multiplayer.LogWarning($"SendHoseConnected failed. Coupler: {coupler.name} {couplerNetId}, OtherCoupler: {otherCoupler.name} {otherCouplerNetId}");
+            return;
+        }
+
         SendPacketToServer(new CommonHoseConnectedPacket
         {
-            NetId = coupler.train.GetNetId(),
+            NetId = couplerNetId,
             IsFront = coupler.isFrontCoupler,
-            OtherNetId = otherCoupler.train.GetNetId(),
+            OtherNetId = otherCouplerNetId,
             OtherIsFront = otherCoupler.isFrontCoupler,
             PlayAudio = playAudio
         }, DeliveryMethod.ReliableUnordered);
@@ -853,9 +883,17 @@ public class NetworkClient : NetworkManager
 
     public void SendHoseDisconnected(Coupler coupler, bool playAudio)
     {
+        ushort couplerNetId = coupler.train.GetNetId();
+
+        if (couplerNetId == 0)
+        {
+            Multiplayer.LogWarning($"SendHoseDisconnected failed. Coupler: {coupler.name} {couplerNetId}");
+            return;
+        }
+
         SendPacketToServer(new CommonHoseDisconnectedPacket
         {
-            NetId = coupler.train.GetNetId(),
+            NetId = couplerNetId,
             IsFront = coupler.isFrontCoupler,
             PlayAudio = playAudio
         }, DeliveryMethod.ReliableUnordered);
@@ -863,11 +901,20 @@ public class NetworkClient : NetworkManager
 
     public void SendMuConnected(MultipleUnitCable cable, MultipleUnitCable otherCable, bool playAudio)
     {
+        ushort cableNetId = cable.muModule.train.GetNetId();
+        ushort otherCableNetId = otherCable.muModule.train.GetNetId();
+
+        if (cableNetId == 0 || otherCableNetId == 0)
+        {
+            Multiplayer.LogWarning($"SendMuConnected failed. Cable: {cable.muModule.train.name} {cableNetId}, OtherCable: {otherCable.muModule.train.name} {otherCableNetId}");
+            return;
+        }
+
         SendPacketToServer(new CommonMuConnectedPacket
         {
-            NetId = cable.muModule.train.GetNetId(),
+            NetId = cableNetId,
             IsFront = cable.isFront,
-            OtherNetId = otherCable.muModule.train.GetNetId(),
+            OtherNetId = otherCableNetId,
             OtherIsFront = otherCable.isFront,
             PlayAudio = playAudio
         }, DeliveryMethod.ReliableUnordered);
@@ -875,6 +922,7 @@ public class NetworkClient : NetworkManager
 
     public void SendMuDisconnected(ushort netId, MultipleUnitCable cable, bool playAudio)
     {
+
         SendPacketToServer(new CommonMuDisconnectedPacket
         {
             NetId = netId,

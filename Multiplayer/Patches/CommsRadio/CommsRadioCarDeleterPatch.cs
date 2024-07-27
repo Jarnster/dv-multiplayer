@@ -23,14 +23,17 @@ public static class CommsRadioCarDeleterPatch
         if (Inventory.Instance.PlayerMoney < __instance.removePrice)
             return true;
 
-        if (__instance.carToDelete.TryNetworked(out NetworkedTrainCar networkedTrainCar) && networkedTrainCar.HasPlayers)
+        __instance.carToDelete.TryNetworked(out NetworkedTrainCar networkedTrainCar);
+
+        if (networkedTrainCar == null || networkedTrainCar != null && (networkedTrainCar.HasPlayers || networkedTrainCar.NetId == 0))
         {
+            Multiplayer.LogDebug(() => $"CommsRadioCarDeleter unable to delete car: {__instance.carToDelete.name}, hasPlayer: {networkedTrainCar?.HasPlayers}, netId {networkedTrainCar?.NetId} ");
             CommsRadioController.PlayAudioFromRadio(__instance.cancelSound, __instance.transform);
             __instance.ClearFlags();
             return false;
         }
 
-        NetworkLifecycle.Instance.Client.SendTrainDeleteRequest(__instance.carToDelete.GetNetId());
+        NetworkLifecycle.Instance.Client.SendTrainDeleteRequest(networkedTrainCar.NetId);
 
         CoroutineManager.Instance.StartCoroutine(PlaySoundsLater(__instance, __instance.carToDelete.transform.position, __instance.removePrice > 0));
         __instance.ClearFlags();

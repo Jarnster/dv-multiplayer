@@ -54,6 +54,10 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
 
         cachedSendPacket.NetId = set.firstCar.GetNetId();
 
+        //car may not be initialised, missing a valid NetID
+        if (cachedSendPacket.NetId == 0)
+            return;
+
         if (set.cars.Contains(null))
         {
             Multiplayer.LogError($"Trainset {set.id} ({set.firstCar.GetNetId()} has a null car!");

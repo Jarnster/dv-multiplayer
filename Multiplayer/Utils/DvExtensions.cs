@@ -7,6 +7,7 @@ using Multiplayer.Components.Networking.World;
 using UnityEngine;
 using UnityEngine.UI;
 using System.Linq;
+using System.Diagnostics;
 
 
 
@@ -24,7 +25,8 @@ public static class DvExtensions
             netId = networkedTrainCar.NetId;
 
         if (netId == 0)
-            throw new InvalidOperationException($"NetId for {car.carLivery.id} ({car.ID}) isn't initialized!");
+            Multiplayer.LogWarning($"NetId for {car.carLivery.id} ({car.ID}) isn't initialized!\r\n" + new System.Diagnostics.StackTrace());
+            //throw new InvalidOperationException($"NetId for {car.carLivery.id} ({car.ID}) isn't initialized!");
         return netId;
     }
 
