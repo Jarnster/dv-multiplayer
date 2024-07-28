@@ -30,6 +30,7 @@ using UnityEngine;
 using UnityModManagerNet;
 using System.Net;
 using static DV.UI.ATutorialsMenuProvider;
+using HarmonyLib;
 
 namespace Multiplayer.Networking.Listeners;
 
@@ -56,6 +57,9 @@ public class NetworkServer : NetworkManager
     public readonly IDifficulty Difficulty;
     private bool IsLoaded;
 
+    //we don't care if the client doesn't have these mods
+    private string[] modWhiteList = { "RuntimeUnityEditor" };
+
     public NetworkServer(IDifficulty difficulty, Settings settings, bool isPublic, bool isSinglePlayer, LobbyServerData serverData) : base(settings)
     {
         this.isPublic = isPublic;
@@ -63,7 +67,9 @@ public class NetworkServer : NetworkManager
         this.serverData = serverData;
 
         Difficulty = difficulty;
-        serverMods = ModInfo.FromModEntries(UnityModManager.modEntries);
+
+        serverMods = ModInfo.FromModEntries(UnityModManager.modEntries)
+                            .Where(mod => !modWhiteList.Contains(mod.Id)).ToArray();
 
         //Start our NAT punch server
         if (Multiplayer.Settings.EnableNatPunch)
@@ -456,11 +462,12 @@ public class NetworkServer : NetworkManager
             return;
         }
 
-        ModInfo[] clientMods = packet.Mods;
+        ModInfo[] clientMods = packet.Mods.Where(mod => !modWhiteList.Contains(mod.Id)).ToArray();
         if (!serverMods.SequenceEqual(clientMods))
         {
             ModInfo[] missing = serverMods.Except(clientMods).ToArray();
             ModInfo[] extra = clientMods.Except(serverMods).ToArray();
+
             LogWarning($"Denied login due to mod mismatch! {missing.Length} missing, {extra.Length} extra");
             ClientboundServerDenyPacket denyPacket = new()
             {

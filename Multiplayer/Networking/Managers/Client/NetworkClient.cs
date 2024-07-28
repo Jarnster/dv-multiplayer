@@ -151,8 +151,18 @@ public class NetworkClient : NetworkManager
             MainMenu.GoBackToMainMenu();
         }
 
-        //string message = $"{disconnectInfo.Reason}";
+        
+        if( disconnectInfo.Reason == DisconnectReason.ConnectionRejected ||
+            disconnectInfo.Reason == DisconnectReason.RemoteConnectionClose)
+        {
+            netPacketProcessor.ReadAllPackets(disconnectInfo.AdditionalData);
+            return;
+        }
 
+        onDisconnect(disconnectInfo.Reason, null);
+
+        //string message = $"{disconnectInfo.Reason}";
+        /*
         switch (disconnectInfo.Reason)
         {
             case DisconnectReason.DisconnectPeerCalled:
@@ -161,9 +171,8 @@ public class NetworkClient : NetworkManager
                 return;
             case DisconnectReason.RemoteConnectionClose:
                 netPacketProcessor.ReadAllPackets(disconnectInfo.AdditionalData);
-                //message = "The server shut down";
-                break;
-        }
+                return;
+        }*/
 
         /*
         NetworkLifecycle.Instance.QueueMainMenuEvent(() =>
@@ -173,8 +182,6 @@ public class NetworkClient : NetworkManager
                 return;
             popup.labelTMPro.text = text;
         });*/
-
-        onDisconnect(disconnectInfo.Reason, null);
     }
 
     public override void OnNetworkLatencyUpdate(NetPeer peer, int latency)
@@ -228,9 +235,9 @@ public class NetworkClient : NetworkManager
                     text += Locale.Get(Locale.DISCONN_REASON__MODS_EXTRA_KEY, placeholders: string.Join("\n - ", packet.Extra));
             }
 
-            //popup.labelTMPro.text = text;
+        //popup.labelTMPro.text = text;
         //});
-
+        Log($"Received player deny packet: {text}");
         onDisconnect(DisconnectReason.ConnectionRejected, text);
     }
 

@@ -387,11 +387,11 @@ namespace Multiplayer.Components.MainMenu
 
                 //Check if we can connect to this server
                 Multiplayer.Log($"Server: \"{selectedServer.GameVersion}\" \"{selectedServer.MultiplayerVersion}\"");
-                Multiplayer.Log($"Client: \"{BuildInfo.BUILD_VERSION_MAJOR.ToString()}\" \"{Multiplayer.ModEntry.Version.ToString()}\"");
-                Multiplayer.Log($"Result: \"{selectedServer.GameVersion == BuildInfo.BUILD_VERSION_MAJOR.ToString()}\" \"{selectedServer.MultiplayerVersion == Multiplayer.ModEntry.Version.ToString()}\"");
+                Multiplayer.Log($"Client: \"{BuildInfo.BUILD_VERSION_MAJOR.ToString()}\" \"{Multiplayer.ModEntry.Version.ToString(3)}\"");
+                Multiplayer.Log($"Result: \"{selectedServer.GameVersion == BuildInfo.BUILD_VERSION_MAJOR.ToString()}\" \"{selectedServer.MultiplayerVersion == Multiplayer.ModEntry.Version.ToString(3)}\"");
 
                 bool canConnect = selectedServer.GameVersion == BuildInfo.BUILD_VERSION_MAJOR.ToString() &&
-                                  selectedServer.MultiplayerVersion == Multiplayer.ModEntry.Version.ToString();
+                                  selectedServer.MultiplayerVersion == Multiplayer.ModEntry.Version.ToString(3);
 
                 buttonJoin.ToggleInteractable(canConnect);
             }
@@ -539,7 +539,7 @@ namespace Multiplayer.Components.MainMenu
                 {
                     portNumber = ushort.Parse(result.data);
                     ShowPasswordPopup();
-                }
+                } 
             }; 
 
         }
@@ -622,6 +622,7 @@ namespace Multiplayer.Components.MainMenu
             Multiplayer.Log($"AttemptConnection Direct: {direct}, Address: {address}");
 
             attempt = 0;
+            connectionState = ConnectionState.NotConnected;
             ShowConnectingPopup();
 
 
@@ -671,8 +672,9 @@ namespace Multiplayer.Components.MainMenu
             if (connectingPopup != null)
                 connectingPopup.labelTMPro.text = $"Connecting, please wait...\r\nAttempt: {attempt}";
 
+            Multiplayer.Log($"AttemptIPv6() starting attempt");
             connectionState = ConnectionState.AttemptingIPv6; 
-            SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, selectedServer.port, password, false, OnDisconnect);
+            SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, OnDisconnect);
 
         }
 
@@ -689,7 +691,7 @@ namespace Multiplayer.Components.MainMenu
 
             //punching not implemented we'll just try again for now
             connectionState = ConnectionState.AttemptingIPv6Punch;
-            SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, selectedServer.port, password, false, OnDisconnect);
+            SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, OnDisconnect);
  
         }
 
@@ -719,15 +721,20 @@ namespace Multiplayer.Components.MainMenu
 
             if (IPAddress.TryParse(address, out IPAddress IPaddress))
             {
+                Multiplayer.Log($"AttemptIPv4() TryParse passed");
                 if (IPaddress.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
                 {
+                    Multiplayer.Log($"AttemptIPv4() starting attempt");
                     connectionState = ConnectionState.AttemptingIPv4;
-                    SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, selectedServer.port, password, false, OnDisconnect);
+                    SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, OnDisconnect);
                     return;
                 }
             }
 
+            Multiplayer.Log($"AttemptIPv4() TryParse failed");
             AttemptFail();
+            string message = "Host Unreachable";
+            MainMenuThingsAndStuff.Instance.ShowOkPopup(message, () => { });
         }
 
         private void AttemptIPv4Punch()
@@ -743,7 +750,7 @@ namespace Multiplayer.Components.MainMenu
 
             //punching not implemented we'll just try again for now
             connectionState = ConnectionState.AttemptingIPv4Punch;
-            SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, selectedServer.port, password, false, OnDisconnect);
+            SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, OnDisconnect);
         }
 
         private void AttemptFail()
@@ -753,11 +760,13 @@ namespace Multiplayer.Components.MainMenu
             if (connectingPopup != null)
             {
                 connectingPopup.RequestClose(PopupClosedByAction.Abortion, null);
-
-                string message = "Unable to reach host!"; //add translations
-
-                MainMenuThingsAndStuff.Instance.ShowOkPopup(message, () => { });
             }
+
+            if(this.gridView != null)
+                IndexChanged(this.gridView);
+
+            if(buttonDirectIP != null)
+                buttonDirectIP.ToggleInteractable(true);
         }
 
 
@@ -776,7 +785,7 @@ namespace Multiplayer.Components.MainMenu
                 case DisconnectReason.DisconnectPeerCalled:
                     if (message == null || message.Length == 0)
                     {
-                        message = "Player kicked"; //add translations
+                        message = "Player Kicked"; //add translations
                     }
                     break;
                 case DisconnectReason.ConnectionFailed:
@@ -795,11 +804,12 @@ namespace Multiplayer.Components.MainMenu
                             return;
                         case ConnectionState.AttemptingIPv4Punch:
                             AttemptFail();
-                            return;
+                            message = "Host Unreachable";
+                            break;
                     }
                     break;
 
-                case DisconnectReason.ConnectionRejected:
+                case DisconnectReason.ConnectionRejected:        
                     if (message == null || message.Length == 0)
                     {
                         message = "Rejected!"; //add translations
@@ -808,15 +818,23 @@ namespace Multiplayer.Components.MainMenu
                 case DisconnectReason.RemoteConnectionClose:
                     if (message == null || message.Length == 0)
                     {
-                        message = "Server shutdown"; //add translations
+                        message = "Server Shuttingdown"; //add translations
                     }
                     break;
             }
 
+            //Multiplayer.LogError($"OnDisconnect() Calling AF");
+            AttemptFail();
+
+            //Multiplayer.LogError($"OnDisconnect() Queuing");
             NetworkLifecycle.Instance.QueueMainMenuEvent(() =>
-                {
-                    MainMenuThingsAndStuff.Instance.ShowOkPopup(message, ()=>{ });
-                });
+            {
+            
+                //Multiplayer.LogError($"OnDisconnect() Adding PU");
+                MainMenuThingsAndStuff.Instance.ShowOkPopup(message, ()=>{ });
+
+                //Multiplayer.LogError($"OnDisconnect() Done!");
+            });
         }
 
         IEnumerator GetRequest(string uri)
@@ -912,7 +930,7 @@ namespace Multiplayer.Components.MainMenu
                 item.HasPassword = UnityEngine.Random.Range(0, 10) > 5;
 
                 item.GameVersion = UnityEngine.Random.Range(1, 10) > 3 ? BuildInfo.BUILD_VERSION_MAJOR.ToString() : "97";
-                item.MultiplayerVersion = UnityEngine.Random.Range(1, 10) > 3 ? Multiplayer.ModEntry.Version.ToString() : "0.1.0";
+                item.MultiplayerVersion = UnityEngine.Random.Range(1, 10) > 3 ? Multiplayer.ModEntry.Version.ToString(3) : "0.1.0";
 
                 gridViewModel.Add(item);
             }
