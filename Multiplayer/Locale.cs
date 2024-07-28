@@ -140,7 +140,7 @@ namespace Multiplayer
             }
 
             csv = Csv.Parse(File.ReadAllText(path));
-            Multiplayer.LogDebug(() => $"Locale dump: {Csv.Dump(csv)}");
+            //Multiplayer.LogDebug(() => $"Locale dump: {Csv.Dump(csv)}");
         }
 
         public static string Get(string key, string overrideLanguage = null)

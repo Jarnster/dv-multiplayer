@@ -109,7 +109,7 @@ function validate_server_info($data) {
     }
 
     if (
-            //make sure we have at lease one IP
+            //make sure we have at least one IP
             $data['ipv4'] == '' && $data['ipv6'] == '' ||   
 
             //Make sure we have all required fields

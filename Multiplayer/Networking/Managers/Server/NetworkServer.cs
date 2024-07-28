@@ -29,6 +29,7 @@ using Multiplayer.Utils;
 using UnityEngine;
 using UnityModManagerNet;
 using System.Net;
+using static DV.UI.ATutorialsMenuProvider;
 
 namespace Multiplayer.Networking.Listeners;
 
@@ -63,6 +64,12 @@ public class NetworkServer : NetworkManager
 
         Difficulty = difficulty;
         serverMods = ModInfo.FromModEntries(UnityModManager.modEntries);
+
+        //Start our NAT punch server
+        if (Multiplayer.Settings.EnableNatPunch)
+        {
+            netManager.NatPunchModule.Init(this);
+        }
     }
 
     public bool Start(int port)
@@ -194,6 +201,17 @@ public class NetworkServer : NetworkManager
 
     #endregion
 
+    #region NAT Punch Events
+    public override void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
+    {
+        //do some stuff here
+    }
+    public override void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token)
+    {
+        //do other stuff here
+    }
+    #endregion
+
     #region Packet Senders
 
     private void SendPacketToAll<T>(T packet, DeliveryMethod deliveryMethod) where T : class, new()
@@ -214,6 +232,10 @@ public class NetworkServer : NetworkManager
         }
     }
 
+    public void KickPlayer(NetPeer peer)
+    {
+        peer.Disconnect(WritePacket(new ClientboundPlayerKickPacket()));
+    }
     public void SendGameParams(GameParams gameParams)
     {
         SendPacketToAll(ClientboundGameParamsPacket.FromGameParams(gameParams), DeliveryMethod.ReliableOrdered, selfPeer);
@@ -291,7 +313,7 @@ public class NetworkServer : NetworkManager
 
     public void SendWindowsRepaired(ushort netId)
     {
-        SendPacketToAll(new ClientboundWindowsBrokenPacket
+        SendPacketToAll(new ClientboundWindowsRepairedPacket
         {
             NetId = netId
         }, DeliveryMethod.ReliableUnordered, selfPeer);

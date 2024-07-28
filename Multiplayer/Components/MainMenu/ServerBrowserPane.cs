@@ -16,6 +16,8 @@ using System.Linq;
 using Multiplayer.Networking.Data;
 using DV;
 using System.Net;
+using LiteNetLib;
+using LiteNetLib.Utils;
 
 namespace Multiplayer.Components.MainMenu
 {
@@ -62,6 +64,21 @@ namespace Multiplayer.Components.MainMenu
         private int portNumber;
         string password = null;
         bool direct = false;
+
+        private ConnectionState connectionState = ConnectionState.NotConnected;
+        private Popup connectingPopup;
+        private int attempt;
+
+        private enum ConnectionState
+        {
+            NotConnected,
+            AttemptingIPv6,
+            AttemptingIPv6Punch,
+            AttemptingIPv4,
+            AttemptingIPv4Punch,
+            Failed,
+            Aborted
+        }
 
         private string[] testNames = new string[] { "ChooChooExpress", "RailwayRascals", "FreightFrenzy", "SteamDream", "DieselDynasty", "CargoKings", "TrackMasters", "RailwayRevolution", "ExpressElders", "IronHorseHeroes", "LocomotiveLegends", "TrainTitans", "HeavyHaulers", "RapidRails", "TimberlineTransport", "CoalCountry", "SilverRailway", "GoldenGauge", "SteelStream", "MountainMoguls", "RailRiders", "TrackTrailblazers", "FreightFanatics", "SteamSensation", "DieselDaredevils", "CargoChampions", "TrackTacticians", "RailwayRoyals", "ExpressExperts", "IronHorseInnovators", "LocomotiveLeaders", "TrainTacticians", "HeavyHitters", "RapidRunners", "TimberlineTrains", "CoalCrushers", "SilverStreamliners", "GoldenGears", "SteelSurge", "MountainMovers", "RailwayWarriors", "TrackTerminators", "FreightFighters", "SteamStreak", "DieselDynamos", "CargoCommanders", "TrackTrailblazers", "RailwayRangers", "ExpressEngineers", "IronHorseInnovators", "LocomotiveLovers", "TrainTrailblazers", "HeavyHaulersHub", "RapidRailsRacers", "TimberlineTrackers", "CoalCountryCarriers", "SilverSpeedsters", "GoldenGaugeGang", "SteelStalwarts", "MountainMoversClub", "RailRunners", "TrackTitans", "FreightFalcons", "SteamSprinters", "DieselDukes", "CargoCommandos", "TrackTracers", "RailwayRebels", "ExpressElite", "IronHorseIcons", "LocomotiveLunatics", "TrainTornadoes", "HeavyHaulersCrew", "RapidRailsRunners", "TimberlineTrackMasters", "CoalCountryCrew", "SilverSprinters", "GoldenGale", "SteelSpeedsters", "MountainMarauders", "RailwayRiders", "TrackTactics", "FreightFury", "SteamSquires", "DieselDefenders", "CargoCrusaders", "TrackTechnicians", "RailwayRaiders", "ExpressEnthusiasts", "IronHorseIlluminati", "LocomotiveLoyalists", "TrainTurbulence", "HeavyHaulersHeroes", "RapidRailsRiders", "TimberlineTrackTitans", "CoalCountryCaravans", "SilverSpeedRacers", "GoldenGaugeGangsters", "SteelStorm", "MountainMasters", "RailwayRoadrunners", "TrackTerror", "FreightFleets", "SteamSurgeons", "DieselDragons", "CargoCrushers", "TrackTaskmasters", "RailwayRevolutionaries", "ExpressExplorers", "IronHorseInquisitors", "LocomotiveLegion", "TrainTriumph", "HeavyHaulersHorde", "RapidRailsRenegades", "TimberlineTrackTeam", "CoalCountryCrusade", "SilverSprintersSquad", "GoldenGaugeGroup", "SteelStrike", "MountainMonarchs", "RailwayRaid", "TrackTacticiansTeam", "FreightForce", "SteamSquad", "DieselDynastyClan", "CargoCrew", "TrackTeam", "RailwayRalliers", "ExpressExpedition", "IronHorseInitiative", "LocomotiveLeague", "TrainTribe", "HeavyHaulersHustle", "RapidRailsRevolution", "TimberlineTrackersTeam", "CoalCountryConvoy", "SilverSprint", "GoldenGaugeGuild", "SteelSpirits", "MountainMayhem", "RailwayRaidersCrew", "TrackTrailblazersTribe", "FreightFleetForce", "SteamStalwarts", "DieselDragonsDen", "CargoCaptains", "TrackTrailblazersTeam", "RailwayRidersRevolution", "ExpressEliteExpedition", "IronHorseInsiders", "LocomotiveLords", "TrainTacticiansTribe", "HeavyHaulersHeroesHorde", "RapidRailsRacersTeam", "TimberlineTrackMastersTeam", "CoalCountryCarriersCrew", "SilverSpeedstersSprint", "GoldenGaugeGangGuild", "SteelSurgeStrike", "MountainMoversMonarchs" };
 
@@ -325,20 +342,6 @@ namespace Multiplayer.Components.MainMenu
                 buttonDirectIP.ToggleInteractable(false);
                 buttonJoin.ToggleInteractable(false);
 
-                //TODO: Add logic to allow IPv6 addresses to be used
-                if (selectedServer.ipv6 != null &&
-                    selectedServer.ipv6 != string.Empty &&
-                    IPv6Regex.IsMatch(selectedServer.ipv6))
-                {
-                    address = selectedServer.ipv6;
-                }else if (selectedServer.ipv4 != null &&
-                    selectedServer.ipv4 != string.Empty &&
-                    IPv4Regex.IsMatch(selectedServer.ipv4))
-                {
-                    address = selectedServer.ipv4;
-                }
-                Multiplayer.Log($"Selected IP address is: {address}");
-
                 if (selectedServer.HasPassword)
                 {
                     //not making a direct connection
@@ -351,8 +354,8 @@ namespace Multiplayer.Components.MainMenu
                     return;
                 }
 
-                //No password, just connect
-                SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, selectedServer.port, null, false);
+                AttemptConnection();
+               
             }
         }
 
@@ -486,10 +489,19 @@ namespace Multiplayer.Components.MainMenu
                         }
                     }
 
-                    ShowOkPopup(Locale.SERVER_BROWSER__IP_INVALID, ShowIpPopup);
+                    MainMenuThingsAndStuff.Instance.ShowOkPopup(Locale.SERVER_BROWSER__IP_INVALID, ShowIpPopup);
                 }
                 else
                 {
+                    if (IPv4Regex.IsMatch(result.data))
+                    {
+                        connectionState = ConnectionState.AttemptingIPv4;
+                    }
+                    else
+                    {
+                        connectionState = ConnectionState.AttemptingIPv6;
+                    }
+
                     address = result.data;
                     ShowPortPopup();
                 }
@@ -521,14 +533,14 @@ namespace Multiplayer.Components.MainMenu
 
                 if (!PortRegex.IsMatch(result.data))
                 {
-                    ShowOkPopup(Locale.SERVER_BROWSER__PORT_INVALID, ShowIpPopup);
+                    MainMenuThingsAndStuff.Instance.ShowOkPopup(Locale.SERVER_BROWSER__PORT_INVALID, ShowIpPopup);
                 }
                 else
                 {
                     portNumber = ushort.Parse(result.data);
                     ShowPasswordPopup();
                 }
-            };
+            }; 
 
         }
 
@@ -571,28 +583,240 @@ namespace Multiplayer.Components.MainMenu
 
                 }
 
-                SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, result.data, false);
+                password = result.data;
 
-                //ShowConnectingPopup(); // Show a connecting message
-                //SingletonBehaviour<NetworkLifecycle>.Instance.ConnectionFailed += HandleConnectionFailed;
-                //SingletonBehaviour<NetworkLifecycle>.Instance.ConnectionEstablished += HandleConnectionEstablished;
+                AttemptConnection();
+                //SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, result.data, false, OnDisconnect);
             };
         }
 
-        // Example of handling connection success
-        private void HandleConnectionEstablished()
+        public void ShowConnectingPopup()
         {
-            // Connection established, handle the UI or game state accordingly
-            Multiplayer.Log("Connection established!");
-            // HideConnectingPopup(); // Hide the connecting message
+            var popup = MainMenuThingsAndStuff.Instance.ShowOkPopup();
+
+            if (popup == null)
+            {
+                Multiplayer.LogError("ShowConnectingPopup() Popup not found.");
+                return;
+            }
+
+            connectingPopup = popup;
+
+            Localize loc = popup.positiveButton.GetComponentInChildren<Localize>();
+            loc.key ="cancel";
+            loc.UpdateLocalization();
+
+
+            popup.labelTMPro.text = $"Connecting, please wait...\r\nAttempt: {attempt}"; //to be localised
+
+            popup.Closed += _ =>
+            {
+                connectionState = ConnectionState.Aborted;
+            };
+            
         }
 
-        // Example of handling connection failure
-        private void HandleConnectionFailed()
+        private void AttemptConnection()
         {
-            // Connection failed, show an error message or handle the failure scenario
-            Multiplayer.LogError("Connection failed!");
-            // ShowConnectionFailedPopup();
+
+            Multiplayer.Log($"AttemptConnection Direct: {direct}, Address: {address}");
+
+            attempt = 0;
+            ShowConnectingPopup();
+
+
+            if (!direct)
+            {
+                if (selectedServer.ipv6 != null && selectedServer.ipv6 != string.Empty)
+                {
+                    address = selectedServer.ipv6;
+                }
+                else
+                {
+                    address = selectedServer.ipv4;
+                }
+            }
+
+            Multiplayer.Log($"AttemptConnection address: {address}");
+
+            if (IPAddress.TryParse(address, out IPAddress IPaddress))
+            {
+                Multiplayer.Log($"AttemptConnection tryParse: {IPaddress.AddressFamily}");
+
+                if (IPaddress.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                {
+                    AttemptIPv4();
+                }
+                else if(IPaddress.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
+                {
+                    AttemptIPv6();
+                }
+
+                return;
+            }
+
+            Multiplayer.LogError($"IP address invalid: {address}");
+
+            AttemptFail();
+        }
+
+        private void AttemptIPv6()
+        {
+            Multiplayer.Log($"AttemptIPv6() {address}");
+
+            if (connectionState == ConnectionState.Aborted)
+                return;
+
+            attempt++;
+            if (connectingPopup != null)
+                connectingPopup.labelTMPro.text = $"Connecting, please wait...\r\nAttempt: {attempt}";
+
+            connectionState = ConnectionState.AttemptingIPv6; 
+            SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, selectedServer.port, password, false, OnDisconnect);
+
+        }
+
+        private void AttemptIPv6Punch()
+        {
+            Multiplayer.Log($"AttemptIPv6Punch() {address}");
+
+            if (connectionState == ConnectionState.Aborted)
+                return;
+
+            attempt++;
+            if(connectingPopup != null)
+                connectingPopup.labelTMPro.text = $"Connecting, please wait...\r\nAttempt: {attempt}";
+
+            //punching not implemented we'll just try again for now
+            connectionState = ConnectionState.AttemptingIPv6Punch;
+            SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, selectedServer.port, password, false, OnDisconnect);
+ 
+        }
+
+        private void AttemptIPv4()
+        {
+            Multiplayer.Log($"AttemptIPv4() {address}");
+
+            if (connectionState == ConnectionState.Aborted)
+                return;
+
+            attempt++;
+            if (connectingPopup != null)
+                connectingPopup.labelTMPro.text = $"Connecting, please wait...\r\nAttempt: {attempt}";
+
+            if (!direct)
+            {
+                if(selectedServer.ipv4 == null || selectedServer.ipv4 == string.Empty)
+                {
+                    AttemptFail();
+                    return;
+                }
+
+                address = selectedServer.ipv4;
+            }
+
+            Multiplayer.Log($"AttemptIPv4() {address}");
+
+            if (IPAddress.TryParse(address, out IPAddress IPaddress))
+            {
+                if (IPaddress.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                {
+                    connectionState = ConnectionState.AttemptingIPv4;
+                    SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, selectedServer.port, password, false, OnDisconnect);
+                    return;
+                }
+            }
+
+            AttemptFail();
+        }
+
+        private void AttemptIPv4Punch()
+        {
+            Multiplayer.Log($"AttemptIPv4Punch() {address}");
+
+            if (connectionState == ConnectionState.Aborted)
+                return;
+
+            attempt++;
+            if (connectingPopup != null)
+                connectingPopup.labelTMPro.text = $"Connecting, please wait...\r\nAttempt: {attempt}";
+
+            //punching not implemented we'll just try again for now
+            connectionState = ConnectionState.AttemptingIPv4Punch;
+            SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, selectedServer.port, password, false, OnDisconnect);
+        }
+
+        private void AttemptFail()
+        {
+            connectionState = ConnectionState.Failed;
+
+            if (connectingPopup != null)
+            {
+                connectingPopup.RequestClose(PopupClosedByAction.Abortion, null);
+
+                string message = "Unable to reach host!"; //add translations
+
+                MainMenuThingsAndStuff.Instance.ShowOkPopup(message, () => { });
+            }
+        }
+
+
+        private void OnDisconnect(DisconnectReason reason, string message)
+        {
+            Multiplayer.LogError($"Connection failed! {reason}, \"{message}\"");
+
+            switch (reason)
+            {
+                case DisconnectReason.UnknownHost:
+                    if (message == null || message.Length == 0)
+                    {
+                        message = "Unknown Host"; //add translations
+                    }
+                    break;
+                case DisconnectReason.DisconnectPeerCalled:
+                    if (message == null || message.Length == 0)
+                    {
+                        message = "Player kicked"; //add translations
+                    }
+                    break;
+                case DisconnectReason.ConnectionFailed:
+
+                    //Check our connectionState
+                    switch (connectionState)
+                    {
+                        case ConnectionState.AttemptingIPv6:
+                            AttemptIPv6Punch();
+                            return;
+                        case ConnectionState.AttemptingIPv6Punch:
+                            AttemptIPv4();
+                            return;
+                        case ConnectionState.AttemptingIPv4:
+                            AttemptIPv4Punch();
+                            return;
+                        case ConnectionState.AttemptingIPv4Punch:
+                            AttemptFail();
+                            return;
+                    }
+                    break;
+
+                case DisconnectReason.ConnectionRejected:
+                    if (message == null || message.Length == 0)
+                    {
+                        message = "Rejected!"; //add translations
+                    }
+                    break;
+                case DisconnectReason.RemoteConnectionClose:
+                    if (message == null || message.Length == 0)
+                    {
+                        message = "Server shutdown"; //add translations
+                    }
+                    break;
+            }
+
+            NetworkLifecycle.Instance.QueueMainMenuEvent(() =>
+                {
+                    MainMenuThingsAndStuff.Instance.ShowOkPopup(message, ()=>{ });
+                });
         }
 
         IEnumerator GetRequest(string uri)
@@ -661,16 +885,6 @@ namespace Multiplayer.Components.MainMenu
             serverRefreshing = false;
             timePassed = 0;
         }
-
-        private static void ShowOkPopup(string text, Action onClick)
-        {
-            var popup = MainMenuThingsAndStuff.Instance.ShowOkPopup();
-            if (popup == null) return;
-
-            popup.labelTMPro.text = text;
-            popup.Closed += _ => onClick();
-        }
-
         private void SetButtonsActive(params GameObject[] buttons)
         {
             foreach (var button in buttons)

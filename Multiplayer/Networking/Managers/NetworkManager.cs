@@ -8,7 +8,7 @@ using Multiplayer.Networking.Serialization;
 
 namespace Multiplayer.Networking.Listeners;
 
-public abstract class NetworkManager : INetEventListener
+public abstract class NetworkManager : INetEventListener, INatPunchListener
 {
     protected readonly NetPacketProcessor netPacketProcessor;
     protected readonly NetManager netManager;
@@ -116,11 +116,15 @@ public abstract class NetworkManager : INetEventListener
         // todo
     }
 
+    //Standard networking callbacks
     public abstract void OnPeerConnected(NetPeer peer);
     public abstract void OnPeerDisconnected(NetPeer peer, DisconnectInfo disconnectInfo);
     public abstract void OnNetworkLatencyUpdate(NetPeer peer, int latency);
     public abstract void OnConnectionRequest(ConnectionRequest request);
 
+    //NAT punching callbacks
+    public abstract void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token);
+    public abstract void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token);
     #endregion
 
     #region Logging

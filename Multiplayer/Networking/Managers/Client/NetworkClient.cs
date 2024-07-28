@@ -1,7 +1,5 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Security.Cryptography;
+using System.Net;
 using System.Text;
 using DV;
 using DV.Damage;
@@ -11,10 +9,8 @@ using DV.MultipleUnit;
 using DV.ServicePenalty.UI;
 using DV.ThingTypes;
 using DV.UI;
-using DV.UIFramework;
 using DV.WeatherSystem;
 using LiteNetLib;
-using Multiplayer.Components;
 using Multiplayer.Components.MainMenu;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Jobs;
@@ -45,6 +41,8 @@ public class NetworkClient : NetworkManager
 {
     protected override string LogPrefix => "[Client]";
 
+    private Action<DisconnectReason,string> onDisconnect;
+
     public NetPeer selfPeer { get; private set; }
     public readonly ClientPlayerManager ClientPlayerManager;
 
@@ -60,8 +58,9 @@ public class NetworkClient : NetworkManager
         ClientPlayerManager = new ClientPlayerManager();
     }
 
-    public void Start(string address, int port, string password, bool isSinglePlayer)
+    public void Start(string address, int port, string password, bool isSinglePlayer, Action<DisconnectReason,string> onDisconnect)
     {
+        this.onDisconnect = onDisconnect;
         netManager.Start();
         ServerboundClientLoginPacket serverboundClientLoginPacket = new()
         {
@@ -80,6 +79,7 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundServerDenyPacket>(OnClientboundServerDenyPacket);
         netPacketProcessor.SubscribeReusable<ClientboundPlayerJoinedPacket>(OnClientboundPlayerJoinedPacket);
         netPacketProcessor.SubscribeReusable<ClientboundPlayerDisconnectPacket>(OnClientboundPlayerDisconnectPacket);
+        netPacketProcessor.SubscribeReusable<ClientboundPlayerKickPacket>(OnClientboundPlayerKickPacket);
         netPacketProcessor.SubscribeReusable<ClientboundPlayerPositionPacket>(OnClientboundPlayerPositionPacket);
         netPacketProcessor.SubscribeReusable<ClientboundPlayerCarPacket>(OnClientboundPlayerCarPacket);
         netPacketProcessor.SubscribeReusable<ClientboundPingUpdatePacket>(OnClientboundPingUpdatePacket);
@@ -143,7 +143,7 @@ public class NetworkClient : NetworkManager
 
         if (MainMenuThingsAndStuff.Instance != null)
         {
-            MainMenuThingsAndStuff.Instance.SwitchToDefaultMenu();
+            //MainMenuThingsAndStuff.Instance.SwitchToDefaultMenu();
             NetworkLifecycle.Instance.TriggerMainMenuEventLater();
         }
         else
@@ -151,7 +151,7 @@ public class NetworkClient : NetworkManager
             MainMenu.GoBackToMainMenu();
         }
 
-        string text = $"{disconnectInfo.Reason}";
+        //string message = $"{disconnectInfo.Reason}";
 
         switch (disconnectInfo.Reason)
         {
@@ -160,17 +160,21 @@ public class NetworkClient : NetworkManager
                 netPacketProcessor.ReadAllPackets(disconnectInfo.AdditionalData);
                 return;
             case DisconnectReason.RemoteConnectionClose:
-                text = "The server shut down";
+                netPacketProcessor.ReadAllPackets(disconnectInfo.AdditionalData);
+                //message = "The server shut down";
                 break;
         }
 
+        /*
         NetworkLifecycle.Instance.QueueMainMenuEvent(() =>
         {
             Popup popup = MainMenuThingsAndStuff.Instance.ShowOkPopup();
             if (popup == null)
                 return;
             popup.labelTMPro.text = text;
-        });
+        });*/
+
+        onDisconnect(disconnectInfo.Reason, null);
     }
 
     public override void OnNetworkLatencyUpdate(NetPeer peer, int latency)
@@ -185,15 +189,29 @@ public class NetworkClient : NetworkManager
 
     #endregion
 
+    #region NAT Punch Events
+    public override void OnNatIntroductionRequest(IPEndPoint localEndPoint, IPEndPoint remoteEndPoint, string token)
+    {
+        //do some stuff here
+    }
+    public override void OnNatIntroductionSuccess(IPEndPoint targetEndPoint, NatAddressType type, string token)
+    {
+        //do other stuff here
+    }
+    #endregion
+
     #region Listeners
 
     private void OnClientboundServerDenyPacket(ClientboundServerDenyPacket packet)
     {
+        
+        /*
         NetworkLifecycle.Instance.QueueMainMenuEvent(() =>
         {
             Popup popup = MainMenuThingsAndStuff.Instance.ShowOkPopup();
             if (popup == null)
                 return;
+        */
             string text = Locale.Get(packet.ReasonKey, packet.ReasonArgs);
 
             if (packet.Missing.Length != 0 || packet.Extra.Length != 0)
@@ -210,8 +228,10 @@ public class NetworkClient : NetworkManager
                     text += Locale.Get(Locale.DISCONN_REASON__MODS_EXTRA_KEY, placeholders: string.Join("\n - ", packet.Extra));
             }
 
-            popup.labelTMPro.text = text;
-        });
+            //popup.labelTMPro.text = text;
+        //});
+
+        onDisconnect(DisconnectReason.ConnectionRejected, text);
     }
 
     private void OnClientboundPlayerJoinedPacket(ClientboundPlayerJoinedPacket packet)
@@ -228,6 +248,12 @@ public class NetworkClient : NetworkManager
         ClientPlayerManager.RemovePlayer(packet.Id);
     }
 
+    private void OnClientboundPlayerKickPacket(ClientboundPlayerKickPacket packet)
+    {
+
+        string text = "You were kicked!"; //to be localised //Locale.Get(packet.ReasonKey, packet.ReasonArgs);
+        onDisconnect(DisconnectReason.ConnectionRejected, text);
+    }
     private void OnClientboundPlayerPositionPacket(ClientboundPlayerPositionPacket packet)
     {
         ClientPlayerManager.UpdatePosition(packet.Id, packet.Position, packet.MoveDir, packet.RotationY, packet.IsJumping, packet.IsOnCar);

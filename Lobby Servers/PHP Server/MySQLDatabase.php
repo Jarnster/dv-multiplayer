@@ -33,8 +33,7 @@ class MySQLDatabase implements DatabaseInterface {
         ]);
         return json_encode([
             "game_server_id" => $data['game_server_id'],
-            "private_key" => $data['private_key'],
-            "ipv4_request" => !isset($data['ipv4'])
+            "private_key" => $data['private_key']
         ]);
     }
 

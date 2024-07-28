@@ -43,12 +43,13 @@ public static class WindowsBreakingController_BreakWindowsFromCollision_Patch
         TrainCar car = TrainCar.Resolve(__instance.transform);
         ushort netId = car.GetNetId();
 
-        if (netId == 0)
+        if (car == null ||netId == 0)
         {
-            Multiplayer.LogWarning($"RepairWindows failed, {car.name}");
+            Multiplayer.LogWarning($"RepairWindows_Postfix failed, {car?.name}");
             return;
         }
 
+        Multiplayer.LogWarning($"RepairWindows_Postfix , {car.name}");
         NetworkLifecycle.Instance.Server.SendWindowsRepaired(netId);
     }
 }

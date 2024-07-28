@@ -17,6 +17,8 @@ public static class ChatManager
     public const string COMMAND_HELP = "help";
     public const string COMMAND_LOG = "log";
     public const string COMMAND_LOG_SHORT = "l";
+    public const string COMMAND_KICK = "kick";
+    //public const string COMMAND_KICK_SHORT = "kick";
 
     public const string MESSAGE_COLOUR_SERVER = "9CDCFE";
     public const string MESSAGE_COLOUR_HELP = "00FF00";
@@ -60,12 +62,18 @@ public static class ChatManager
                     HelpMessage(sender);
                     break;
 
+                case COMMAND_KICK:
+                    KickMessage(message, COMMAND_KICK.Length, player.Username, sender);
+                    break;
+
+#if DEBUG
                 case COMMAND_LOG_SHORT:
                     Multiplayer.specLog = !Multiplayer.specLog;
                     break;
                 case COMMAND_LOG:
                     Multiplayer.specLog = !Multiplayer.specLog;
                     break;
+#endif
 
                 //allow messages that are not commands to go through
                 default:
@@ -161,6 +169,39 @@ public static class ChatManager
         message = "<i><alpha=#50>" + senderName + ":</color> <noparse>" + message + "</noparse></i>";
 
         NetworkLifecycle.Instance.Server.SendWhisper(message, recipient);
+    }
+
+    public static void KickMessage(string message, int commandLength, string senderName, NetPeer sender)
+    {
+        NetPeer player;
+        string playerName;
+
+        //If user is not the host, we should ignore - will require changes for dedicated server
+        if (sender != null && !NetworkLifecycle.Instance.IsHost(sender))
+            return;
+
+        //Remove the command "/server" or "/s"
+        if (commandLength > 0)
+        {
+            message = message.Substring(commandLength + 2);
+        }
+
+        playerName = message.Split(' ')[0];
+
+        player = NetPeerFromName(playerName);
+
+        if (player == null || NetworkLifecycle.Instance.IsHost(player))
+        {
+            message = $"<color=#{MESSAGE_COLOUR_SERVER}>Unable to kick {playerName}</color>";
+        }
+        else
+        {
+            message = $"<color=#{MESSAGE_COLOUR_SERVER}>{playerName} was kicked</color>";
+
+            NetworkLifecycle.Instance.Server.KickPlayer(player);
+        }
+
+        NetworkLifecycle.Instance.Server.SendWhisper(message, sender);
     }
 
     private static void HelpMessage(NetPeer peer)

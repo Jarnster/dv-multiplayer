@@ -147,16 +147,15 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
         if (!server.Start(port))
             return false;
         Server = server;
-        StartClient("localhost", port, Multiplayer.Settings.Password, isSinglePlayer);
+        StartClient("localhost", port, Multiplayer.Settings.Password, isSinglePlayer, null/* (DisconnectReason dr,string msg) =>{ }*/);
         return true;
     }
-
-    public void StartClient(string address, int port, string password, bool isSinglePlayer)
+    public void StartClient(string address, int port, string password, bool isSinglePlayer, Action<DisconnectReason,string> onDisconnect )
     {
         if (Client != null)
             throw new InvalidOperationException("NetworkManager already exists!");
         NetworkClient client = new(Multiplayer.Settings);
-        client.Start(address, port, password, isSinglePlayer);
+        client.Start(address, port, password, isSinglePlayer, onDisconnect);
         Client = client;
         OnSettingsUpdated(Multiplayer.Settings); // Show stats if enabled
     }

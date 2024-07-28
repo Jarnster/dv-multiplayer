@@ -93,6 +93,15 @@ namespace Multiplayer.Components.MainMenu
             return null;
         }
 
+        public void ShowOkPopup(string text, Action onClick)
+        {
+            var popup = ShowOkPopup();
+            if (popup == null) return;
+
+            popup.labelTMPro.text = text;
+            popup.Closed += _ => onClick();
+        }
+
         /// <param name="func">A function to apply to the MainMenuPopupManager while the object is disabled</param>
         public static void Create(Action<MainMenuThingsAndStuff> func)
         {
