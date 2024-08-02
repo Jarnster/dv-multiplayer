@@ -18,7 +18,7 @@
     ·
     <a href="https://github.com/AMacro/dv-multiplayer/issues">Request Feature</a>
     ·
-    <a href="https://discord.com/channels/332511223536943105/1234574186161377363" target="_blank">Discord</a>
+    <a href="https://discord.com/channels/332511223536943105/1234574186161377363" target="blank" rel="noopener noreferrer">Discord</a>
   </p>
 </div>
 
