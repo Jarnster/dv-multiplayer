@@ -14,9 +14,11 @@
     A <a href="https://store.steampowered.com/app/588030">Derail Valley</a> mod that adds multiplayer.
     <br />
     <br />
-    <a href="https://github.com/Insprill/dv-multiplayer/issues">Report Bug</a>
+    <a href="https://github.com/AMacro/dv-multiplayer/issues">Report Bug</a>
     ·
-    <a href="https://github.com/Insprill/dv-multiplayer/issues">Request Feature</a>
+    <a href="https://github.com/AMacro/dv-multiplayer/issues">Request Feature</a>
+    ·
+    <a href="https://discord.com/channels/332511223536943105/1234574186161377363" target="_blank">Discord</a>
   </p>
 </div>
 
@@ -46,6 +48,7 @@ Multiplayer is a Derail Valley mod that adds multiplayer to the game, allowing y
 
 It works by having one player host a game, and then other players can join that game.
 
+This fork is a continuation of [Insprill's](https://github.com/Insprill/dv-multiplayer) amazing efforts.
 
 
 
