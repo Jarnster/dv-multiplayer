@@ -77,6 +77,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     private Dictionary<string, float> lastSentPortValues;
     private HashSet<string> dirtyFuses;
     private bool handbrakeDirty;
+    private bool mainResPressureDirty;
     public bool BogieTracksDirty;
     public int Bogie1TrackDirection;
     public int Bogie2TrackDirection;
@@ -150,6 +151,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         brakeSystem.HandbrakePositionChanged += Common_OnHandbrakePositionChanged;
         brakeSystem.BrakeCylinderReleased += Common_OnBrakeCylinderReleased;
+        
+
         NetworkLifecycle.Instance.OnTick += Common_OnTick;
         if (NetworkLifecycle.Instance.IsHost())
         {
@@ -157,6 +160,9 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             bogie1.TrackChanged += Server_BogieTrackChanged;
             bogie2.TrackChanged += Server_BogieTrackChanged;
             TrainCar.CarDamage.CarEffectiveHealthStateUpdate += Server_CarHealthUpdate;
+
+            brakeSystem.MainResPressureChanged += Server_MainResUpdate;
+
             StartCoroutine(Server_WaitForLogicCar());
         }
     }
@@ -186,6 +192,9 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             bogie1.TrackChanged -= Server_BogieTrackChanged;
             bogie2.TrackChanged -= Server_BogieTrackChanged;
             TrainCar.CarDamage.CarEffectiveHealthStateUpdate -= Server_CarHealthUpdate;
+
+            brakeSystem.MainResPressureChanged -= Server_MainResUpdate;
+
             if (TrainCar.logicCar != null)
             {
                 TrainCar.logicCar.CargoLoaded -= Server_OnCargoLoaded;
@@ -227,6 +236,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     public void Server_DirtyAllState()
     {
         handbrakeDirty = true;
+        mainResPressureDirty = true;
         cargoDirty = true;
         cargoIsLoading = true;
         healthDirty = true;
@@ -238,7 +248,12 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         {
             dirtyPorts.Add(portId);
             if (simulationFlow.TryGetPort(portId, out Port port))
+            {
                 lastSentPortValues[portId] = port.value;
+
+                //Multiplayer.Log($"Server_DirtyAllState({TrainCar.ID}): {portId}({port.type}): {port.value}({port.valueType})");
+
+            }
         }
 
         foreach (string fuseId in simulationFlow.fullFuseIdToFuse.Keys)
@@ -295,13 +310,27 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         healthDirty = true;
     }
 
+    private void Server_MainResUpdate(float normalizedPressure, float pressure)
+    {
+        mainResPressureDirty = true;
+    }
+
     private void Server_OnTick(uint tick)
     {
         if (UnloadWatcher.isUnloading)
             return;
+        Server_SendBrakePressures();
         Server_SendCouplers();
         Server_SendCargoState();
         Server_SendHealthState();
+    }
+
+    private void Server_SendBrakePressures()
+    {
+        if (!mainResPressureDirty)
+            return;
+        mainResPressureDirty = false;
+        NetworkLifecycle.Instance.Server.SendBrakePressures(NetId, brakeSystem.mainReservoirPressure, brakeSystem.independentPipePressure, brakeSystem.brakePipePressure, brakeSystem.brakeCylinderPressure);
     }
 
     private void Server_SendCouplers()
@@ -525,6 +554,22 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             client_bogie1Queue.ReceiveSnapshot(movementPart.Bogie1, tick);
             client_bogie2Queue.ReceiveSnapshot(movementPart.Bogie2, tick);
         }
+    }
+
+    public void Client_ReceiveBrakePressureUpdate(float mainReservoirPressure, float independentPipePressure, float brakePipePressure, float brakeCylinderPressure)
+    {
+        if (brakeSystem == null)
+            return;
+
+        if (!hasSimFlow)
+            return;
+
+        brakeSystem.ForceIndependentPipePressure(independentPipePressure);
+        brakeSystem.ForceTargetIndBrakeCylinderPressure(brakeCylinderPressure);
+        brakeSystem.SetMainReservoirPressure(mainReservoirPressure);
+
+        brakeSystem.brakePipePressure = brakePipePressure;
+        brakeSystem.brakeCylinderPressure = brakeCylinderPressure;
     }
 
     #endregion

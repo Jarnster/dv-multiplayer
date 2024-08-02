@@ -697,7 +697,7 @@ namespace Multiplayer.Components.MainMenu
 
         private void AttemptIPv4()
         {
-            Multiplayer.Log($"AttemptIPv4() {address}");
+            Multiplayer.Log($"AttemptIPv4() {address}, {connectionState}");
 
             if (connectionState == ConnectionState.Aborted)
                 return;

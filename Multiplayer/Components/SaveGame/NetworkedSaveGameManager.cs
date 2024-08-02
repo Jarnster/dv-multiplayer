@@ -73,6 +73,7 @@ public class NetworkedSaveGameManager : SingletonBehaviour<NetworkedSaveGameMana
             JObject playerData = new();
             playerData.SetVector3(SaveGameKeys.Player_position, player.AbsoluteWorldPosition);
             playerData.SetFloat(SaveGameKeys.Player_rotation, player.WorldRotationY);
+            //store inventory see StorageSerializer.SaveStorage()
             players.SetJObject(player.Guid.ToString(), playerData);
         }
 

@@ -1,6 +1,7 @@
 using System;
 using System.Net;
 using System.Text;
+using System.Collections.Generic;
 using DV;
 using DV.Damage;
 using DV.InventorySystem;
@@ -11,6 +12,7 @@ using DV.ThingTypes;
 using DV.UI;
 using DV.WeatherSystem;
 using LiteNetLib;
+using Multiplayer.Components;
 using Multiplayer.Components.MainMenu;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Jobs;
@@ -34,6 +36,7 @@ using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityModManagerNet;
 using Object = UnityEngine.Object;
+using System.Linq;
 
 namespace Multiplayer.Networking.Listeners;
 
@@ -109,6 +112,7 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonHandbrakePositionPacket>(OnCommonHandbrakePositionPacket);
         netPacketProcessor.SubscribeReusable<CommonTrainPortsPacket>(OnCommonSimFlowPacket);
         netPacketProcessor.SubscribeReusable<CommonTrainFusesPacket>(OnCommonTrainFusesPacket);
+        netPacketProcessor.SubscribeReusable<ClientboundBrakePressureUpdatePacket>(OnClientboundBrakePressureUpdatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundCargoStatePacket>(OnClientboundCargoStatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundCarHealthUpdatePacket>(OnClientboundCarHealthUpdatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundRerailTrainPacket>(OnClientboundRerailTrainPacket);
@@ -118,10 +122,10 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundLicenseAcquiredPacket>(OnClientboundLicenseAcquiredPacket);
         netPacketProcessor.SubscribeReusable<ClientboundGarageUnlockPacket>(OnClientboundGarageUnlockPacket);
         netPacketProcessor.SubscribeReusable<ClientboundDebtStatusPacket>(OnClientboundDebtStatusPacket);
-        //netPacketProcessor.SubscribeReusable<ClientboundJobsPacket>(OnClientboundJobsPacket);
-        //netPacketProcessor.SubscribeReusable<ClientboundJobCreatePacket>(OnClientboundJobCreatePacket);
-        //netPacketProcessor.SubscribeReusable<ClientboundJobTakeResponsePacket>(OnClientboundJobTakeResponsePacket);
-        netPacketProcessor.SubscribeReusable<CommonChatPacket>(OnCommonChatPacket);
+        netPacketProcessor.SubscribeReusable<ClientboundJobsPacket>(OnClientboundJobsPacket);
+        netPacketProcessor.SubscribeReusable<ClientboundJobCreatePacket>(OnClientboundJobCreatePacket);
+        netPacketProcessor.SubscribeReusable<ClientboundJobTakeResponsePacket>(OnClientboundJobTakeResponsePacket);
+        netPacketProcessor.SubscribeReusable<CommonChatPacket>(OnCommonChatPacket); 
     }
 
     #region Net Events
@@ -564,6 +568,17 @@ public class NetworkClient : NetworkManager
         networkedTrainCar.Common_UpdateFuses(packet);
     }
 
+    private void OnClientboundBrakePressureUpdatePacket(ClientboundBrakePressureUpdatePacket packet)
+    {
+        if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+            return;
+
+
+        networkedTrainCar.Client_ReceiveBrakePressureUpdate(packet.MainReservoirPressure, packet.IndependentPipePressure, packet.BrakePipePressure, packet.BrakeCylinderPressure);
+
+        //Multiplayer.LogDebug(() => $"Received Brake Pressures netId {packet.NetId}: {packet.MainReservoirPressure}, {packet.IndependentPipePressure}, {packet.BrakePipePressure}, {packet.BrakeCylinderPressure}");
+    }
+
     private void OnClientboundCargoStatePacket(ClientboundCargoStatePacket packet)
     {
         if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
@@ -671,9 +686,11 @@ public class NetworkClient : NetworkManager
         chatGUI.ReceiveMessage(packet.message);
     }
 
-    /* Temp for stable release
+
     private void OnClientboundJobCreatePacket(ClientboundJobCreatePacket packet)
     {
+        Multiplayer.Log($"Received job packet. Job ID:{packet.job.ID}");
+
         if (NetworkLifecycle.Instance.IsHost())
             return;
 
@@ -682,7 +699,7 @@ public class NetworkClient : NetworkManager
             tasks.Add(TaskBeforeDataData.ToTask(taskBeforeDataData));
 
         StationsChainDataData chainData = packet.job.ChainData;
-        //packet.job.JobType
+
         Job newJob = new Job(
                 tasks,
                 (JobType)packet.job.JobType,
@@ -700,7 +717,7 @@ public class NetworkClient : NetworkManager
         StationController station;
         if(!StationComponentLookup.Instance.StationControllerFromId(packet.stationId, out station))
         {
-            Multiplayer.LogWarning($"OnClientboundJobCreatePacket Could not get staion for stationId: {packet.stationId}");
+            Multiplayer.LogWarning($"OnClientboundJobCreatePacket Could not get station for stationId: {packet.stationId}");
             return;
         }
 
@@ -716,6 +733,8 @@ public class NetworkClient : NetworkManager
     }
     private void OnClientboundJobsPacket(ClientboundJobsPacket packet)
     {
+        Multiplayer.Log($"Received job packet. Job count:{packet.Jobs.Count()}");
+
         if (NetworkLifecycle.Instance.IsHost())
             return;
 
@@ -724,8 +743,6 @@ public class NetworkClient : NetworkManager
             LogError("Received job packet but couldn't find station!");
             return;
         }
-
-        Multiplayer.Log($"Received job packet. Job count:{packet.Jobs.Count()}");
 
         for (int i=0;i < packet.Jobs.Count(); i++)
         {
@@ -763,13 +780,15 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundJobTakeResponsePacket(ClientboundJobTakeResponsePacket packet)
     {
+        Multiplayer.Log($"OnClientboundJobTakeResponsePacket jobId: {packet.netId}, Status: {packet.granted}");
+
         NetworkedJob networkedJob;
 
         if(!NetworkedJob.Get(packet.netId, out networkedJob))
             return;
 
         NetworkedPlayer player;
-        if (PlayerManager.TryGetPlayer(packet.playerId, out player))
+        if (ClientPlayerManager.TryGetPlayer(packet.playerId, out player))
         {
             networkedJob.takenBy = player.Guid;
         }
@@ -780,7 +799,7 @@ public class NetworkClient : NetworkManager
         networkedJob.jobValidator = null;
         networkedJob.jobOverview = null;
     }
-    */
+    
     #endregion
 
     #region Senders
@@ -999,6 +1018,14 @@ public class NetworkClient : NetworkManager
             PortIds = portIds,
             PortValues = portValues
         }, DeliveryMethod.ReliableOrdered);
+
+        string log=$"Sending ports netId: {netId}";
+        for (int i = 0; i < portIds.Length; i++) {
+            log += $"\r\n\t{portIds[i]}: {portValues[i]}";
+        }
+
+        Multiplayer.LogDebug(() => log);
+
     }
 
     public void SendFuses(ushort netId, string[] fuseIds, bool[] fuseValues)

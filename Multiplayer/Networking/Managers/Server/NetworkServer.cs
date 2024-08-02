@@ -273,6 +273,20 @@ public class NetworkServer : NetworkManager
         SendPacketToAll(packet, reliable ? DeliveryMethod.ReliableOrdered : DeliveryMethod.Unreliable, selfPeer);
     }
 
+    public void SendBrakePressures(ushort netId, float mainReservoirPressure, float independentPipePressure, float brakePipePressure, float brakeCylinderPressure)
+    {
+        SendPacketToAll(new ClientboundBrakePressureUpdatePacket
+        {
+            NetId = netId,
+            MainReservoirPressure = mainReservoirPressure,
+            IndependentPipePressure = independentPipePressure,
+            BrakePipePressure = brakePipePressure,
+            BrakeCylinderPressure = brakeCylinderPressure
+        }, DeliveryMethod.ReliableOrdered, selfPeer);
+
+        //Multiplayer.LogDebug(()=> $"Sending Brake Pressures netId {netId}: {mainReservoirPressure}, {independentPipePressure}, {brakePipePressure}, {brakeCylinderPressure}");
+    }
+
     public void SendCargoState(TrainCar trainCar, ushort netId, bool isLoading, byte cargoModelIndex)
     {
         Car logicCar = trainCar.logicCar;
