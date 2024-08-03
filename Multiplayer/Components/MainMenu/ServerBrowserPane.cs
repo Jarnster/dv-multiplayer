@@ -354,6 +354,9 @@ namespace Multiplayer.Components.MainMenu
                     return;
                 }
 
+                //password not required
+                password = null;
+
                 AttemptConnection();
                
             }
