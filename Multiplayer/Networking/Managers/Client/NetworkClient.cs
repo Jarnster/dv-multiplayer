@@ -363,13 +363,16 @@ public class NetworkClient : NetworkManager
         displayLoadingInfo.OnLoadingFinished();
 
         //if not single player, add in chat
-        GameObject common = GameObject.Find("[MAIN]/[GameUI]/[NewCanvasController]/Auxiliary Canvas, EventSystem, Input Module");
-        if (common != null)
+        if (!isSinglePlayer)
         {
-            //
-            GameObject chat = new GameObject("Chat GUI", typeof(ChatGUI));
-            chat.transform.SetParent(common.transform, false);
-            chatGUI = chat.GetComponent<ChatGUI>();
+            GameObject common = GameObject.Find("[MAIN]/[GameUI]/[NewCanvasController]/Auxiliary Canvas, EventSystem, Input Module");
+            if (common != null)
+            {
+                //
+                GameObject chat = new GameObject("Chat GUI", typeof(ChatGUI));
+                chat.transform.SetParent(common.transform, false);
+                chatGUI = chat.GetComponent<ChatGUI>();
+            }
         }
     }
 
