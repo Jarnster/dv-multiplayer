@@ -9,7 +9,7 @@ using Newtonsoft.Json;
 
 namespace Multiplayer.Networking.Data;
 
-public abstract class TaskBeforeDataData
+public abstract class TaskData
 {
     public byte State { get; set; }
     public float TaskStartTime { get; set; }
@@ -19,9 +19,9 @@ public abstract class TaskBeforeDataData
     public byte TaskType { get; set; }
 
 
-    public static TaskBeforeDataData FromTask(Task task)
+    public static TaskData FromTask(Task task)
     {
-        TaskBeforeDataData taskData = task switch
+        TaskData taskData = task switch
         {
             WarehouseTask warehouseTask => WarehouseTaskData.FromWarehouseTask(warehouseTask),
             TransportTask transportTask => TransportTaskData.FromTransportTask(transportTask),
@@ -59,7 +59,7 @@ public abstract class TaskBeforeDataData
             var task = (SequentialTasksData)data;
             List<Task> tasks = new List<Task>();
 
-            foreach (TaskBeforeDataData taskBeforeDataData in task.Tasks)
+            foreach (TaskData taskBeforeDataData in task.Tasks)
                 tasks.Add(ToTask(taskBeforeDataData));
 
 
@@ -71,7 +71,7 @@ public abstract class TaskBeforeDataData
             var task = (ParallelTasksData)data;
             List<Task> tasks = new List<Task>();
 
-            foreach (TaskBeforeDataData taskBeforeDataData in task.Tasks)
+            foreach (TaskData taskBeforeDataData in task.Tasks)
                 tasks.Add(ToTask(taskBeforeDataData));
 
 
@@ -119,7 +119,7 @@ public abstract class TaskBeforeDataData
         throw new ArgumentException("Unknown task type: " + data.GetType());
     }
 
-    public static TaskBeforeDataData DeserializeTask(NetDataReader reader)
+    public static TaskData DeserializeTask(NetDataReader reader)
     {
         TaskType taskType = (TaskType)reader.GetByte();
         Multiplayer.Log("Task type: " + taskType + "");
@@ -134,7 +134,7 @@ public abstract class TaskBeforeDataData
         };
     }
 
-    public static void Serialize(NetDataWriter writer, TaskBeforeDataData data)
+    public static void Serialize(NetDataWriter writer, TaskData data)
     {
         writer.Put(data.TaskType);
         writer.Put(data.State);
@@ -145,7 +145,7 @@ public abstract class TaskBeforeDataData
         writer.Put(data.TaskType);
     }
 
-    public static void Deserialize(NetDataReader reader, TaskBeforeDataData data)
+    public static void Deserialize(NetDataReader reader, TaskData data)
     {
         data.State = reader.GetByte();
         data.TaskStartTime = reader.GetFloat();
@@ -156,9 +156,9 @@ public abstract class TaskBeforeDataData
     }
 }
 
-public class ParallelTasksData : TaskBeforeDataData
+public class ParallelTasksData : TaskData
 {
-    public TaskBeforeDataData[] Tasks { get; set; }
+    public TaskData[] Tasks { get; set; }
 
     public static ParallelTasksData FromParallelTask(ParallelTasks task)
     {
@@ -170,7 +170,7 @@ public class ParallelTasksData : TaskBeforeDataData
 
     public static void Serialize(NetDataWriter writer, ParallelTasksData data)
     {
-        TaskBeforeDataData.Serialize(writer, data);
+        TaskData.Serialize(writer, data);
         writer.Put((byte)data.Tasks.Length);
         foreach (var taskBeforeDataData in data.Tasks)
             SerializeTask(taskBeforeDataData, writer);
@@ -181,7 +181,7 @@ public class ParallelTasksData : TaskBeforeDataData
         var parallelTask = new ParallelTasksData();
         Deserialize(reader, parallelTask);
         var tasksLength = reader.GetByte();
-        var tasks = new TaskBeforeDataData[tasksLength];
+        var tasks = new TaskData[tasksLength];
         for (int i = 0; i < tasksLength; i++)
             tasks[i] = DeserializeTask(reader);
         parallelTask.Tasks = tasks;
@@ -189,9 +189,9 @@ public class ParallelTasksData : TaskBeforeDataData
     }
 }
 
-public class SequentialTasksData : TaskBeforeDataData
+public class SequentialTasksData : TaskData
 {
-    public TaskBeforeDataData[] Tasks { get; set; }
+    public TaskData[] Tasks { get; set; }
 
 
     public static SequentialTasksData FromSequentialTask(SequentialTasks task)
@@ -204,7 +204,7 @@ public class SequentialTasksData : TaskBeforeDataData
 
     public static void Serialize(NetDataWriter writer, SequentialTasksData data)
     {
-        TaskBeforeDataData.Serialize(writer, data);
+        TaskData.Serialize(writer, data);
         writer.Put((byte)data.Tasks.Length);
         foreach (var taskBeforeDataData in data.Tasks)
             SerializeTask(taskBeforeDataData, writer);
@@ -215,7 +215,7 @@ public class SequentialTasksData : TaskBeforeDataData
         var sequentialTask = new SequentialTasksData();
         Deserialize(reader, sequentialTask);
         var tasksLength = reader.GetByte();
-        var tasks = new TaskBeforeDataData[tasksLength];
+        var tasks = new TaskData[tasksLength];
         for (int i = 0; i < tasksLength; i++)
             tasks[i] = DeserializeTask(reader);
         sequentialTask.Tasks = tasks;
@@ -223,7 +223,7 @@ public class SequentialTasksData : TaskBeforeDataData
     }
 }
 
-public class WarehouseTaskData : TaskBeforeDataData
+public class WarehouseTaskData : TaskData
 {
     public string[] Cars { get; set; }
     public byte WarehouseTaskType { get; set; }
@@ -258,7 +258,7 @@ public class WarehouseTaskData : TaskBeforeDataData
 
     public static void Serialize(NetDataWriter writer, WarehouseTaskData data)
     {
-        TaskBeforeDataData.Serialize(writer, data);
+        TaskData.Serialize(writer, data);
         writer.PutArray(data.Cars);
         writer.Put(data.WarehouseTaskType);
         writer.Put(data.WarehouseMachine);
@@ -282,7 +282,7 @@ public class WarehouseTaskData : TaskBeforeDataData
     }
 }
 
-public class TransportTaskData : TaskBeforeDataData
+public class TransportTaskData : TaskData
 {
     public string[] Cars { get; set; }
     public string StartingTrack { get; set; }
@@ -319,7 +319,7 @@ public class TransportTaskData : TaskBeforeDataData
 
     public static void Serialize(NetDataWriter writer, TransportTaskData data)
     {
-        TaskBeforeDataData.Serialize(writer, data);
+        TaskData.Serialize(writer, data);
         writer.PutArray(data.Cars);
         writer.Put(data.StartingTrack);
         writer.Put(data.DestinationTrack);

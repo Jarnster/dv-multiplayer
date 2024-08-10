@@ -74,7 +74,7 @@ public class NetworkedWorldMap : MonoBehaviour
 
     private void OnTick(uint obj)
     {
-        if (!worldMap.initialized)
+        if (!worldMap.initialized || UnloadWatcher.isUnloading)
             return;
         UpdatePlayers();
     }

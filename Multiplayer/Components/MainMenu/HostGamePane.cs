@@ -352,7 +352,7 @@ private void SetupListeners(bool on)
 
         serverData.RequiredMods = ""; //FIX THIS - get the mods required
         serverData.GameVersion = BuildInfo.BUILD_VERSION_MAJOR.ToString();
-        serverData.MultiplayerVersion = Multiplayer.ModEntry.Version.ToString();
+        serverData.MultiplayerVersion = Multiplayer.Ver;
 
         serverData.ServerDetails = details.text.Trim();
 

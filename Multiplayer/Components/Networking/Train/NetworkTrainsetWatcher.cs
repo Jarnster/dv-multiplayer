@@ -33,6 +33,9 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
 
     private void Server_OnTick(uint tick)
     {
+        if (UnloadWatcher.isUnloading)
+            return;
+
         cachedSendPacket.Tick = tick;
         foreach (Trainset set in Trainset.allSets)
             Server_TickSet(set);

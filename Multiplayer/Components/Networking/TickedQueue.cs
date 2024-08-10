@@ -32,7 +32,7 @@ public abstract class TickedQueue<T> : MonoBehaviour
 
     private void OnTick(uint tick)
     {
-        if (snapshots.Count == 0)
+        if (snapshots.Count == 0 || UnloadWatcher.isUnloading)
             return;
         while (snapshots.Count > 0)
         {

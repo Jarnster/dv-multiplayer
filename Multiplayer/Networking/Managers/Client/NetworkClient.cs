@@ -695,8 +695,8 @@ public class NetworkClient : NetworkManager
             return;
 
         List<Task> tasks = new List<Task>();
-        foreach (TaskBeforeDataData taskBeforeDataData in packet.job.Tasks)
-            tasks.Add(TaskBeforeDataData.ToTask(taskBeforeDataData));
+        foreach (Data.TaskData taskBeforeDataData in packet.job.Tasks)
+            tasks.Add(Data.TaskData.ToTask(taskBeforeDataData));
 
         StationsChainDataData chainData = packet.job.ChainData;
 
@@ -750,8 +750,8 @@ public class NetworkClient : NetworkManager
             ushort netId = packet.netIds[i];
 
             var tasks = new List<Task>();
-            foreach (TaskBeforeDataData taskBeforeDataData in job.Tasks)
-                tasks.Add(TaskBeforeDataData.ToTask(taskBeforeDataData));
+            foreach (Data.TaskData taskBeforeDataData in job.Tasks)
+                tasks.Add(Data.TaskData.ToTask(taskBeforeDataData));
 
             StationsChainDataData chainData = job.ChainData;
 

@@ -390,11 +390,11 @@ namespace Multiplayer.Components.MainMenu
 
                 //Check if we can connect to this server
                 Multiplayer.Log($"Server: \"{selectedServer.GameVersion}\" \"{selectedServer.MultiplayerVersion}\"");
-                Multiplayer.Log($"Client: \"{BuildInfo.BUILD_VERSION_MAJOR.ToString()}\" \"{Multiplayer.ModEntry.Version.ToString(3)}\"");
-                Multiplayer.Log($"Result: \"{selectedServer.GameVersion == BuildInfo.BUILD_VERSION_MAJOR.ToString()}\" \"{selectedServer.MultiplayerVersion == Multiplayer.ModEntry.Version.ToString(3)}\"");
+                Multiplayer.Log($"Client: \"{BuildInfo.BUILD_VERSION_MAJOR.ToString()}\" \"{Multiplayer.Ver}\"");
+                Multiplayer.Log($"Result: \"{selectedServer.GameVersion == BuildInfo.BUILD_VERSION_MAJOR.ToString()}\" \"{selectedServer.MultiplayerVersion == Multiplayer.Ver}\"");
 
                 bool canConnect = selectedServer.GameVersion == BuildInfo.BUILD_VERSION_MAJOR.ToString() &&
-                                  selectedServer.MultiplayerVersion == Multiplayer.ModEntry.Version.ToString(3);
+                                  selectedServer.MultiplayerVersion == Multiplayer.Ver;
 
                 buttonJoin.ToggleInteractable(canConnect);
             }
@@ -425,7 +425,7 @@ namespace Multiplayer.Components.MainMenu
                 details += "<alpha=#50>" + Locale.SERVER_BROWSER__MODS_REQUIRED + ":</color> " + (selectedServer.RequiredMods != null? Locale.SERVER_BROWSER__YES : Locale.SERVER_BROWSER__NO) + "<br>";
                 details += "<br>";
                 details += "<alpha=#50>" + Locale.SERVER_BROWSER__GAME_VERSION + ":</color> " + (selectedServer.GameVersion != BuildInfo.BUILD_VERSION_MAJOR.ToString() ? "<color=\"red\">" : "") + selectedServer.GameVersion + "</color><br>";
-                details += "<alpha=#50>" + Locale.SERVER_BROWSER__MOD_VERSION + ":</color> " + (selectedServer.MultiplayerVersion != Multiplayer.ModEntry.Version.ToString() ? "<color=\"red\">" : "") + selectedServer.MultiplayerVersion + "</color><br>";
+                details += "<alpha=#50>" + Locale.SERVER_BROWSER__MOD_VERSION + ":</color> " + (selectedServer.MultiplayerVersion != Multiplayer.Ver ? "<color=\"red\">" : "") + selectedServer.MultiplayerVersion + "</color><br>";
                 details += "<br>";
                 details += selectedServer.ServerDetails;
 
@@ -628,7 +628,6 @@ namespace Multiplayer.Components.MainMenu
             connectionState = ConnectionState.NotConnected;
             ShowConnectingPopup();
 
-
             if (!direct)
             {
                 if (selectedServer.ipv6 != null && selectedServer.ipv6 != string.Empty)
@@ -782,13 +781,13 @@ namespace Multiplayer.Components.MainMenu
                 case DisconnectReason.UnknownHost:
                     if (message == null || message.Length == 0)
                     {
-                        message = "Unknown Host"; //add translations
+                        message = "Unknown Host"; //TODO: add translations
                     }
                     break;
                 case DisconnectReason.DisconnectPeerCalled:
                     if (message == null || message.Length == 0)
                     {
-                        message = "Player Kicked"; //add translations
+                        message = "Player Kicked"; //TODO: add translations
                     }
                     break;
                 case DisconnectReason.ConnectionFailed:
@@ -797,17 +796,24 @@ namespace Multiplayer.Components.MainMenu
                     switch (connectionState)
                     {
                         case ConnectionState.AttemptingIPv6:
-                            AttemptIPv6Punch();
+                            if (Multiplayer.Settings.EnableNatPunch)
+                                AttemptIPv6Punch();
+                            else
+                                AttemptIPv4();
                             return;
                         case ConnectionState.AttemptingIPv6Punch:
                             AttemptIPv4();
                             return;
                         case ConnectionState.AttemptingIPv4:
-                            AttemptIPv4Punch();
+                            if (Multiplayer.Settings.EnableNatPunch)
+                                AttemptIPv4Punch();
+                            else
+                                AttemptFail();
+                                message = "Host Unreachable"; //TODO: add translations
                             return;
                         case ConnectionState.AttemptingIPv4Punch:
                             AttemptFail();
-                            message = "Host Unreachable";
+                            message = "Host Unreachable"; //TODO: add translations
                             break;
                     }
                     break;
@@ -815,13 +821,13 @@ namespace Multiplayer.Components.MainMenu
                 case DisconnectReason.ConnectionRejected:        
                     if (message == null || message.Length == 0)
                     {
-                        message = "Rejected!"; //add translations
+                        message = "Rejected!"; //TODO: add translations
                     }
                     break;
                 case DisconnectReason.RemoteConnectionClose:
                     if (message == null || message.Length == 0)
                     {
-                        message = "Server Shuttingdown"; //add translations
+                        message = "Server Shutting Down"; //TODO: add translations
                     }
                     break;
             }
@@ -833,7 +839,7 @@ namespace Multiplayer.Components.MainMenu
             NetworkLifecycle.Instance.QueueMainMenuEvent(() =>
             {
             
-                //Multiplayer.LogError($"OnDisconnect() Adding PU");
+                Multiplayer.LogError($"OnDisconnect() Adding PU");
                 MainMenuThingsAndStuff.Instance.ShowOkPopup(message, ()=>{ });
 
                 //Multiplayer.LogError($"OnDisconnect() Done!");
@@ -933,7 +939,7 @@ namespace Multiplayer.Components.MainMenu
                 item.HasPassword = UnityEngine.Random.Range(0, 10) > 5;
 
                 item.GameVersion = UnityEngine.Random.Range(1, 10) > 3 ? BuildInfo.BUILD_VERSION_MAJOR.ToString() : "97";
-                item.MultiplayerVersion = UnityEngine.Random.Range(1, 10) > 3 ? Multiplayer.ModEntry.Version.ToString(3) : "0.1.0";
+                item.MultiplayerVersion = UnityEngine.Random.Range(1, 10) > 3 ? Multiplayer.Ver : "0.1.0";
 
                 gridViewModel.Add(item);
             }

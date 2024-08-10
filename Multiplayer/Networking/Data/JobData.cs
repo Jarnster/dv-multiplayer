@@ -9,7 +9,7 @@ public class JobData
 {
     public byte JobType { get; set; }
     public string ID { get; set; }
-    public TaskBeforeDataData[] Tasks { get; set; }
+    public TaskData[] Tasks { get; set; }
     public StationsChainDataData ChainData { get; set; }
     public int RequiredLicenses { get; set; }
     public float StartTime { get; set; }
@@ -24,7 +24,7 @@ public class JobData
         {
             JobType = (byte)job.jobType,
             ID = job.ID,
-            Tasks = job.tasks.Select(x => TaskBeforeDataData.FromTask(x)).ToArray(),
+            Tasks = job.tasks.Select(x => TaskData.FromTask(x)).ToArray(),
             ChainData = StationsChainDataData.FromStationData(job.chainData),
             RequiredLicenses = (int)job.requiredLicenses,
             StartTime = job.startTime,
@@ -41,7 +41,7 @@ public class JobData
         writer.Put(data.ID);
         writer.Put((byte)data.Tasks.Length);
         foreach (var taskBeforeDataData in data.Tasks)
-            TaskBeforeDataData.SerializeTask(taskBeforeDataData, writer);
+            TaskData.SerializeTask(taskBeforeDataData, writer);
         StationsChainDataData.Serialize(writer, data.ChainData);
         writer.Put(data.RequiredLicenses);
         writer.Put(data.StartTime);
@@ -61,9 +61,9 @@ public class JobData
         Multiplayer.Log("JobData.Deserialize() id: " + id);
         var tasksLength = reader.GetByte();
         Multiplayer.Log("JobData.Deserialize() tasksLength: " + tasksLength);
-        var tasks = new TaskBeforeDataData[tasksLength];
+        var tasks = new TaskData[tasksLength];
         for (int i = 0; i < tasksLength; i++)
-            tasks[i] = TaskBeforeDataData.DeserializeTask(reader);
+            tasks[i] = TaskData.DeserializeTask(reader);
         //Multiplayer.Log("JobData.Deserialize() tasks: " + JsonConvert.SerializeObject(tasks, Formatting.None));
         var chainData = StationsChainDataData.Deserialize(reader);
         //Multiplayer.Log("JobData.Deserialize() chainData: " + JsonConvert.SerializeObject(chainData, Formatting.Indented));

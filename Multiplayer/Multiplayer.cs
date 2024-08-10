@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Linq;
+using System.Reflection;
 using HarmonyLib;
 using JetBrains.Annotations;
 using Multiplayer.Components.Networking;
@@ -21,6 +23,19 @@ public static class Multiplayer
 
     private static AssetBundle assetBundle;
     public static AssetIndex AssetIndex { get; private set; }
+    public static string Ver {
+        get {
+            AssemblyInformationalVersionAttribute info = (AssemblyInformationalVersionAttribute)typeof(Multiplayer).Assembly.
+                                                            GetCustomAttributes(typeof(AssemblyInformationalVersionAttribute), false)
+                                                            .FirstOrDefault();
+
+            if (info == null || Settings.ForceJson)
+                return ModEntry.Info.Version;
+
+            return info.InformationalVersion.Split('+')[0];
+        }
+    }
+    
 
     public static bool specLog = false;
 
@@ -28,7 +43,7 @@ public static class Multiplayer
     private static bool Load(UnityModManager.ModEntry modEntry)
     {
         ModEntry = modEntry;
-        Settings = Settings.Load<Settings>(modEntry);
+        Settings = Settings.Load(modEntry);//Settings.Load<Settings>(modEntry);
         ModEntry.OnGUI = Settings.Draw;
         ModEntry.OnSaveGUI = Settings.Save;
 
@@ -39,6 +54,8 @@ public static class Multiplayer
             File.Delete(LOG_FILE);
 
             Locale.Load(ModEntry.Path);
+
+            Log($"Multiplayer JSON Version: {ModEntry.Info.Version}, Internal Version: {Ver} ");
 
             Log("Patching...");
             harmony = new Harmony(ModEntry.Info.Id);

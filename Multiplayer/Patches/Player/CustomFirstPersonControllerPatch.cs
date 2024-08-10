@@ -60,6 +60,9 @@ public static class CustomFirstPersonControllerPatch
 
     private static void OnTick(uint tick)
     {
+        if(UnloadWatcher.isUnloading)
+            return;
+
         Vector3 position = isOnCar ? PlayerManager.PlayerTransform.localPosition : PlayerManager.GetWorldAbsolutePlayerPosition();
         float rotationY = (isOnCar ? PlayerManager.PlayerTransform.localEulerAngles : PlayerManager.PlayerTransform.eulerAngles).y;
 

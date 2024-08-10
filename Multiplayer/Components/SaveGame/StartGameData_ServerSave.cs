@@ -59,8 +59,8 @@ public class StartGameData_ServerSave : AStartGameData
 
         if (saveGameData.GetString(SaveGameKeys.Game_mode) == "FreeRoam")
             LicenseManager.Instance.GrabAllGameModeSpecificUnlockables(SaveGameKeys.Game_mode);
-        else
-            StartingItemsController.Instance.AddStartingItems(saveGameData, true);
+        //else
+        StartingItemsController.Instance.AddStartingItems(saveGameData, true);
 
         // if (packet.Debt_existing_locos != null)
         //     LocoDebtController.Instance.LoadExistingLocosDebtsSaveData(packet.Debt_existing_locos.Select(JObject.Parse).ToArray());

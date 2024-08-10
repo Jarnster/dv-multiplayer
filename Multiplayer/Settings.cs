@@ -14,6 +14,8 @@ public class Settings : UnityModManager.ModSettings, IDrawable
 
     public static Action<Settings> OnSettingsUpdated;
 
+    public int SettingsVer = 0;
+
     [Header("Player")]
     [Draw("Username", Tooltip = "Your username in-game")]
     public string Username = "Player";
@@ -85,7 +87,7 @@ public class Settings : UnityModManager.ModSettings, IDrawable
     public int SimulationMinLatency = 30;
     [Draw("Maximum Latency (ms)", VisibleOn = "SimulateLatency|true")]
     public int SimulationMaxLatency = 100;
-
+    public bool ForceJson = false;
     public void Draw(UnityModManager.ModEntry modEntry)
     {
         Settings self = this;
@@ -117,5 +119,46 @@ public class Settings : UnityModManager.ModSettings, IDrawable
         guid = System.Guid.NewGuid();
         Guid = guid.ToString();
         return guid;
+    }
+
+    public static Settings Load(UnityModManager.ModEntry modEntry)
+    {
+        Settings data = Settings.Load<Settings>(modEntry);
+
+            MigrateSettings(ref data);
+            
+            data.SettingsVer = GetCurrentVersion();
+
+            data.Save(modEntry);
+ 
+        return data;
+    }
+
+    private static int GetCurrentVersion()
+    {
+        return 1;
+    }
+
+    // Function to handle migrations based on the current version
+    private static void MigrateSettings(ref Settings data)
+    { 
+        switch (data.SettingsVer)
+        {
+            case 0:
+                //We want to disable Punch until it's fully implemented
+                data.EnableNatPunch = false;
+                data.SettingsVer = 1;
+
+                //Ensure http setting is upgraded to https if using the default lobby server
+                if(data.LobbyServerAddress == "http://dv.mineit.space")
+                    data.LobbyServerAddress = new Settings().LobbyServerAddress;
+
+                MigrateSettings(ref data);
+                break;
+
+            default:
+                break;
+        }
+
     }
 }
