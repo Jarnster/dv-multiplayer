@@ -72,6 +72,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
     private bool hasSimFlow;
     private SimulationFlow simulationFlow;
+    public FireboxSimController firebox;
 
     private HashSet<string> dirtyPorts;
     private Dictionary<string, float> lastSentPortValues;
@@ -86,6 +87,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     public byte CargoModelIndex = byte.MaxValue;
     private bool healthDirty;
     private bool sendCouplers;
+    private bool fireboxDirty;
 
     public bool IsDestroying;
 
@@ -147,8 +149,15 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             dirtyFuses = new HashSet<string>(simulationFlow.fullFuseIdToFuse.Count);
             foreach (KeyValuePair<string, Fuse> kvp in simulationFlow.fullFuseIdToFuse)
                 kvp.Value.StateUpdated += _ => { Common_OnFuseUpdated(kvp.Value); };
+        
+            if (simController.firebox != null)
+            {
+                firebox = simController.firebox;
+                firebox.fireboxCoalControlPort.ValueUpdatedInternally += Client_OnAddCoal;   //Player adding coal
+                firebox.fireboxIgnitionPort.ValueUpdatedInternally += Client_OnIgnite;      //Player igniting firebox
+            }
         }
-
+         
         brakeSystem.HandbrakePositionChanged += Common_OnHandbrakePositionChanged;
         brakeSystem.BrakeCylinderReleased += Common_OnBrakeCylinderReleased;
         
@@ -162,6 +171,12 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             TrainCar.CarDamage.CarEffectiveHealthStateUpdate += Server_CarHealthUpdate;
 
             brakeSystem.MainResPressureChanged += Server_MainResUpdate;
+
+            if (firebox != null)
+            {
+                firebox.fireboxContentsPort.ValueUpdatedInternally += Common_OnFireboxUpdate;
+                firebox.fireOnPort.ValueUpdatedInternally += Common_OnFireboxUpdate;
+            }
 
             StartCoroutine(Server_WaitForLogicCar());
         }
@@ -185,8 +200,16 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         foreach (Coupler coupler in TrainCar.couplers)
             hoseToCoupler.Remove(coupler.hoseAndCock);
+
+        if (firebox != null)
+        {
+            firebox.fireboxCoalControlPort.ValueUpdatedInternally -= Client_OnAddCoal;   //Player adding coal
+            firebox.fireboxIgnitionPort.ValueUpdatedInternally -= Client_OnIgnite;      //Player igniting firebox
+        }
+
         brakeSystem.HandbrakePositionChanged -= Common_OnHandbrakePositionChanged;
         brakeSystem.BrakeCylinderReleased -= Common_OnBrakeCylinderReleased;
+
         if (NetworkLifecycle.Instance.IsHost())
         {
             bogie1.TrackChanged -= Server_BogieTrackChanged;
@@ -194,6 +217,12 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             TrainCar.CarDamage.CarEffectiveHealthStateUpdate -= Server_CarHealthUpdate;
 
             brakeSystem.MainResPressureChanged -= Server_MainResUpdate;
+
+            if (firebox != null)
+            {
+                firebox.fireboxContentsPort.ValueUpdatedInternally -= Common_OnFireboxUpdate;
+                firebox.fireOnPort.ValueUpdatedInternally -= Common_OnFireboxUpdate;
+            }
 
             if (TrainCar.logicCar != null)
             {
@@ -242,6 +271,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         healthDirty = true;
         BogieTracksDirty = true;
         sendCouplers = true;
+        fireboxDirty = firebox != null; //only dirty if exists
+
         if (!hasSimFlow)
             return;
         foreach (string portId in simulationFlow.fullPortIdToPort.Keys)
@@ -270,6 +301,10 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
                     NetworkLifecycle.Instance.Server.LogWarning($"Player {player.Username} tried to send a non-control port!");
                     Common_DirtyPorts(packet.PortIds);
                     return false;
+                }
+                else
+                {
+                    NetworkLifecycle.Instance.Server.LogWarning($"Player {player.Username} sent portId: {portId}, value type: {port.valueType}");
                 }
 
         // Only allow the player to update ports on the car they are in/near
@@ -315,11 +350,18 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         mainResPressureDirty = true;
     }
 
+    private void Server_FireboxUpdate(float normalizedPressure, float pressure)
+    {
+        fireboxDirty = true;
+    }
+
     private void Server_OnTick(uint tick)
     {
         if (UnloadWatcher.isUnloading)
             return;
+
         Server_SendBrakePressures();
+        Server_SendFireBoxState();
         Server_SendCouplers();
         Server_SendCargoState();
         Server_SendHealthState();
@@ -331,6 +373,15 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             return;
         mainResPressureDirty = false;
         NetworkLifecycle.Instance.Server.SendBrakePressures(NetId, brakeSystem.mainReservoirPressure, brakeSystem.independentPipePressure, brakeSystem.brakePipePressure, brakeSystem.brakeCylinderPressure);
+    }
+
+    private void Server_SendFireBoxState()
+    {
+        if (!fireboxDirty || firebox == null)
+            return;
+
+        fireboxDirty = false;
+        NetworkLifecycle.Instance.Server.SendFireboxState(NetId, firebox.fireboxContentsPort.value, firebox.IsFireOn);
     }
 
     private void Server_SendCouplers()
@@ -375,6 +426,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     {
         if (UnloadWatcher.isUnloading)
             return;
+
         Common_SendHandbrakePosition();
         Common_SendFuses();
         Common_SendPorts();
@@ -386,6 +438,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             return;
         if (!TrainCar.brakeSystem.hasHandbrake)
             return;
+
         handbrakeDirty = false;
         NetworkLifecycle.Instance.Client.SendHandbrakePositionChanged(NetId, brakeSystem.handbrakePosition);
     }
@@ -477,6 +530,14 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         NetworkLifecycle.Instance.Client.SendBrakeCylinderReleased(NetId);
     }
 
+    private void Common_OnFireboxUpdate(float _)
+    {
+        if (NetworkLifecycle.Instance.IsProcessingPacket)
+            return;
+
+        fireboxDirty = true;
+    }
+
     private void Common_OnPortUpdated(Port port)
     {
         if (UnloadWatcher.isUnloading || NetworkLifecycle.Instance.IsProcessingPacket)
@@ -500,15 +561,23 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         if (!hasSimFlow)
             return;
 
+        string log = $"CommonTrainPortsPacket({TrainCar.ID})";
         for (int i = 0; i < packet.PortIds.Length; i++)
         {
             Port port = simulationFlow.fullPortIdToPort[packet.PortIds[i]];
             float value = packet.PortValues[i];
+            float before = port.value;
+
             if (port.type == PortType.EXTERNAL_IN)
                 port.ExternalValueUpdate(value);
             else
                 port.Value = value;
+
+            if (Multiplayer.Settings.DebugLogging)
+                log += $"\r\n\tPort name: {port.id}, value before: {before}, value after: {port.value}, value: {value}, port type: {port.type}";
         }
+
+        NetworkLifecycle.Instance.Client.LogDebug(() => log);
     }
 
     public void Common_UpdateFuses(CommonTrainFusesPacket packet)
@@ -571,6 +640,40 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         brakeSystem.brakePipePressure = brakePipePressure;
         brakeSystem.brakeCylinderPressure = brakeCylinderPressure;
     }
+    private void Client_OnAddCoal(float coalMassDelta)
+    {
+        if (NetworkLifecycle.Instance.IsProcessingPacket)
+            return;
 
+        if (coalMassDelta <= 0)
+            return;
+
+        NetworkLifecycle.Instance.Client.LogDebug(() => $"Common_OnAddCoal({TrainCar.ID}): coalMassDelta: {coalMassDelta}");
+        NetworkLifecycle.Instance.Client.SendAddCoal(NetId, coalMassDelta);
+    }
+
+    private void Client_OnIgnite(float ignition)
+    {
+        if (NetworkLifecycle.Instance.IsProcessingPacket)
+            return;
+
+        if (ignition == 0f)
+            return;
+
+        NetworkLifecycle.Instance.Client.LogDebug(() => $"Common_OnIgnite({TrainCar.ID})");
+        NetworkLifecycle.Instance.Client.SendFireboxIgnition(NetId);
+    }
+
+    public void Client_ReceiveFireboxStateUpdate(float fireboxContents, bool isOn)
+    {
+        if (firebox == null)
+            return;
+
+        if (!hasSimFlow)
+            return;
+
+        firebox.fireboxContentsPort.Value = fireboxContents;
+        firebox.fireOnPort.Value = isOn ? 1f : 0f;
+    }
     #endregion
 }

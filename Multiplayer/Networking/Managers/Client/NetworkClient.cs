@@ -579,6 +579,17 @@ public class NetworkClient : NetworkManager
         //Multiplayer.LogDebug(() => $"Received Brake Pressures netId {packet.NetId}: {packet.MainReservoirPressure}, {packet.IndependentPipePressure}, {packet.BrakePipePressure}, {packet.BrakeCylinderPressure}");
     }
 
+    private void OnClientboundFireboxStatePacket(ClientboundFireboxStatePacket packet)
+    {
+        if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+            return;
+
+
+        networkedTrainCar.Client_ReceiveFireboxStateUpdate(packet.Contents, packet.IsOn);
+
+        Multiplayer.LogDebug(() => $"Received Brake Pressures netId {packet.NetId}: {packet.Contents}, {packet.IsOn}");
+    }
+
     private void OnClientboundCargoStatePacket(ClientboundCargoStatePacket packet)
     {
         if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
@@ -1009,6 +1020,22 @@ public class NetworkClient : NetworkManager
             Position = position
         }, DeliveryMethod.ReliableOrdered);
     }
+    public void SendAddCoal(ushort netId, float coalMassDelta)
+    {
+        SendPacketToServer(new ServerboundAddCoalPacket
+        {
+            NetId = netId,
+            CoalMassDelta = coalMassDelta
+        }, DeliveryMethod.ReliableOrdered);
+    }
+
+    public void SendFireboxIgnition(ushort netId)
+    {
+        SendPacketToServer(new ServerboundFireboxIgnitePacket
+        {
+            NetId = netId,
+        }, DeliveryMethod.ReliableOrdered);
+    }
 
     public void SendPorts(ushort netId, string[] portIds, float[] portValues)
     {
@@ -1019,13 +1046,14 @@ public class NetworkClient : NetworkManager
             PortValues = portValues
         }, DeliveryMethod.ReliableOrdered);
 
+        /*
         string log=$"Sending ports netId: {netId}";
         for (int i = 0; i < portIds.Length; i++) {
             log += $"\r\n\t{portIds[i]}: {portValues[i]}";
         }
 
         Multiplayer.LogDebug(() => log);
-
+        */
     }
 
     public void SendFuses(ushort netId, string[] fuseIds, bool[] fuseValues)

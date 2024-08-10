@@ -128,6 +128,8 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonCockFiddlePacket, NetPeer>(OnCommonCockFiddlePacket);
         netPacketProcessor.SubscribeReusable<CommonBrakeCylinderReleasePacket, NetPeer>(OnCommonBrakeCylinderReleasePacket);
         netPacketProcessor.SubscribeReusable<CommonHandbrakePositionPacket, NetPeer>(OnCommonHandbrakePositionPacket);
+        netPacketProcessor.SubscribeReusable<ServerboundAddCoalPacket, NetPeer>(OnServerboundAddCoalPacket);
+        netPacketProcessor.SubscribeReusable<ServerboundFireboxIgnitePacket, NetPeer>(OnServerboundFireboxIgnitePacket);
         netPacketProcessor.SubscribeReusable<CommonTrainPortsPacket, NetPeer>(OnCommonTrainPortsPacket);
         netPacketProcessor.SubscribeReusable<CommonTrainFusesPacket, NetPeer>(OnCommonTrainFusesPacket);
         netPacketProcessor.SubscribeReusable<ServerboundJobTakeRequestPacket, NetPeer>(OnServerboundJobTakeRequestPacket);
@@ -285,6 +287,18 @@ public class NetworkServer : NetworkManager
         }, DeliveryMethod.ReliableOrdered, selfPeer);
 
         //Multiplayer.LogDebug(()=> $"Sending Brake Pressures netId {netId}: {mainReservoirPressure}, {independentPipePressure}, {brakePipePressure}, {brakeCylinderPressure}");
+    }
+
+    public void SendFireboxState(ushort netId, float fireboxContents, bool fireboxOn)
+    {
+        SendPacketToAll(new ClientboundFireboxStatePacket
+        {
+            NetId = netId,
+            Contents = fireboxContents,
+            IsOn = fireboxOn
+        }, DeliveryMethod.ReliableOrdered, selfPeer);
+
+        Multiplayer.LogDebug(() => $"Sending Firebox States netId {netId}: {fireboxContents}, {fireboxOn}");
     }
 
     public void SendCargoState(TrainCar trainCar, ushort netId, bool isLoading, byte cargoModelIndex)
@@ -579,7 +593,7 @@ public class NetworkServer : NetworkManager
             SendPacket(peer, ClientboundSpawnTrainSetPacket.FromTrainSet(set), DeliveryMethod.ReliableOrdered);
         }
 
-        /* Temp for stable release
+        /*
         //send jobs - do we need a job manager/job IDs to make this easier?
         foreach(StationController station in StationController.allStations)
         {
@@ -732,14 +746,64 @@ public class NetworkServer : NetworkManager
         SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
     }
 
+    private void OnServerboundAddCoalPacket(ServerboundAddCoalPacket packet, NetPeer peer)
+    {
+        if (!TryGetServerPlayer(peer, out ServerPlayer player))
+            return;
+
+        if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+            return;
+
+        //is value valid?
+        if (float.IsNaN(packet.CoalMassDelta))
+            return;
+
+        if (!NetworkLifecycle.Instance.IsHost(peer))
+        {
+            float carLength = CarSpawner.Instance.carLiveryToCarLength[networkedTrainCar.TrainCar.carLivery];
+
+            //is player close enough to add coal?
+            if ((player.WorldPosition - networkedTrainCar.transform.position).sqrMagnitude <= carLength * carLength)
+            networkedTrainCar.firebox?.fireboxCoalControlPort.ExternalValueUpdate(packet.CoalMassDelta);
+        }
+            
+    }
+
+    private void OnServerboundFireboxIgnitePacket(ServerboundFireboxIgnitePacket packet, NetPeer peer)
+    {
+        if (!TryGetServerPlayer(peer, out ServerPlayer player))
+            return;
+
+        if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
+            return;
+
+        if (!NetworkLifecycle.Instance.IsHost(peer))
+        {
+            //is player close enough to ignite firebox?
+            float carLength = CarSpawner.Instance.carLiveryToCarLength[networkedTrainCar.TrainCar.carLivery];
+            if ((player.WorldPosition - networkedTrainCar.transform.position).sqrMagnitude <= carLength * carLength)
+                networkedTrainCar.firebox?.Ignite();
+        }
+    }
+
     private void OnCommonTrainPortsPacket(CommonTrainPortsPacket packet, NetPeer peer)
     {
         if (!TryGetServerPlayer(peer, out ServerPlayer player))
             return;
         if (!NetworkedTrainCar.Get(packet.NetId, out NetworkedTrainCar networkedTrainCar))
             return;
-        if (!NetworkLifecycle.Instance.IsHost(peer) && !networkedTrainCar.Server_ValidateClientSimFlowPacket(player, packet))
-            return;
+
+        //if not the host && validation fails then ignore packet
+        if (!NetworkLifecycle.Instance.IsHost(peer))
+        {
+            bool flag = networkedTrainCar.Server_ValidateClientSimFlowPacket(player, packet);
+
+            LogDebug(() => $"OnCommonTrainPortsPacket from {player.Username}, Not host, valid: {flag}");
+            if (!flag)
+            {
+                return;
+            }
+        }
 
         SendPacketToAll(packet, DeliveryMethod.ReliableOrdered, peer);
     }
