@@ -39,7 +39,7 @@ public class HostGamePane : MonoBehaviour
 
     ButtonDV startButton;
 
-    GameObject ViewPort;
+    //GameObject ViewPort;
 
     public ISaveGame saveGame;
     public UIStartGameData startGameData;

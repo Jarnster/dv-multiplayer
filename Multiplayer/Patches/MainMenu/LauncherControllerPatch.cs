@@ -18,7 +18,7 @@ public static class LauncherController_Patch
     private const int PADDING = 10;
     
     private static GameObject goHost;
-    private static LauncherController lcInstance;
+    //private static LauncherController lcInstance;
     
 
 

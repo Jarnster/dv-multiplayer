@@ -50,7 +50,7 @@ namespace Multiplayer.Components.MainMenu
         //Misc GUI Elements
         private TextMeshProUGUI serverName;
         private TextMeshProUGUI detailsPane;
-        private ScrollRect serverInfo;
+        //private ScrollRect serverInfo;
 
 
         private bool serverRefreshing = false;

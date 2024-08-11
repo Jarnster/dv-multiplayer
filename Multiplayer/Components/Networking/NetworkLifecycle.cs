@@ -43,8 +43,6 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
     private readonly ExecutionTimer tickTimer = new();
     private readonly ExecutionTimer tickWatchdog = new(0.25f);
 
-    float timeElapsed = 0f; //time since last lobby server update
-
     /// <summary>
     ///     Whether the provided NetPeer is the host.
     ///     Note that this does NOT check authority, and should only be used for client-only logic.
