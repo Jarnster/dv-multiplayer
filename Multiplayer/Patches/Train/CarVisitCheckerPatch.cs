@@ -23,6 +23,14 @@ public static class CarVisitCheckerPatch
             __result = true; //Pretend there's a player in the car
             return false;   //don't run our vanilla game code
         }
+        if (NetworkLifecycle.Instance.Server.ServerPlayers.Count == 0)
+        {
+
+            //no server players (this should only apply to a dedicated server), don't despawn
+            __instance.playerIsInCar = true;
+            __result = true;
+            return false;
+        }
 
         //We are the host, check all players against this car
         foreach (ServerPlayer player in NetworkLifecycle.Instance.Server.ServerPlayers)
@@ -45,12 +53,13 @@ public static class CarVisitCheckerPatch
             }
         }
 
-        //no server players (this should only apply to a dedicated server), don't despawn
-        __instance.playerIsInCar = true;
-        __result = true;
+        //No one on the car
+        __instance.playerIsInCar = false;
+        __result = __instance.recentlyVisitedTimer.RemainingTime > 0f;
         return false;
     }
 
+    /*
     [HarmonyPrefix]
     [HarmonyPatch(nameof(CarVisitChecker.RecentlyVisitedRemainingTime), MethodType.Getter)]
     private static bool RecentlyVisitedRemainingTime_Prefix(ref float __result)
@@ -60,4 +69,5 @@ public static class CarVisitCheckerPatch
         __result = CarVisitChecker.RECENTLY_VISITED_TIME_THRESHOLD;
         return false;
     }
+    */
 }
