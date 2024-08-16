@@ -98,7 +98,6 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     public TickedQueue<RigidbodySnapshot> Client_trainRigidbodyQueue;
     private TickedQueue<BogieData> client_bogie1Queue;
     private TickedQueue<BogieData> client_bogie2Queue;
-    public uint TicksSinceSync = uint.MaxValue;
 
     #endregion
 
@@ -608,25 +607,16 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     {
         if (!client_Initialized)
             return;
-
         if (TrainCar.isEligibleForSleep)
             TrainCar.ForceOptimizationState(false);
 
-
-        // Handle RigidBody snapshot (common for both derailed and normal states)
-        if (movementPart.MovementType.HasFlag(TrainsetMovementPart.TrainsetMovementType.RigidBody))
-            Client_trainRigidbodyQueue.ReceiveSnapshot(movementPart.RigidbodySnapshot, tick);
-
-        // Handle derailment (only rigid body)
-        if (movementPart.MovementType == TrainsetMovementPart.TrainsetMovementType.RigidBody)
+        if (movementPart.IsRigidbodySnapshot)
         {
             TrainCar.Derail();
             TrainCar.stress.ResetTrainStress();
-            return;
+            Client_trainRigidbodyQueue.ReceiveSnapshot(movementPart.RigidbodySnapshot, tick);
         }
-
-        // Handle normal movement (bogie data and optional rigid body data)
-        if (movementPart.MovementType.HasFlag(TrainsetMovementPart.TrainsetMovementType.Bogie))
+        else
         {
             Client_trainSpeedQueue.ReceiveSnapshot(movementPart.Speed, tick);
             TrainCar.stress.slowBuildUpStress = movementPart.SlowBuildUpStress;
@@ -658,7 +648,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         if (coalMassDelta <= 0)
             return;
 
-        //NetworkLifecycle.Instance.Client.LogDebug(() => $"Common_OnAddCoal({TrainCar.ID}): coalMassDelta: {coalMassDelta}");
+        NetworkLifecycle.Instance.Client.LogDebug(() => $"Common_OnAddCoal({TrainCar.ID}): coalMassDelta: {coalMassDelta}");
         NetworkLifecycle.Instance.Client.SendAddCoal(NetId, coalMassDelta);
     }
 
@@ -670,7 +660,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         if (ignition == 0f)
             return;
 
-        //NetworkLifecycle.Instance.Client.LogDebug(() => $"Common_OnIgnite({TrainCar.ID})");
+        NetworkLifecycle.Instance.Client.LogDebug(() => $"Common_OnIgnite({TrainCar.ID})");
         NetworkLifecycle.Instance.Client.SendFireboxIgnition(NetId);
     }
 

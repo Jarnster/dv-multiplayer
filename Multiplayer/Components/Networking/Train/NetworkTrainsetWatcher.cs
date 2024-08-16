@@ -11,9 +11,6 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
 {
     private ClientboundTrainsetPhysicsPacket cachedSendPacket;
 
-    const float DESIRED_FULL_SYNC_INTERVAL = 2f; // in seconds
-    const int MAX_UNSYNC_TICKS = (int)(NetworkLifecycle.TICK_RATE * DESIRED_FULL_SYNC_INTERVAL);
-
     protected override void Awake()
     {
         base.Awake();
@@ -46,47 +43,35 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
 
     private void Server_TickSet(Trainset set)
     {
-        bool anyCarMoving = false;
-        bool maxTicksReached = false;
-
-        if (set == null)
+        bool dirty = false;
+        foreach (TrainCar trainCar in set.cars)
         {
-            Multiplayer.LogError($"Server_TickSet(): Received null set!");
-            return;
+            if (trainCar.isStationary)
+                continue;
+            dirty = true;
+            break;
         }
 
+        if (!dirty)
+            return;
+
         cachedSendPacket.NetId = set.firstCar.GetNetId();
+
         //car may not be initialised, missing a valid NetID
         if (cachedSendPacket.NetId == 0)
             return;
 
-        foreach (TrainCar trainCar in set.cars)
+        if (set.cars.Contains(null))
         {
-            if (trainCar == null || !trainCar.gameObject.activeSelf)
-            {
-                Multiplayer.LogError($"Trainset {set.id} ({set.firstCar?.GetNetId()} has a null or inactive ({trainCar?.gameObject.activeSelf}) car!");
-                return;
-            }
-
-            //If we can locate the networked car, we'll add to the ticks counter
-            if (NetworkedTrainCar.TryGetFromTrainCar(trainCar, out NetworkedTrainCar netTC))
-            {
-                netTC.TicksSinceSync++;
-                maxTicksReached |=  netTC.TicksSinceSync >= MAX_UNSYNC_TICKS;
-            }
-
-            //Even if the car is stationary, if the max ticks has been exceeded we will still sync
-            if (!trainCar.isStationary)
-                anyCarMoving = true;
-
-            //we can finish checking early if we have BOTH a dirty and a max ticks
-            if (anyCarMoving && maxTicksReached)
-                break;
+            Multiplayer.LogError($"Trainset {set.id} ({set.firstCar.GetNetId()} has a null car!");
+            return;
         }
 
-        //if any car is dirty or exceeded its max ticks we will re-sync the entire train
-        if (!anyCarMoving && !maxTicksReached)
+        if (set.cars.Any(car => !car.gameObject.activeSelf))
+        {
+            Multiplayer.LogError($"Trainset {set.id} ({set.firstCar.GetNetId()} has a non-active car!");
             return;
+        }
 
         TrainsetMovementPart[] trainsetParts = new TrainsetMovementPart[set.cars.Count];
         bool anyTracksDirty = false;
@@ -95,35 +80,23 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
             TrainCar trainCar = set.cars[i];
             if (!trainCar.TryNetworked(out NetworkedTrainCar networkedTrainCar))
             {
+                Multiplayer.LogDebug(() => $"TrainCar UNKNOWN is not networked! Is active? {trainCar.gameObject.activeInHierarchy}");
                 Multiplayer.LogDebug(() => $"TrainCar {trainCar.ID} is not networked! Is active? {trainCar.gameObject.activeInHierarchy}");
                 continue;
             }
 
+            //NetworkedTrainCar networkedTrainCar = trainCar.Networked();
             anyTracksDirty |= networkedTrainCar.BogieTracksDirty;
 
             if (trainCar.derailed)
-            {
                 trainsetParts[i] = new TrainsetMovementPart(RigidbodySnapshot.From(trainCar.rb));
-            }
             else
-            {
-                RigidbodySnapshot? snapshot = null;
-
-                //Have we exceeded the max ticks?
-                if (maxTicksReached)
-                {
-                    snapshot = RigidbodySnapshot.From(trainCar.rb);
-                    networkedTrainCar.TicksSinceSync = 0;   //reset this car's tick count
-                }
-
                 trainsetParts[i] = new TrainsetMovementPart(
                     trainCar.GetForwardSpeed(),
                     trainCar.stress.slowBuildUpStress,
                     BogieData.FromBogie(trainCar.Bogies[0], networkedTrainCar.BogieTracksDirty, networkedTrainCar.Bogie1TrackDirection),
-                    BogieData.FromBogie(trainCar.Bogies[1], networkedTrainCar.BogieTracksDirty, networkedTrainCar.Bogie2TrackDirection),
-                    snapshot
+                    BogieData.FromBogie(trainCar.Bogies[1], networkedTrainCar.BogieTracksDirty, networkedTrainCar.Bogie2TrackDirection)
                 );
-            }
         }
 
         cachedSendPacket.TrainsetParts = trainsetParts;
@@ -165,94 +138,3 @@ public class NetworkTrainsetWatcher : SingletonBehaviour<NetworkTrainsetWatcher>
         return $"[{nameof(NetworkTrainsetWatcher)}]";
     }
 }
-
-/* Backup
- *     private void Server_TickSet(Trainset set)
-    {
-        bool dirty = false;
-        bool maxTicks = false;
-
-        foreach (TrainCar trainCar in set.cars)
-        {
-            //If we can locate the networked car, we'll add to the ticks counter
-            if(NetworkedTrainCar.TryGetFromTrainCar(trainCar, out NetworkedTrainCar netTC))
-                netTC.TicksSinceSync++;
-
-            //if we've exceeded the max ticks since a full sync
-            if(netTC != null && netTC.TicksSinceSync >= MAX_UNSYNC_TICKS)
-                maxTicks = true;
-
-            //Even if the car is stationary, if the max ticks has been exceeded we will still sync
-            if (trainCar.isStationary)
-                continue;
-
-            dirty = true;
-            break;
-        }
-
-        //if any car is dirty or exceeded its max ticks we will re-sync the entire train
-        if (!dirty && !maxTicks)
-            return;
-
-        cachedSendPacket.NetId = set.firstCar.GetNetId();
-
-        //car may not be initialised, missing a valid NetID
-        if (cachedSendPacket.NetId == 0)
-            return;
-
-        if (set.cars.Contains(null))
-        {
-            Multiplayer.LogError($"Trainset {set.id} ({set.firstCar.GetNetId()} has a null car!");
-            return;
-        }
-
-        if (set.cars.Any(car => !car.gameObject.activeSelf))
-        {
-            Multiplayer.LogError($"Trainset {set.id} ({set.firstCar.GetNetId()} has a non-active car!");
-            return;
-        }
-
-        TrainsetMovementPart[] trainsetParts = new TrainsetMovementPart[set.cars.Count];
-        bool anyTracksDirty = false;
-        for (int i = 0; i < set.cars.Count; i++)
-        {
-            TrainCar trainCar = set.cars[i];
-            if (!trainCar.TryNetworked(out NetworkedTrainCar networkedTrainCar))
-            {
-                Multiplayer.LogDebug(() => $"TrainCar {trainCar?.ID ?? "UNKOWN"} is not networked! Is active? {trainCar.gameObject.activeInHierarchy}");
-                continue;
-            }
-
-            anyTracksDirty |= networkedTrainCar.BogieTracksDirty;
-
-            if (trainCar.derailed)
-            {
-                trainsetParts[i] = new TrainsetMovementPart(RigidbodySnapshot.From(trainCar.rb));
-            }
-            else
-            {
-                RigidbodySnapshot? snapshot = null;
-
-                //Have we exceeded the max ticks?
-                if (maxTicks)
-                {
-                    snapshot = RigidbodySnapshot.From(trainCar.rb);
-                    networkedTrainCar.TicksSinceSync = 0;   //reset this car's tick count
-                }
-
-                trainsetParts[i] = new TrainsetMovementPart(
-                    trainCar.GetForwardSpeed(),
-                    trainCar.stress.slowBuildUpStress,
-                    BogieData.FromBogie(trainCar.Bogies[0], networkedTrainCar.BogieTracksDirty, networkedTrainCar.Bogie1TrackDirection),
-                    BogieData.FromBogie(trainCar.Bogies[1], networkedTrainCar.BogieTracksDirty, networkedTrainCar.Bogie2TrackDirection),
-                    snapshot
-                );
-
-                
-            }
-        }
-
-        cachedSendPacket.TrainsetParts = trainsetParts;
-        NetworkLifecycle.Instance.Server.SendTrainsetPhysicsUpdate(cachedSendPacket, anyTracksDirty);
-    }
-*/
