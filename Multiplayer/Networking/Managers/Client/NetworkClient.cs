@@ -590,7 +590,7 @@ public class NetworkClient : NetworkManager
 
         networkedTrainCar.Client_ReceiveFireboxStateUpdate(packet.Contents, packet.IsOn);
 
-        Multiplayer.LogDebug(() => $"Received Brake Pressures netId {packet.NetId}: {packet.Contents}, {packet.IsOn}");
+        //Multiplayer.LogDebug(() => $"Received Brake Pressures netId {packet.NetId}: {packet.Contents}, {packet.IsOn}");
     }
 
     private void OnClientboundCargoStatePacket(ClientboundCargoStatePacket packet)

@@ -6,12 +6,9 @@ using Multiplayer.Components.Networking.Train;
 using Multiplayer.Components.Networking.World;
 using UnityEngine;
 using UnityEngine.UI;
-using System.Linq;
 using System.Diagnostics;
 using Multiplayer.Components.Networking;
 using Multiplayer.Networking.Data;
-using static Oculus.Avatar.CAPI;
-using Multiplayer.Patches.Train;
 
 
 
@@ -132,16 +129,18 @@ public static class DvExtensions
         foreach (ServerPlayer serverPlayer in NetworkLifecycle.Instance.Server.ServerPlayers)
         {
             float sqDist = (serverPlayer.WorldPosition - anchor).sqrMagnitude;
+            /*
             if(origin == "UnusedTrainCarDeleter.AreDeleteConditionsFulfilled_Patch0")
                 Multiplayer.LogDebug(() => $"AnyPlayerSqrMag(): car: {UnusedTrainCarDeleterPatch.current?.ID}, player: {serverPlayer.Username}, result: {sqDist}");
-
+            */
             if (sqDist < result)
                 result = sqDist;
         }
 
+        /*
         if (origin == "UnusedTrainCarDeleter.AreDeleteConditionsFulfilled_Patch0")
             Multiplayer.LogDebug(() => $"AnyPlayerSqrMag(): player: result: {result}");
-
+        */
         return result;
     }
     #endregion

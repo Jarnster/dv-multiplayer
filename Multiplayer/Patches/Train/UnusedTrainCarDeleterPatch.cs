@@ -30,7 +30,7 @@ public static class UnusedTrainCarDeleterPatch
 
         foreach (CodeInstruction instruction in instructions)
         {
-            Multiplayer.LogDebug(() => $"Transpiling: {instruction.ToString()} - ldarg_1_Counter: {ldarg_1_Counter},  found: {foundEntry}, complete: {complete}, skip: {skipCtr}, len: {instruction.opcode.Size} + {instruction.operand}");
+            //Multiplayer.LogDebug(() => $"Transpiling: {instruction.ToString()} - ldarg_1_Counter: {ldarg_1_Counter},  found: {foundEntry}, complete: {complete}, skip: {skipCtr}, len: {instruction.opcode.Size} + {instruction.operand}");
             if (instruction.opcode == OpCodes.Ldarg_1 && !foundEntry)
             {
                 ldarg_1_Counter++;
@@ -68,6 +68,7 @@ public static class UnusedTrainCarDeleterPatch
         }
     }
 
+/*
     [HarmonyPatch("AreDeleteConditionsFulfilled")]
     [HarmonyPrefix]
     public static void Prefix(UnusedTrainCarDeleter __instance, TrainCar trainCar)
@@ -82,16 +83,18 @@ public static class UnusedTrainCarDeleterPatch
             }
         }
 
-        Multiplayer.LogDebug(() => $"AreDeleteConditionsFulfilled_Prefix({trainCar?.ID}) Visit Checker: {trainCar?.visitChecker?.IsRecentlyVisited}, Livery: {CarTypes.IsAnyLocomotiveOrTender(trainCar?.carLivery)}, Player Spawned: {trainCar?.playerSpawnedCar} jobs: {job}");
+        //Multiplayer.LogDebug(() => $"AreDeleteConditionsFulfilled_Prefix({trainCar?.ID}) Visit Checker: {trainCar?.visitChecker?.IsRecentlyVisited}, Livery: {CarTypes.IsAnyLocomotiveOrTender(trainCar?.carLivery)}, Player Spawned: {trainCar?.playerSpawnedCar} jobs: {job}");
 
         current = trainCar;
     }
 
+    
     [HarmonyPatch("AreDeleteConditionsFulfilled")]
     [HarmonyPostfix]
     public static void Postfix(UnusedTrainCarDeleter __instance, TrainCar trainCar, bool __result)
     {
-        Multiplayer.LogDebug(() => $"AreDeleteConditionsFulfilled_Postfix({trainCar?.ID}) = {__result}");
+        //Multiplayer.LogDebug(() => $"AreDeleteConditionsFulfilled_Postfix({trainCar?.ID}) = {__result}");
     }
+    */
 
 }

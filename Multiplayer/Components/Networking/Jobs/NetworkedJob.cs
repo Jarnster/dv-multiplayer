@@ -88,13 +88,13 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
         Multiplayer.Log("NetworkJob.Awake()");
         base.Awake();
 
-
         /*
         job = GetComponent<Job>();
+
         jobToNetworkedJob[job] = this;
-
-
-
+        jobIdToNetworkedJob[job.ID] = this;
+        jobIdToJob[job.ID] = job;
+        
         if (NetworkLifecycle.Instance.IsHost())
         {
             //do we need a job watcher - probably not, but maybe or maybe we need a task watcher
@@ -114,11 +114,7 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
     private void Start()
     {
         //startup stuff
-        Multiplayer.Log("NetworkedJob.Start()");
-
-        jobToNetworkedJob[job] = this;
-        jobIdToNetworkedJob[job.ID] = this;
-        jobIdToJob[job.ID] = job;
+        Multiplayer.Log($"NetworkedJob.Start({job.ID})");
 
         isJobNew = true;  //Send new jobs on tick
 
@@ -132,24 +128,25 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
         if (!NetworkLifecycle.Instance.IsHost())
         {
             //station.logicStation.AddJobToStation(job);
+            
             if (station.logicStation.availableJobs.Contains(job))
             {
                 Multiplayer.LogError("Trying to add the same job[" + job.ID + "] multiple times to station! Skipping, trying to recover.");
                 return;
             }
 
-            station.logicStation.availableJobs.Add(job);
-            job.JobTaken += this.OnJobTaken;
-            job.JobExpired += this.OnJobExpired;
+            //station.logicStation.availableJobs.Add(job);
+            //job.JobTaken += this.OnJobTaken;
+            //job.JobExpired += this.OnJobExpired;
             //job.JobAddedToStation?.Invoke();
-            SingletonBehaviour<CoroutineManager>.Instance.StartCoroutine(NetworkedStation.UpdateCarPlates(job.tasks, job.ID));
+            CoroutineManager.Instance.StartCoroutine(NetworkedStation.UpdateCarPlates(job.tasks, job.ID));
         }
         else
         {
             //setup even handlers
-            job.JobTaken += this.OnJobTaken;
-            job.JobExpired += this.OnJobExpired;
-            NetworkLifecycle.Instance.OnTick += Server_OnTick;
+            //job.JobTaken += this.OnJobTaken;
+            //job.JobExpired += this.OnJobExpired;
+            //NetworkLifecycle.Instance.OnTick += Server_OnTick;
         }
             
         Multiplayer.Log("NetworkedJob.Start() Started");
@@ -161,17 +158,18 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
         if (UnloadWatcher.isQuitting)
             return;
 
-        NetworkLifecycle.Instance.OnTick -= Common_OnTick;
-        NetworkLifecycle.Instance.OnTick -= Server_OnTick;
+        //NetworkLifecycle.Instance.OnTick -= Common_OnTick;
+        //NetworkLifecycle.Instance.OnTick -= Server_OnTick;
 
         if (UnloadWatcher.isUnloading)
             return;
 
-        job.JobTaken -= this.OnJobTaken;
 
-        jobToNetworkedJob.Remove(job);
-        jobIdToNetworkedJob.Remove(job.ID);
-        jobIdToNetworkedJob.Remove(job.ID);
+        //job.JobTaken -= this.OnJobTaken;
+
+        //jobToNetworkedJob.Remove(job);
+        //jobIdToNetworkedJob.Remove(job.ID);
+        //jobIdToNetworkedJob.Remove(job.ID);
 
         //Clean up any actions we added
         

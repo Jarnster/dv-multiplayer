@@ -798,7 +798,7 @@ public class NetworkServer : NetworkManager
         {
             bool flag = networkedTrainCar.Server_ValidateClientSimFlowPacket(player, packet);
 
-            LogDebug(() => $"OnCommonTrainPortsPacket from {player.Username}, Not host, valid: {flag}");
+            //LogDebug(() => $"OnCommonTrainPortsPacket from {player.Username}, Not host, valid: {flag}");
             if (!flag)
             {
                 return;

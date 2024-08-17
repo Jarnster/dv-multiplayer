@@ -77,6 +77,9 @@ public class RigidbodySnapshot
 
     public void Apply(Rigidbody rb)
     {
+        if (rb == null)
+            return;
+
         IncludedData flags = (IncludedData)IncludedDataFlags;
 
         if (flags.HasFlag(IncludedData.Position))
