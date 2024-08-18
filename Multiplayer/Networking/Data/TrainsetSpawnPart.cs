@@ -17,11 +17,11 @@ public readonly struct TrainsetSpawnPart
     public readonly bool IsRearCoupled;
     public readonly float Speed;
     public readonly Vector3 Position;
-    public readonly Vector3 Rotation;
+    public readonly Quaternion Rotation;
     public readonly BogieData Bogie1;
     public readonly BogieData Bogie2;
 
-    private TrainsetSpawnPart(ushort netId, string liveryId, string carId, string carGuid, bool playerSpawnedCar, bool isFrontCoupled, bool isRearCoupled, float speed, Vector3 position, Vector3 rotation,
+    private TrainsetSpawnPart(ushort netId, string liveryId, string carId, string carGuid, bool playerSpawnedCar, bool isFrontCoupled, bool isRearCoupled, float speed, Vector3 position, Quaternion rotation,
         BogieData bogie1, BogieData bogie2)
     {
         NetId = netId;
@@ -49,7 +49,7 @@ public readonly struct TrainsetSpawnPart
         writer.Put(data.IsRearCoupled);
         writer.Put(data.Speed);
         Vector3Serializer.Serialize(writer, data.Position);
-        Vector3Serializer.Serialize(writer, data.Rotation);
+        QuaternionSerializer.Serialize(writer, data.Rotation);
         BogieData.Serialize(writer, data.Bogie1);
         BogieData.Serialize(writer, data.Bogie2);
     }
@@ -66,7 +66,7 @@ public readonly struct TrainsetSpawnPart
             reader.GetBool(),
             reader.GetFloat(),
             Vector3Serializer.Deserialize(reader),
-            Vector3Serializer.Deserialize(reader),
+            QuaternionSerializer.Deserialize(reader),
             BogieData.Deserialize(reader),
             BogieData.Deserialize(reader)
         );
@@ -86,7 +86,7 @@ public readonly struct TrainsetSpawnPart
             trainCar.rearCoupler.IsCoupled(),
             trainCar.GetForwardSpeed(),
             transform.position - WorldMover.currentMove,
-            transform.eulerAngles,
+            transform.rotation,
             BogieData.FromBogie(trainCar.Bogies[0], true, networkedTrainCar.Bogie1TrackDirection),
             BogieData.FromBogie(trainCar.Bogies[1], true, networkedTrainCar.Bogie2TrackDirection)
         );

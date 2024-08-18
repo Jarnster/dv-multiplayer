@@ -53,7 +53,7 @@ public static class NetworkedCarSpawner
 
         Transform trainTransform = trainCar.transform;
         trainTransform.position = spawnPart.Position + WorldMover.currentMove;
-        trainTransform.eulerAngles = spawnPart.Rotation;
+        trainTransform.rotation = spawnPart.Rotation;
         trainCar.playerSpawnedCar = spawnPart.PlayerSpawnedCar;
         trainCar.preventAutoCouple = true;
 

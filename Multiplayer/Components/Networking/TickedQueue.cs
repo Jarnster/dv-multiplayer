@@ -41,5 +41,10 @@ public abstract class TickedQueue<T> : MonoBehaviour
         }
     }
 
+    public void Clear()
+    {
+        snapshots.Clear();
+    }
+
     protected abstract void Process(T snapshot, uint snapshotTick);
 }

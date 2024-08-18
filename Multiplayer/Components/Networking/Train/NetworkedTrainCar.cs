@@ -64,6 +64,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     #endregion
 
     public TrainCar TrainCar;
+    public uint TicksSinceSync = uint.MaxValue;
     public bool HasPlayers => PlayerManager.Car == TrainCar || GetComponentInChildren<NetworkedPlayer>() != null;
 
     private Bogie bogie1;
@@ -96,8 +97,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     private bool client_Initialized;
     public TickedQueue<float> Client_trainSpeedQueue;
     public TickedQueue<RigidbodySnapshot> Client_trainRigidbodyQueue;
-    private TickedQueue<BogieData> client_bogie1Queue;
-    private TickedQueue<BogieData> client_bogie2Queue;
+    public TickedQueue<BogieData> client_bogie1Queue;
+    public TickedQueue<BogieData> client_bogie2Queue;
 
     #endregion
 
@@ -365,6 +366,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         Server_SendCouplers();
         Server_SendCargoState();
         Server_SendHealthState();
+
+        TicksSinceSync++; //keep track of last full sync
     }
 
     private void Server_SendBrakePressures()
@@ -610,18 +613,46 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         if (TrainCar.isEligibleForSleep)
             TrainCar.ForceOptimizationState(false);
 
-        if (movementPart.IsRigidbodySnapshot)
+        if (movementPart.typeFlag == TrainsetMovementPart.MovementType.RigidBody)
         {
+            //Multiplayer.LogDebug(() => $"Client_ReceiveTrainPhysicsUpdate({TrainCar.ID}, {tick}): is RigidBody");
             TrainCar.Derail();
             TrainCar.stress.ResetTrainStress();
             Client_trainRigidbodyQueue.ReceiveSnapshot(movementPart.RigidbodySnapshot, tick);
         }
         else
         {
+            //move the car to the correct position first - maybe?
+            if (movementPart.typeFlag.HasFlag(TrainsetMovementPart.MovementType.Sync))
+            {
+                /*
+                float d1 = (TrainCar.transform.position - (movementPart.Position + WorldMover.currentMove)).sqrMagnitude;
+                Quaternion d2 = TrainCar.transform.rotation *  Quaternion.Inverse(movementPart.Rotation);
+
+                Multiplayer.LogDebug(()=> $"Client_ReceiveTrainPhysicsUpdate({TrainCar.ID}, {tick}): Sync, Queue counts: {Client_trainSpeedQueue.snapshots.Count}, {Client_trainRigidbodyQueue.snapshots.Count}, {client_bogie1Queue.snapshots.Count}, {client_bogie2Queue.snapshots.Count}, Deltas: {d1}, {d2}");
+                */
+                TrainCar.transform.position = movementPart.Position + WorldMover.currentMove;
+                TrainCar.transform.rotation = movementPart.Rotation;
+
+                //clear the queues?
+                Client_trainSpeedQueue.Clear();
+                Client_trainRigidbodyQueue.Clear();
+                client_bogie1Queue.Clear();
+                client_bogie2Queue.Clear();
+
+                TrainCar.stress.ResetTrainStress();
+            }/*
+            else
+            {
+                Multiplayer.LogDebug(() => $"Client_ReceiveTrainPhysicsUpdate({TrainCar.ID}, {tick}): Physics");
+            }*/
+
             Client_trainSpeedQueue.ReceiveSnapshot(movementPart.Speed, tick);
             TrainCar.stress.slowBuildUpStress = movementPart.SlowBuildUpStress;
             client_bogie1Queue.ReceiveSnapshot(movementPart.Bogie1, tick);
             client_bogie2Queue.ReceiveSnapshot(movementPart.Bogie2, tick);
+
+            
         }
     }
 
