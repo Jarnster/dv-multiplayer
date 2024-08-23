@@ -84,7 +84,7 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundPlayerDisconnectPacket>(OnClientboundPlayerDisconnectPacket);
         netPacketProcessor.SubscribeReusable<ClientboundPlayerKickPacket>(OnClientboundPlayerKickPacket);
         netPacketProcessor.SubscribeReusable<ClientboundPlayerPositionPacket>(OnClientboundPlayerPositionPacket);
-        netPacketProcessor.SubscribeReusable<ClientboundPlayerCarPacket>(OnClientboundPlayerCarPacket);
+        //netPacketProcessor.SubscribeReusable<ClientboundPlayerCarPacket>(OnClientboundPlayerCarPacket);
         netPacketProcessor.SubscribeReusable<ClientboundPingUpdatePacket>(OnClientboundPingUpdatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundTickSyncPacket>(OnClientboundTickSyncPacket);
         netPacketProcessor.SubscribeReusable<ClientboundServerLoadingPacket>(OnClientboundServerLoadingPacket);
@@ -249,8 +249,8 @@ public class NetworkClient : NetworkManager
     {
         Guid guid = new(packet.Guid);
         ClientPlayerManager.AddPlayer(packet.Id, packet.Username, guid);
-        ClientPlayerManager.UpdateCar(packet.Id, packet.TrainCar);
-        ClientPlayerManager.UpdatePosition(packet.Id, packet.Position, Vector3.zero, packet.Rotation, false, packet.TrainCar != 0);
+        //ClientPlayerManager.UpdateCar(packet.Id, packet.TrainCar);
+        ClientPlayerManager.UpdatePosition(packet.Id, packet.Position, Vector3.zero, packet.Rotation, false, packet.CarID != 0, packet.CarID);
     }
 
     private void OnClientboundPlayerDisconnectPacket(ClientboundPlayerDisconnectPacket packet)
@@ -267,13 +267,13 @@ public class NetworkClient : NetworkManager
     }
     private void OnClientboundPlayerPositionPacket(ClientboundPlayerPositionPacket packet)
     {
-        ClientPlayerManager.UpdatePosition(packet.Id, packet.Position, packet.MoveDir, packet.RotationY, packet.IsJumping, packet.IsOnCar);
+        ClientPlayerManager.UpdatePosition(packet.Id, packet.Position, packet.MoveDir, packet.RotationY, packet.IsJumping, packet.IsOnCar, packet.CarID);
     }
 
-    private void OnClientboundPlayerCarPacket(ClientboundPlayerCarPacket packet)
-    {
-        ClientPlayerManager.UpdateCar(packet.Id, packet.CarId);
-    }
+    //private void OnClientboundPlayerCarPacket(ClientboundPlayerCarPacket packet)
+    //{
+    //    ClientPlayerManager.UpdateCar(packet.Id, packet.CarId);
+    //}
 
     private void OnClientboundPingUpdatePacket(ClientboundPingUpdatePacket packet)
     {
@@ -834,28 +834,32 @@ public class NetworkClient : NetworkManager
         SendPacketToServer(new ServerboundClientReadyPacket(), DeliveryMethod.ReliableOrdered);
     }
 
-    public void SendPlayerPosition(Vector3 position, Vector3 moveDir, float rotationY, bool isJumping, bool isOnCar, bool reliable)
+    public void SendPlayerPosition(Vector3 position, Vector3 moveDir, float rotationY, ushort carId, bool isJumping, bool isOnCar, bool reliable)
     {
+        Multiplayer.LogDebug(() => $"SendPlayerPosition({position}, {moveDir}, {rotationY}, {carId}, {isJumping}, {isOnCar})");
+
         SendPacketToServer(new ServerboundPlayerPositionPacket
         {
             Position = position,
             MoveDir = new Vector2(moveDir.x, moveDir.z),
             RotationY = rotationY,
-            IsJumpingIsOnCar = (byte)((isJumping ? 1 : 0) | (isOnCar ? 2 : 0))
+            IsJumpingIsOnCar = (byte)((isJumping ? 1 : 0) | (isOnCar ? 2 : 0)),
+            CarID = carId
         }, reliable ? DeliveryMethod.ReliableOrdered : DeliveryMethod.Sequenced);
     }
 
-    public void SendPlayerCar(ushort carId,Vector3 position, Vector3 moveDir, float rotationY, bool isJumping)
-    {
-        SendPacketToServer(new ServerboundPlayerCarPacket
-        {
-            CarId = carId,
-            Position = position,
-            MoveDir = moveDir,
-            RotationY=rotationY,
+    //public void SendPlayerCar(ushort carId,Vector3 position, Vector3 moveDir, float rotationY, bool isJumping)
+    //{
+    //    Multiplayer.LogDebug(() => $"SendPlayerCar({carId}, {position}, {moveDir}, {rotationY}, {isJumping})");
+    //    SendPacketToServer(new ServerboundPlayerCarPacket
+    //    {
+    //        CarId = carId,
+    //        Position = position,
+    //        MoveDir = moveDir,
+    //        RotationY=rotationY,
  
-        }, DeliveryMethod.ReliableOrdered);
-    }
+    //    }, DeliveryMethod.ReliableOrdered);
+    //}
 
     public void SendTimeAdvance(float amountOfTimeToSkipInSeconds)
     {

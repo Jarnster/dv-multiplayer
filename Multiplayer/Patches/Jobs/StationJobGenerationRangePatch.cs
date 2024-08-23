@@ -1,6 +1,5 @@
 using HarmonyLib;
 using Multiplayer.Components.Networking;
-using Multiplayer.Networking.Data;
 using Multiplayer.Utils;
 using UnityEngine;
 
@@ -18,18 +17,7 @@ public static class StationJobGenerationRange_PlayerSqrDistanceFromStationCenter
 
         __result = anchor.AnyPlayerSqrMag();
 
-        /*
-        __result = float.MaxValue;
-
-        //Loop through all of the players and return the one thats closest to the anchor
-        foreach (ServerPlayer serverPlayer in NetworkLifecycle.Instance.Server.ServerPlayers)
-        {
-            float sqDist = (serverPlayer.WorldPosition - anchor).sqrMagnitude;
-
-            if (sqDist < __result)
-                __result = sqDist;
-        }
-        */
+        //Multiplayer.Log($"PlayerSqrDistanceFromStationCenter() {__result}");
 
         return false;
     }
@@ -47,18 +35,6 @@ public static class StationJobGenerationRange_PlayerSqrDistanceFromStationOffice
 
         __result = anchor.AnyPlayerSqrMag();
 
-        /*
-        __result = float.MaxValue;
-
-        //Loop through all of the players and return the one thats closest to the anchor
-        foreach (ServerPlayer serverPlayer in NetworkLifecycle.Instance.Server.ServerPlayers)
-        {
-            float sqDist = (serverPlayer.WorldPosition - anchor).sqrMagnitude;
-
-            if (sqDist < __result)
-                __result = sqDist;
-        }
-        */
         return false;
     }
 }

@@ -111,7 +111,7 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<ServerboundClientReadyPacket, NetPeer>(OnServerboundClientReadyPacket);
         netPacketProcessor.SubscribeReusable<ServerboundSaveGameDataRequestPacket, NetPeer>(OnServerboundSaveGameDataRequestPacket);
         netPacketProcessor.SubscribeReusable<ServerboundPlayerPositionPacket, NetPeer>(OnServerboundPlayerPositionPacket);
-        netPacketProcessor.SubscribeReusable<ServerboundPlayerCarPacket, NetPeer>(OnServerboundPlayerCarPacket);
+        //netPacketProcessor.SubscribeReusable<ServerboundPlayerCarPacket, NetPeer>(OnServerboundPlayerCarPacket);
         netPacketProcessor.SubscribeReusable<ServerboundTimeAdvancePacket, NetPeer>(OnServerboundTimeAdvancePacket);
         netPacketProcessor.SubscribeReusable<ServerboundTrainSyncRequestPacket>(OnServerboundTrainSyncRequestPacket);
         netPacketProcessor.SubscribeReusable<ServerboundTrainDeleteRequestPacket, NetPeer>(OnServerboundTrainDeleteRequestPacket);
@@ -629,7 +629,7 @@ public class NetworkServer : NetworkManager
                 Id = player.Id,
                 Username = player.Username,
                 Guid = player.Guid.ToByteArray(),
-                TrainCar = player.CarId,
+                CarID = player.CarId,
                 Position = player.RawPosition,
                 Rotation = player.RawRotationY
             }, DeliveryMethod.ReliableOrdered);
@@ -645,8 +645,10 @@ public class NetworkServer : NetworkManager
     {
         if (TryGetServerPlayer(peer, out ServerPlayer player))
         {
+            player.CarId = packet.CarID;
             player.RawPosition = packet.Position;
             player.RawRotationY = packet.RotationY;
+
         }
 
         ClientboundPlayerPositionPacket clientboundPacket = new()
@@ -655,33 +657,34 @@ public class NetworkServer : NetworkManager
             Position = packet.Position,
             MoveDir = packet.MoveDir,
             RotationY = packet.RotationY,
-            IsJumpingIsOnCar = packet.IsJumpingIsOnCar
+            IsJumpingIsOnCar = packet.IsJumpingIsOnCar,
+            CarID = packet.CarID
         };
 
         SendPacketToAll(clientboundPacket, DeliveryMethod.Sequenced, peer);
     }
 
-    private void OnServerboundPlayerCarPacket(ServerboundPlayerCarPacket packet, NetPeer peer)
-    {
-        if (packet.CarId != 0 && !NetworkedTrainCar.Get(packet.CarId, out NetworkedTrainCar _))
-            return;
+    //private void OnServerboundPlayerCarPacket(ServerboundPlayerCarPacket packet, NetPeer peer)
+    //{
+    //    if (packet.CarId != 0 && !NetworkedTrainCar.Get(packet.CarId, out NetworkedTrainCar _))
+    //        return;
 
-        if (TryGetServerPlayer(peer, out ServerPlayer player))
-        {
-            player.CarId = packet.CarId;
-            player.RawPosition = packet.Position;
-            player.RawRotationY = packet.RotationY;
+    //    if (TryGetServerPlayer(peer, out ServerPlayer player))
+    //    {
+    //        player.CarId = packet.CarId;
+    //        player.RawPosition = packet.Position;
+    //        player.RawRotationY = packet.RotationY;
 
-        }
+    //    }
 
-        ClientboundPlayerCarPacket clientboundPacket = new()
-        {
-            Id = (byte)peer.Id,
-            CarId = packet.CarId
-        };
+    //    ClientboundPlayerCarPacket clientboundPacket = new()
+    //    {
+    //        Id = (byte)peer.Id,
+    //        CarId = packet.CarId
+    //    };
 
-        SendPacketToAll(clientboundPacket, DeliveryMethod.ReliableOrdered, peer);
-    }
+    //    SendPacketToAll(clientboundPacket, DeliveryMethod.ReliableOrdered, peer);
+    //}
 
     private void OnServerboundTimeAdvancePacket(ServerboundTimeAdvancePacket packet, NetPeer peer)
     {

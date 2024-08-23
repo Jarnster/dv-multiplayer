@@ -55,17 +55,18 @@ public class ClientPlayerManager
         player.SetPing(ping);
     }
 
-    public void UpdatePosition(byte id, Vector3 position, Vector3 moveDir, float rotation, bool isJumping, bool isOnCar)
+    public void UpdatePosition(byte id, Vector3 position, Vector3 moveDir, float rotation, bool isJumping, bool isOnCar, ushort carId)
     {
         if (!playerMap.TryGetValue(id, out NetworkedPlayer player))
             return;
+        player.UpdateCar(carId);
         player.UpdatePosition(position, moveDir, rotation, isJumping, isOnCar);
     }
 
-    public void UpdateCar(byte playerId, ushort carId)
-    {
-        if (!playerMap.TryGetValue(playerId, out NetworkedPlayer player))
-            return;
-        player.UpdateCar(carId);
-    }
+    //public void UpdateCar(byte playerId, ushort carId)
+    //{
+    //    if (!playerMap.TryGetValue(playerId, out NetworkedPlayer player))
+    //        return;
+    //    player.UpdateCar(carId);
+    //}
 }

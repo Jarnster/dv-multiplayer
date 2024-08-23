@@ -121,9 +121,7 @@ public static class DvExtensions
     public static float AnyPlayerSqrMag(this Vector3 anchor)
     {
         float result = float.MaxValue;
-        string origin = new StackTrace().GetFrame(1).GetMethod().Name;
-
-        
+        //string origin = new StackTrace().GetFrame(1).GetMethod().Name;
 
         //Loop through all of the players and return the one thats closest to the anchor
         foreach (ServerPlayer serverPlayer in NetworkLifecycle.Instance.Server.ServerPlayers)
