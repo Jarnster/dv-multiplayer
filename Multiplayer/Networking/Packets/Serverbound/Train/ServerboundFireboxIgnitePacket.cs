@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Multiplayer.Networking.Packets.Serverbound;
+namespace Multiplayer.Networking.Packets.Serverbound.Train;
 
 public class ServerboundFireboxIgnitePacket
 {
