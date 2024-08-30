@@ -3,7 +3,7 @@
         <TargetFramework>net48</TargetFramework>
         <LangVersion>latest</LangVersion>
         <RootNamespace>Multiplayer</RootNamespace>
-        <InformationalVersion>0.1.8.1</InformationalVersion>
+        <InformationalVersion>0.1.8.2</InformationalVersion>
     </PropertyGroup>
 
     <ItemGroup>
