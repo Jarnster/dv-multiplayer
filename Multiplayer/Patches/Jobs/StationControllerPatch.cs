@@ -8,6 +8,6 @@ public static class StationController_Awake_Patch
 {
     public static void Postfix(StationController __instance)
     {
-        __instance.gameObject.AddComponent<NetworkedStation>();
+        __instance.gameObject.AddComponent<NetworkedStationController>();
     }
 }

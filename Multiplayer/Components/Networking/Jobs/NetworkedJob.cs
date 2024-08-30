@@ -3,14 +3,10 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using DV.Logic.Job;
-using DV.ThingTypes;
-using DV.Utils;
-using Multiplayer.Components.Networking.Player;
+using Multiplayer.Components.Networking.Train;
 using Multiplayer.Components.Networking.World;
-using Multiplayer.Networking.Data;
-using Multiplayer.Utils;
 using UnityEngine;
-using static System.Collections.Specialized.BitVector32;
+
 
 namespace Multiplayer.Components.Networking.Jobs;
 
@@ -32,7 +28,7 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
     public static bool GetJob(ushort netId, out Job obj)
     {
         bool b = Get(netId, out NetworkedJob networkedJob);
-        obj = b ? networkedJob.job : null;
+        obj = b ? networkedJob.Job : null;
         return b;
     }
 
@@ -46,25 +42,14 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
     {
         return jobToNetworkedJob.TryGetValue(job, out networkedJob);
     }
-
-    /*public static NetworkedJob AddJob(string stationID, Job job)
-    {
-        NetworkedJob netJob = new NetworkedJob(stationID, job);
-
-        jobToNetworkedJob[job] = netJob;
-        jobIdToNetworkedJob[job.ID] = netJob;
-        jobIdToJob[job.ID] = job;
-
-        Multiplayer.Log($"NetworkedJob Added with netId: {jobToNetworkedJob[job].NetId}, jobId: {job.ID}");
-        return jobToNetworkedJob[job];
-    }*/
     #endregion
 
-    public Job job;
-    public JobOverview jobOverview;
-    public JobBooklet jobBooklet;
-    public string stationID;
-    public bool isJobNew = true;
+    public Job Job;
+    public JobOverview JobOverview;
+    public JobBooklet JobBooklet;
+    public Station Station;
+
+//    public bool isJobNew = true;
     public bool isJobDirty = false;
     public bool isTaskDirty = false;
 
@@ -83,63 +68,20 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
 
     protected override bool IsIdServerAuthoritative => true;
 
-    protected override void Awake()
-    {
-        Multiplayer.Log("NetworkJob.Awake()");
-        base.Awake();
-
-        /*
-        job = GetComponent<Job>();
-
-        jobToNetworkedJob[job] = this;
-        jobIdToNetworkedJob[job.ID] = this;
-        jobIdToJob[job.ID] = job;
-        
-        if (NetworkLifecycle.Instance.IsHost())
-        {
-            //do we need a job watcher - probably not, but maybe or maybe we need a task watcher
-            //NetworkTrainsetWatcher.Instance.CheckInstance(); // Ensure the NetworkTrainsetWatcher is initialized
-        }
-        else
-        {
-            //Networked task??
-
-            //Client_trainSpeedQueue = TrainCar.GetOrAddComponent<TrainSpeedQueue>();
-            //Client_trainRigidbodyQueue = TrainCar.GetOrAddComponent<NetworkedRigidbody>();
-            //StartCoroutine(Client_InitLater());
-        }
-        */
-    }
-
     private void Start()
     {
         //startup stuff
-        Multiplayer.Log($"NetworkedJob.Start({job.ID})");
+        Multiplayer.Log($"NetworkedJob.Start({Job.ID})");
 
-        isJobNew = true;  //Send new jobs on tick
+        jobToNetworkedJob[Job] = this;
+        jobIdToNetworkedJob[Job.ID] = this;
+        jobIdToJob[Job.ID] = Job;
 
-        StationController station;
-        if (!StationComponentLookup.Instance.StationControllerFromId(stationID, out station))
-        {
-            Multiplayer.LogWarning($"NetworkJob.Start() Could not get staion for stationId: {stationID}");
-            return;
-        }
+        //isJobNew = true;  //Send new jobs on tick
 
         if (!NetworkLifecycle.Instance.IsHost())
-        {
-            //station.logicStation.AddJobToStation(job);
-            
-            if (station.logicStation.availableJobs.Contains(job))
-            {
-                Multiplayer.LogError("Trying to add the same job[" + job.ID + "] multiple times to station! Skipping, trying to recover.");
-                return;
-            }
-
-            //station.logicStation.availableJobs.Add(job);
-            //job.JobTaken += this.OnJobTaken;
-            //job.JobExpired += this.OnJobExpired;
-            //job.JobAddedToStation?.Invoke();
-            CoroutineManager.Instance.StartCoroutine(NetworkedStation.UpdateCarPlates(job.tasks, job.ID));
+        {           
+            CoroutineManager.Instance.StartCoroutine(NetworkedStationController.UpdateCarPlates(Job.tasks, Job.ID));
         }
         else
         {
@@ -150,7 +92,6 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
         }
             
         Multiplayer.Log("NetworkedJob.Start() Started");
-        //possibly capture tasks at this point for tracking??
     }
 
     private void OnDisable()
@@ -221,7 +162,7 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
     }
     */
 
-  
+
     private void Server_OnTick(uint tick)
     {
         if (UnloadWatcher.isUnloading)
@@ -301,7 +242,7 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
 
     public void OnJobExpired(Job jobExpired)
     {
-        Multiplayer.Log($"Job Expired: {job.ID}");
+        Multiplayer.Log($"Job Expired: {Job.ID}");
         jobExpired.JobTaken -= this.OnJobTaken;
         jobExpired.JobExpired -= this.OnJobExpired;
         //jobExpired.JobCompleted += this.OnJobCompleted;

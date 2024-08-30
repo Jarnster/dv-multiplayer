@@ -29,8 +29,8 @@ using Multiplayer.Utils;
 using UnityEngine;
 using UnityModManagerNet;
 using System.Net;
-using static DV.UI.ATutorialsMenuProvider;
-using HarmonyLib;
+using Multiplayer.Networking.Packets.Serverbound.Train;
+
 
 namespace Multiplayer.Networking.Listeners;
 
@@ -386,11 +386,11 @@ public class NetworkServer : NetworkManager
         }, DeliveryMethod.ReliableUnordered, selfPeer);
     }
 
-    //public void SendJobCreatePacket(NetworkedJob job)
-    //{
-    //    Multiplayer.Log("Sending JobCreatePacket with netId: " + job.NetId + ", Job ID: " + job.job.ID);
-    //    SendPacketToAll(ClientboundJobCreatePacket.FromNetworkedJob(job),DeliveryMethod.ReliableSequenced);
-    //}
+    public void SendJobsCreatePacket(ushort stationID, NetworkedJob[] jobs)
+    {
+        Multiplayer.Log($"Sending JobCreatePacket with {jobs.Length} jobs");
+        SendPacketToAll(ClientboundJobsCreatePacket.FromNetworkedJobs(stationID, jobs),DeliveryMethod.ReliableSequenced);
+    }
 
     public void SendChat(string message, NetPeer exclude = null)
     {
@@ -593,30 +593,29 @@ public class NetworkServer : NetworkManager
             SendPacket(peer, ClientboundSpawnTrainSetPacket.FromTrainSet(set), DeliveryMethod.ReliableOrdered);
         }
 
-        /*
-        //send jobs - do we need a job manager/job IDs to make this easier?
+        // Sync Stations (match NetIDs with StationIDs) - we could do this the same as junctions but juntions may need to be upgraded to work this way - future planning for mod integration
+        SendPacket(peer, new ClientBoundStationControllerLookupPacket(NetworkedStationController.GetAll().ToArray()), DeliveryMethod.ReliableOrdered);
+
+        //send jobs
         foreach(StationController station in StationController.allStations)
         {
-            List<JobData> jobData = new List<JobData>();
-            List<ushort> netIds = new List<ushort>();
-
-            foreach(Job job in station.logicStation.availableJobs)
+            if(NetworkedStationController.GetFromStationController(station, out NetworkedStationController netStation))
             {
-                jobData.Add(JobData.FromJob(job));
-                netIds.Add(NetworkedJob.GetFromJob(job).NetId);
-            }
+                NetworkedJob[] jobs = netStation.NetworkedJobs.ToArray();
+                for (int i = 0; i < jobs.Length; i++)
+                {
+                    //NetworkedJob[] batch = new NetworkedJob[5];
 
-            SendPacket(peer,
-                        new ClientboundJobsPacket
-                            {
-                                stationId = station.logicStation.ID,
-                                netIds = netIds.ToArray(),
-                                Jobs = jobData.ToArray(),
-                            },
-                        DeliveryMethod.ReliableOrdered
-                    );
-                
-        }*/
+                    //Array.Copy(jobs,i,batch,0,5);
+                  
+                    SendJobsCreatePacket(netStation.NetId, [jobs[i]]);
+                }
+            }
+            else
+            {
+                Multiplayer.LogError($"Sending job packets... Failed to get NetworkedStation from station");
+            }
+        }
 
 
         // Send existing players

@@ -1,4 +1,4 @@
-namespace Multiplayer.Networking.Packets.Serverbound;
+namespace Multiplayer.Networking.Packets.Serverbound.Train;
 
 public class ServerboundTrainSyncRequestPacket
 {

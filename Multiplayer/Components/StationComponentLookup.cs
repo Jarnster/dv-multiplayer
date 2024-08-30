@@ -5,7 +5,7 @@ using JetBrains.Annotations;
 using Multiplayer.Components.Networking.World;
 
 namespace Multiplayer.Components;
-
+/*
 public class StationComponentLookup : SingletonBehaviour<StationComponentLookup>
 {
     private readonly Dictionary<Station, NetworkedStation> stationToNetworkedStationController = new();
@@ -48,3 +48,4 @@ public class StationComponentLookup : SingletonBehaviour<StationComponentLookup>
         return $"[{nameof(StationComponentLookup)}]";
     }
 }
+*/

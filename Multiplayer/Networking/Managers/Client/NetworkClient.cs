@@ -37,6 +37,8 @@ using UnityEngine;
 using UnityModManagerNet;
 using Object = UnityEngine.Object;
 using System.Linq;
+using Multiplayer.Networking.Packets.Serverbound.Train;
+using static Multiplayer.Networking.Packets.Clientbound.World.ClientBoundStationControllerLookupPacket;
 
 namespace Multiplayer.Networking.Listeners;
 
@@ -95,6 +97,7 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundRemoveLoadingScreenPacket>(OnClientboundRemoveLoadingScreen);
         netPacketProcessor.SubscribeReusable<ClientboundTimeAdvancePacket>(OnClientboundTimeAdvancePacket);
         netPacketProcessor.SubscribeReusable<ClientboundRailwayStatePacket>(OnClientboundRailwayStatePacket);
+        netPacketProcessor.SubscribeReusable<ClientBoundStationControllerLookupPacket>(OnClientBoundStationControllerLookupPacket);
         netPacketProcessor.SubscribeReusable<CommonChangeJunctionPacket>(OnCommonChangeJunctionPacket);
         netPacketProcessor.SubscribeReusable<CommonRotateTurntablePacket>(OnCommonRotateTurntablePacket);
         netPacketProcessor.SubscribeReusable<ClientboundSpawnTrainCarPacket>(OnClientboundSpawnTrainCarPacket);
@@ -122,9 +125,8 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundLicenseAcquiredPacket>(OnClientboundLicenseAcquiredPacket);
         netPacketProcessor.SubscribeReusable<ClientboundGarageUnlockPacket>(OnClientboundGarageUnlockPacket);
         netPacketProcessor.SubscribeReusable<ClientboundDebtStatusPacket>(OnClientboundDebtStatusPacket);
-        netPacketProcessor.SubscribeReusable<ClientboundJobsPacket>(OnClientboundJobsPacket);
-        netPacketProcessor.SubscribeReusable<ClientboundJobCreatePacket>(OnClientboundJobCreatePacket);
-        netPacketProcessor.SubscribeReusable<ClientboundJobTakeResponsePacket>(OnClientboundJobTakeResponsePacket);
+        netPacketProcessor.SubscribeReusable<ClientboundJobsCreatePacket>(OnClientboundJobsCreatePacket);
+        //netPacketProcessor.SubscribeReusable<ClientboundJobTakeResponsePacket>(OnClientboundJobTakeResponsePacket);
         netPacketProcessor.SubscribeReusable<CommonChatPacket>(OnCommonChatPacket); 
     }
 
@@ -381,7 +383,42 @@ public class NetworkClient : NetworkManager
         TimeAdvance.AdvanceTime(packet.amountOfTimeToSkipInSeconds);
     }
 
-    private void OnClientboundRailwayStatePacket(ClientboundRailwayStatePacket packet)
+    //Force stations to be mapped to same netId across all clients and server - probably should implement for junctions, etc.
+    private void OnClientBoundStationControllerLookupPacket(ClientBoundStationControllerLookupPacket packet)
+    {
+
+        if (packet == null)
+        {
+            LogError("OnClientBoundStationControllerLookupPacket received null packet");
+            return;
+        }
+
+        if (packet.NetID == null || packet.StationID == null)
+        {
+            LogError($"OnClientBoundStationControllerLookupPacket received packet with null arrays: NetID is null: {packet.NetID == null}, StationID is null: {packet.StationID == null}");
+            return;
+        }
+
+
+        for (int i = 0; i < packet.NetID.Length; i++)
+        {
+            if (!NetworkedStationController.GetFromStationId(packet.StationID[i], out NetworkedStationController netStationCont))
+            {
+                LogError($"OnClientBoundStationControllerLookupPacket() could not find station: {packet.StationID[i]}");
+            }
+            else if (packet.NetID[i] > 0)
+            {
+                netStationCont.NetId = packet.NetID[i];
+            }
+            else
+            {
+                LogError($"OnClientBoundStationControllerLookupPacket() station: {packet.StationID[i]} mapped to NetID 0");
+            }
+        }
+    }
+
+
+        private void OnClientboundRailwayStatePacket(ClientboundRailwayStatePacket packet)
     {
         for (int i = 0; i < packet.SelectedJunctionBranches.Length; i++)
         {
@@ -701,97 +738,24 @@ public class NetworkClient : NetworkManager
     }
 
 
-    private void OnClientboundJobCreatePacket(ClientboundJobCreatePacket packet)
+    private void OnClientboundJobsCreatePacket(ClientboundJobsCreatePacket packet)
     {
-        Multiplayer.Log($"Received job packet. Job ID:{packet.job.ID}");
+        Multiplayer.Log($"OnClientboundJobCreatePacket() for station {packet.StationNetId}, containing {packet.Jobs.Length}");
 
         if (NetworkLifecycle.Instance.IsHost())
             return;
 
-        List<Task> tasks = new List<Task>();
-        foreach (Data.TaskData taskBeforeDataData in packet.job.Tasks)
-            tasks.Add(Data.TaskData.ToTask(taskBeforeDataData));
-
-        StationsChainDataData chainData = packet.job.ChainData;
-
-        Job newJob = new Job(
-                tasks,
-                (JobType)packet.job.JobType,
-                packet.job.TimeLimit,
-                packet.job.InitialWage,
-                new StationsChainData(chainData.ChainOriginYardId, chainData.ChainDestinationYardId),
-                packet.job.ID,
-                (JobLicenses)packet.job.RequiredLicenses
-            );
-
-        //NetworkedJob netJob = NetworkedJob.AddJob(packet.stationId, newJob);
-        //netJob.NetId = packet.netId;
-
-        //Find the station
-        StationController station;
-        if(!StationComponentLookup.Instance.StationControllerFromId(packet.stationId, out station))
+        if(!NetworkedStationController.Get(packet.StationNetId, out NetworkedStationController networkedStationController))
         {
-            Multiplayer.LogWarning($"OnClientboundJobCreatePacket Could not get station for stationId: {packet.stationId}");
+            LogError($"OnClientboundJobCreatePacket() {packet.StationNetId} does not exist!");
             return;
         }
 
-        //create a new game object
-        NetworkedJob netJob = station.gameObject.AddComponent<NetworkedJob>();
-        if (netJob != null)
-        {
-            netJob.job = newJob;
-            netJob.stationID = packet.stationId;
-            netJob.NetId = packet.netId;
-        }
+        networkedStationController.AddJobs(packet.Jobs);
 
     }
-    private void OnClientboundJobsPacket(ClientboundJobsPacket packet)
-    {
-        Multiplayer.Log($"Received job packet. Job count:{packet.Jobs.Count()}");
 
-        if (NetworkLifecycle.Instance.IsHost())
-            return;
-
-        if (!StationComponentLookup.Instance.StationControllerFromId(packet.stationId, out StationController station))
-        {
-            LogError("Received job packet but couldn't find station!");
-            return;
-        }
-
-        for (int i=0;i < packet.Jobs.Count(); i++)
-        {
-            JobData job = packet.Jobs[i];
-            ushort netId = packet.netIds[i];
-
-            var tasks = new List<Task>();
-            foreach (Data.TaskData taskBeforeDataData in job.Tasks)
-                tasks.Add(Data.TaskData.ToTask(taskBeforeDataData));
-
-            StationsChainDataData chainData = job.ChainData;
-
-            Job newJob = new Job(
-                tasks,
-                (JobType)job.JobType,
-                job.TimeLimit,
-                job.InitialWage,
-                new StationsChainData(chainData.ChainOriginYardId, chainData.ChainDestinationYardId),
-                job.ID,
-                (JobLicenses)job.RequiredLicenses
-            );
-
-            Multiplayer.Log($"Attempting to add Job with ID {newJob.ID} to station.");//\r\nExisting jobs are: {station.logicStation.availableJobs.Select(x=>x.ID + "\r\n\t").ToArray().Join()}\r\nDoes the Job already exist in station? {station.logicStation.availableJobs.Where(x => x.ID == newJob.ID).Count() > 0}");
-
-            //create a new game object
-            NetworkedJob netJob = station.gameObject.AddComponent<NetworkedJob>();
-            if (netJob != null)
-            {
-                netJob.job = newJob;
-                netJob.stationID = packet.stationId;
-                netJob.NetId = netId;
-            }
-        }
-    }
-
+    /*
     private void OnClientboundJobTakeResponsePacket(ClientboundJobTakeResponsePacket packet)
     {
         Multiplayer.Log($"OnClientboundJobTakeResponsePacket jobId: {packet.netId}, Status: {packet.granted}");
@@ -813,6 +777,7 @@ public class NetworkClient : NetworkManager
         networkedJob.jobValidator = null;
         networkedJob.jobOverview = null;
     }
+    */
     
     #endregion
 
@@ -836,7 +801,7 @@ public class NetworkClient : NetworkManager
 
     public void SendPlayerPosition(Vector3 position, Vector3 moveDir, float rotationY, ushort carId, bool isJumping, bool isOnCar, bool reliable)
     {
-        Multiplayer.LogDebug(() => $"SendPlayerPosition({position}, {moveDir}, {rotationY}, {carId}, {isJumping}, {isOnCar})");
+        //Multiplayer.LogDebug(() => $"SendPlayerPosition({position}, {moveDir}, {rotationY}, {carId}, {isJumping}, {isOnCar})");
 
         SendPacketToServer(new ServerboundPlayerPositionPacket
         {
@@ -847,19 +812,6 @@ public class NetworkClient : NetworkManager
             CarID = carId
         }, reliable ? DeliveryMethod.ReliableOrdered : DeliveryMethod.Sequenced);
     }
-
-    //public void SendPlayerCar(ushort carId,Vector3 position, Vector3 moveDir, float rotationY, bool isJumping)
-    //{
-    //    Multiplayer.LogDebug(() => $"SendPlayerCar({carId}, {position}, {moveDir}, {rotationY}, {isJumping})");
-    //    SendPacketToServer(new ServerboundPlayerCarPacket
-    //    {
-    //        CarId = carId,
-    //        Position = position,
-    //        MoveDir = moveDir,
-    //        RotationY=rotationY,
- 
-    //    }, DeliveryMethod.ReliableOrdered);
-    //}
 
     public void SendTimeAdvance(float amountOfTimeToSkipInSeconds)
     {

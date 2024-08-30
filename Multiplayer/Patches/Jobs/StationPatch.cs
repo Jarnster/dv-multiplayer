@@ -4,6 +4,7 @@ using Multiplayer.Components;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Jobs;
 using Multiplayer.Components.Networking.Train;
+using Multiplayer.Components.Networking.World;
 using Multiplayer.Utils;
 
 namespace Multiplayer.Patches.Jobs;
@@ -16,19 +17,13 @@ public static class Station_AddJobToStation_Patch
         if (!NetworkLifecycle.Instance.IsHost())
             return false;
 
-        Multiplayer.Log($"Station_AddJobToStation_Patch adding NetworkJob for stationId: {__instance.ID}, jobId: {job.ID}");
+        Multiplayer.Log($"Station.AddJobToStation() adding NetworkJob for stationId: {__instance.ID}, jobId: {job.ID}");
         
-        StationController stationController;
-        if(!StationComponentLookup.Instance.StationControllerFromId(__instance.ID, out stationController))
+        if(!NetworkedStationController.GetFromStationId(__instance.ID, out NetworkedStationController netStationController))
             return false;
         
-        NetworkedJob netJob = stationController.gameObject.AddComponent<NetworkedJob>();
-        if (netJob != null)
-        {
-            netJob.job=job;
-            netJob.stationID = __instance.ID;
+        netStationController.AddJob(job);
 
-        }
         return true;
     }
 }
