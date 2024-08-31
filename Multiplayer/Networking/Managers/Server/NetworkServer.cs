@@ -385,10 +385,10 @@ public class NetworkServer : NetworkManager
         }, DeliveryMethod.ReliableUnordered, selfPeer);
     }
 
-    public void SendJobsCreatePacket(ushort stationID, NetworkedJob[] jobs)
+    public void SendJobsCreatePacket(ushort stationID, NetworkedJob[] jobs, DeliveryMethod method = DeliveryMethod.ReliableSequenced )
     {
         Multiplayer.Log($"Sending JobsCreatePacket with {jobs.Count()} jobs");
-        SendPacketToAll(ClientboundJobsCreatePacket.FromNetworkedJobs(stationID, jobs),DeliveryMethod.ReliableSequenced);
+        SendPacketToAll(ClientboundJobsCreatePacket.FromNetworkedJobs(stationID, jobs), method);
     }
 
     public void SendChat(string message, NetPeer exclude = null)
@@ -603,11 +603,7 @@ public class NetworkServer : NetworkManager
                 NetworkedJob[] jobs = netStation.NetworkedJobs.ToArray();
                 for (int i = 0; i < jobs.Length; i++)
                 {
-                    //NetworkedJob[] batch = new NetworkedJob[5];
-
-                    //Array.Copy(jobs,i,batch,0,5);
-                  
-                    SendJobsCreatePacket(netStation.NetId, [jobs[i]]);
+                    SendJobsCreatePacket(netStation.NetId, [jobs[i]], DeliveryMethod.ReliableOrdered);
                 }
             }
             else
@@ -661,28 +657,6 @@ public class NetworkServer : NetworkManager
 
         SendPacketToAll(clientboundPacket, DeliveryMethod.Sequenced, peer);
     }
-
-    //private void OnServerboundPlayerCarPacket(ServerboundPlayerCarPacket packet, NetPeer peer)
-    //{
-    //    if (packet.CarId != 0 && !NetworkedTrainCar.Get(packet.CarId, out NetworkedTrainCar _))
-    //        return;
-
-    //    if (TryGetServerPlayer(peer, out ServerPlayer player))
-    //    {
-    //        player.CarId = packet.CarId;
-    //        player.RawPosition = packet.Position;
-    //        player.RawRotationY = packet.RotationY;
-
-    //    }
-
-    //    ClientboundPlayerCarPacket clientboundPacket = new()
-    //    {
-    //        Id = (byte)peer.Id,
-    //        CarId = packet.CarId
-    //    };
-
-    //    SendPacketToAll(clientboundPacket, DeliveryMethod.ReliableOrdered, peer);
-    //}
 
     private void OnServerboundTimeAdvancePacket(ServerboundTimeAdvancePacket packet, NetPeer peer)
     {

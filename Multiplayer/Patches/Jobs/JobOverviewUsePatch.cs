@@ -12,14 +12,24 @@ using System.Collections;
 using Unity.Jobs;
 using UnityEngine;
 using static UnityEngine.GraphicsBuffer;
-/* Temp for stable release
+
 namespace Multiplayer.Patches.Jobs;
-//public void HandleUse(ItemUseTarget target)
-[HarmonyPatch(typeof(JobOverviewUse), nameof(JobOverviewUse.HandleUse))]
-public static class JobOverviewUse_HandleUse_Patch
+
+[HarmonyPatch(typeof(JobValidator))]
+public static class JobValidator_Patch
 {
-    private static bool Prefix(JobOverviewUse __instance, ItemUseTarget target, ref JobOverview ___jobOverview)
+    [HarmonyPatch(nameof(JobValidator.ProcessJobOverview))]
+    private static bool Prefix(JobValidator __instance, JobOverview jobOverview)
     {
+        if (!NetworkLifecycle.Instance.IsHost())
+        {
+            __instance.bookletPrinter.PlayErrorSound();
+            return false;
+        }
+
+        return true;
+
+        /*
         JobValidator component = target.GetComponent<JobValidator>();
         if (component == null)
             return false;
@@ -60,8 +70,6 @@ public static class JobOverviewUse_HandleUse_Patch
 
         component.bookletPrinter.PlayErrorSound();
         return false;
-
+        */
     }
 }
-
-*/

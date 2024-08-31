@@ -2,8 +2,10 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using DV.UI;
 using HarmonyLib;
 using JetBrains.Annotations;
+using Multiplayer.Components.MainMenu;
 using Multiplayer.Components.Networking;
 using Multiplayer.Editor;
 using Multiplayer.Patches.Mods;
@@ -117,6 +119,24 @@ public static class Multiplayer
         AssetIndex = indices[0];
         return true;
     }
+
+    //private static void LateUpdate(UnityModManager.ModEntry modEntry, float deltaTime)
+    //{
+    //    if (ModEntry.NewestVersion != null && ModEntry.NewestVersion.ToString() != "")
+    //    {
+    //        Log($"Multiplayer Latest Version: {ModEntry.NewestVersion}");
+
+    //        ModEntry.OnLateUpdate -= Multiplayer.LateUpdate;
+
+    //        if (ModEntry.NewestVersion > ModEntry.Version)
+    //        {
+    //            if (MainMenuThingsAndStuff.Instance != null)
+    //            {
+
+    //            }
+    //        }
+    //    }
+    //}
 
     #region Logging
 

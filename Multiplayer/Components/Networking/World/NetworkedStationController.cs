@@ -80,6 +80,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
 
     public HashSet<NetworkedJob> NetworkedJobs { get; } = new HashSet<NetworkedJob>();
     private List<NetworkedJob> NewJobs = new List<NetworkedJob>();
+    private List<NetworkedJob> DirtyJobs = new List<NetworkedJob>();
     //public List<NetworkedJobOverview> JobOverviews; //for later use
 
     private void Awake()
@@ -113,6 +114,12 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         networkedJob.Job = job;
         NetworkedJobs.Add(networkedJob);
         NewJobs.Add(networkedJob);
+
+        //Setup handlers
+        job.JobTaken += OnJobTaken;
+        job.JobAbandoned += OnJobAbandoned;
+        job.JobCompleted += OnJobCompleted;
+        job.JobExpired += OnJobExpired;
     }
 
     private void OnJobTaken(Job job, bool viaLoadGame)
@@ -137,12 +144,20 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
 
     private void Server_OnTick(uint tick)
     {
+        //Send new jobs
         if (NewJobs.Count > 0)
         {
             NetworkLifecycle.Instance.Server.SendJobsCreatePacket(NetId, NewJobs.ToArray());
             NewJobs.Clear();
         }
+
+        //Send jobs with a changed status
+        if (DirtyJobs.Count > 0)
+        {
+            //todo send packet with updates
+        }
     }
+
 
     #region Client
     public void AddJobs(JobData[] jobs)
@@ -201,6 +216,8 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
             // Create a new NetworkedJob
             NetworkedJob networkedJob = new GameObject($"NetworkedJob {newJob.ID}").AddComponent<NetworkedJob>();
             networkedJob.Job = newJob;
+            networkedJob.Station = this;
+            networkedJob.OwnedBy = jobData.OwnedBy;
 
             //NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {jobData?.ID}, netID: {jobData?.NetID}, NetJob Add");
             NetworkedJobs.Add(networkedJob);
@@ -209,13 +226,27 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
             // Start coroutine to update car plates
             StartCoroutine(UpdateCarPlates(tasks, newJob.ID));
 
+            //If the job is not owned by anyone, we can add it to the station
+            //if(networkedJob.OwnedBy == Guid.Empty)
+            StationController.logicStation.AddJobToStation(newJob);
+            
+
+            //start coroutine for generating overviews and booklets
+            //StartCoroutine(CreatePaperWork());
+
             // Log the addition of the new job
             NetworkLifecycle.Instance.Client.Log($"AddJobs() {newJob?.ID} to NetworkedStationController {StationController?.logicStation?.ID}");
         }
-    }
-    #endregion
 
-    #region common functions
+        //allow booklets to be created
+        StationController.attemptJobOverviewGeneration = true;
+    }
+
+    public void UpdateJob()
+    {
+
+    }
+
     public static IEnumerator UpdateCarPlates(List<DV.Logic.Job.Task> tasks, string jobId)
     {
 
@@ -300,6 +331,11 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         }
 
         Multiplayer.Log("NetworkedStation.UpdateCarPlatesRecursive() Returning");
+    }
+
+    public IEnumerator CreatePaperWork()
+    {
+        yield return null;
     }
     #endregion
 }

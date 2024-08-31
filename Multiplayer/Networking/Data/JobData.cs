@@ -2,6 +2,8 @@ using DV.Logic.Job;
 using DV.ThingTypes;
 using LiteNetLib.Utils;
 using Multiplayer.Components.Networking;
+using Multiplayer.Components.Networking.Jobs;
+using System;
 
 namespace Multiplayer.Networking.Data;
 
@@ -18,12 +20,15 @@ public class JobData
     public float InitialWage { get; set; }
     public JobState State { get; set; } //serialise as byte
     public float TimeLimit { get; set; }
+    public Guid OwnedBy { get; set; }
 
-    public static JobData FromJob(ushort netID, Job job)
+    public static JobData FromJob(NetworkedJob networkedJob)
     {
+        Job job = networkedJob.Job;
+
         return new JobData
         {
-            NetID = netID,
+            NetID = networkedJob.NetId,
             JobType = job.jobType,
             ID = job.ID,
             Tasks = TaskNetworkDataFactory.ConvertTasks(job.tasks),
@@ -33,7 +38,8 @@ public class JobData
             FinishTime = job.finishTime,
             InitialWage = job.initialWage,
             State = job.State,
-            TimeLimit = job.TimeLimit
+            TimeLimit = job.TimeLimit,
+            OwnedBy = networkedJob.OwnedBy
         };
     }
 
@@ -73,6 +79,10 @@ public class JobData
         //Multiplayer.Log($"JobData.Serialize({data.ID}) TimeLimit {data.TimeLimit}");
         writer.Put(data.TimeLimit);
         //Multiplayer.Log(JsonConvert.SerializeObject(data, Formatting.None));
+
+        //Take on the GUID of the player
+        //if(data.State != JobState.Available)
+        //    writer.Put(data.OwnedBy.ToByteArray());
     }
 
     public static JobData Deserialize(NetDataReader reader)
@@ -115,6 +125,8 @@ public class JobData
         float timeLimit = reader.GetFloat();
         //Multiplayer.Log("JobData.Deserialize() timeLimit: " + timeLimit);
 
+        //Guid ownedBy =  (state != JobState.Available)? new(reader.GetBytesWithLength()) : Guid.Empty;
+
         return new JobData
         {
             NetID = netID,
@@ -127,7 +139,8 @@ public class JobData
             FinishTime = finishTime,
             InitialWage = initialWage,
             State = state,
-            TimeLimit = timeLimit
+            TimeLimit = timeLimit,
+            //OwnedBy = ownedBy,
         };
     }
 
