@@ -223,7 +223,7 @@ public class HostGamePane : MonoBehaviour
         go.transform.GetComponent<RectTransform>().sizeDelta = new Vector2(go.transform.GetComponent<RectTransform>().sizeDelta.x, 106);
         details = go.GetComponent<TMP_InputField>();
         details.characterLimit = MAX_DETAILS_LEN;
-        details.lineType = TMP_InputField.LineType.MultiLineSubmit;
+        details.lineType = TMP_InputField.LineType.MultiLineNewline;
         details.FindChildByName("text [noloc]").GetComponent<TMP_Text>().alignment = TextAlignmentOptions.TopLeft;
 
         details.placeholder.GetComponent<TMP_Text>().text = Locale.SERVER_HOST_DETAILS;
