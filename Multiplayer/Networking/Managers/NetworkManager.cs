@@ -40,7 +40,7 @@ public abstract class NetworkManager : INetEventListener, INatPunchListener
         netPacketProcessor.RegisterNestedType(JobData.Serialize, JobData.Deserialize);
         netPacketProcessor.RegisterNestedType(ModInfo.Serialize, ModInfo.Deserialize);
         netPacketProcessor.RegisterNestedType(RigidbodySnapshot.Serialize, RigidbodySnapshot.Deserialize);
-        netPacketProcessor.RegisterNestedType(StationsChainDataData.Serialize, StationsChainDataData.Deserialize);
+        netPacketProcessor.RegisterNestedType(StationsChainNetworkData.Serialize, StationsChainNetworkData.Deserialize);
         netPacketProcessor.RegisterNestedType(TrainsetMovementPart.Serialize, TrainsetMovementPart.Deserialize);
         netPacketProcessor.RegisterNestedType(TrainsetSpawnPart.Serialize, TrainsetSpawnPart.Deserialize);
         netPacketProcessor.RegisterNestedType(Vector2Serializer.Serialize, Vector2Serializer.Deserialize);

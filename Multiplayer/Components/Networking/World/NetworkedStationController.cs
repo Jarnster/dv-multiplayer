@@ -147,23 +147,38 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
     #region Client
     public void AddJobs(JobData[] jobs)
     {
+        //NetworkLifecycle.Instance.Client.Log($"AddJobs() jobs[] exists: {jobs != null}, job count: {jobs?.Count()}");
+
+        //NetworkLifecycle.Instance.Client.Log($"AddJobs() preloop");
         foreach (JobData jobData in jobs)
         {
-            NetworkLifecycle.Instance.Client.Log($"AddJobs() {jobData.ID}, {jobData.NetID}");
+            //NetworkLifecycle.Instance.Client.Log($"AddJobs() inloop");
+
+            //NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {jobData?.ID ?? ""}, netID: {jobData?.NetID}, task count: {jobData?.Tasks?.Count()}");
 
             // Convert TaskNetworkData to Task objects
             List<Task> tasks = new List<Task>();
             foreach (TaskNetworkData taskData in jobData.Tasks)
             {
+                if (NetworkLifecycle.Instance.IsHost())
+                {
+                    Task test = taskData.ToTask();
+                    continue;
+                }
+
+                //NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {jobData?.ID}, task type: {taskData.TaskType}");
                 tasks.Add(taskData.ToTask());
             }
 
+            //NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {jobData?.ID}, netID: {jobData?.NetID}, StationsChainData");
             // Create StationsChainData from ChainData
             StationsChainData chainData = new StationsChainData(
                 jobData.ChainData.ChainOriginYardId,
                 jobData.ChainData.ChainDestinationYardId
             );
 
+
+            //NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {jobData?.ID}, netID: {jobData?.NetID}, newJob");
             // Create a new local Job
             Job newJob = new Job(
                 tasks,
@@ -175,21 +190,27 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
                 jobData.RequiredLicenses
             );
 
+            //NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {jobData?.ID}, netID: {jobData?.NetID}, properties");
             // Set additional properties
             newJob.startTime = jobData.StartTime;
             newJob.finishTime = jobData.FinishTime;
             newJob.State = jobData.State;
 
+            //NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {jobData?.ID}, netID: {jobData?.NetID}, netjob");
+
             // Create a new NetworkedJob
             NetworkedJob networkedJob = new GameObject($"NetworkedJob {newJob.ID}").AddComponent<NetworkedJob>();
             networkedJob.Job = newJob;
+
+            //NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {jobData?.ID}, netID: {jobData?.NetID}, NetJob Add");
             NetworkedJobs.Add(networkedJob);
 
+            //NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {jobData?.ID}, netID: {jobData?.NetID}, CarPlates");
             // Start coroutine to update car plates
             StartCoroutine(UpdateCarPlates(tasks, newJob.ID));
 
             // Log the addition of the new job
-            Multiplayer.Log($"AddJobs() {newJob.ID} to NetworkedStationController {StationController.logicStation.ID}");
+            NetworkLifecycle.Instance.Client.Log($"AddJobs() {newJob?.ID} to NetworkedStationController {StationController?.logicStation?.ID}");
         }
     }
     #endregion

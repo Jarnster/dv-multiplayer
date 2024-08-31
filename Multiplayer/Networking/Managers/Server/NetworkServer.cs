@@ -111,7 +111,6 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<ServerboundClientReadyPacket, NetPeer>(OnServerboundClientReadyPacket);
         netPacketProcessor.SubscribeReusable<ServerboundSaveGameDataRequestPacket, NetPeer>(OnServerboundSaveGameDataRequestPacket);
         netPacketProcessor.SubscribeReusable<ServerboundPlayerPositionPacket, NetPeer>(OnServerboundPlayerPositionPacket);
-        //netPacketProcessor.SubscribeReusable<ServerboundPlayerCarPacket, NetPeer>(OnServerboundPlayerCarPacket);
         netPacketProcessor.SubscribeReusable<ServerboundTimeAdvancePacket, NetPeer>(OnServerboundTimeAdvancePacket);
         netPacketProcessor.SubscribeReusable<ServerboundTrainSyncRequestPacket>(OnServerboundTrainSyncRequestPacket);
         netPacketProcessor.SubscribeReusable<ServerboundTrainDeleteRequestPacket, NetPeer>(OnServerboundTrainDeleteRequestPacket);
@@ -388,7 +387,7 @@ public class NetworkServer : NetworkManager
 
     public void SendJobsCreatePacket(ushort stationID, NetworkedJob[] jobs)
     {
-        Multiplayer.Log($"Sending JobCreatePacket with {jobs.Length} jobs");
+        Multiplayer.Log($"Sending JobsCreatePacket with {jobs.Count()} jobs");
         SendPacketToAll(ClientboundJobsCreatePacket.FromNetworkedJobs(stationID, jobs),DeliveryMethod.ReliableSequenced);
     }
 

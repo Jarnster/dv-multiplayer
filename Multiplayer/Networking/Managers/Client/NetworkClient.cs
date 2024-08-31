@@ -484,7 +484,7 @@ public class NetworkClient : NetworkManager
         //Protect myself from getting deleted in race conditions
         if (PlayerManager.Car == networkedTrainCar.TrainCar)
         {
-            Multiplayer.LogWarning($"Server attempted to delete car I'm on: {PlayerManager.Car.ID}, net ID: {packet.NetId}");
+            LogWarning($"Server attempted to delete car I'm on: {PlayerManager.Car.ID}, net ID: {packet.NetId}");
             PlayerManager.SetCar(null);
         }
 
@@ -616,7 +616,7 @@ public class NetworkClient : NetworkManager
 
         networkedTrainCar.Client_ReceiveBrakePressureUpdate(packet.MainReservoirPressure, packet.IndependentPipePressure, packet.BrakePipePressure, packet.BrakeCylinderPressure);
 
-        //Multiplayer.LogDebug(() => $"Received Brake Pressures netId {packet.NetId}: {packet.MainReservoirPressure}, {packet.IndependentPipePressure}, {packet.BrakePipePressure}, {packet.BrakeCylinderPressure}");
+        //LogDebug(() => $"Received Brake Pressures netId {packet.NetId}: {packet.MainReservoirPressure}, {packet.IndependentPipePressure}, {packet.BrakePipePressure}, {packet.BrakeCylinderPressure}");
     }
 
     private void OnClientboundFireboxStatePacket(ClientboundFireboxStatePacket packet)
@@ -627,7 +627,7 @@ public class NetworkClient : NetworkManager
 
         networkedTrainCar.Client_ReceiveFireboxStateUpdate(packet.Contents, packet.IsOn);
 
-        //Multiplayer.LogDebug(() => $"Received Brake Pressures netId {packet.NetId}: {packet.Contents}, {packet.IsOn}");
+        //LogDebug(() => $"Received Brake Pressures netId {packet.NetId}: {packet.Contents}, {packet.IsOn}");
     }
 
     private void OnClientboundCargoStatePacket(ClientboundCargoStatePacket packet)
@@ -740,14 +740,14 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundJobsCreatePacket(ClientboundJobsCreatePacket packet)
     {
-        Multiplayer.Log($"OnClientboundJobCreatePacket() for station {packet.StationNetId}, containing {packet.Jobs.Length}");
+        Log($"OnClientboundJobsCreatePacket() for station {packet.StationNetId}, containing {packet.Jobs.Length}");
 
         if (NetworkLifecycle.Instance.IsHost())
             return;
 
         if(!NetworkedStationController.Get(packet.StationNetId, out NetworkedStationController networkedStationController))
         {
-            LogError($"OnClientboundJobCreatePacket() {packet.StationNetId} does not exist!");
+            LogError($"OnClientboundJobsCreatePacket() {packet.StationNetId} does not exist!");
             return;
         }
 
@@ -758,7 +758,7 @@ public class NetworkClient : NetworkManager
     /*
     private void OnClientboundJobTakeResponsePacket(ClientboundJobTakeResponsePacket packet)
     {
-        Multiplayer.Log($"OnClientboundJobTakeResponsePacket jobId: {packet.netId}, Status: {packet.granted}");
+        Log($"OnClientboundJobTakeResponsePacket jobId: {packet.netId}, Status: {packet.granted}");
 
         NetworkedJob networkedJob;
 
@@ -771,7 +771,7 @@ public class NetworkClient : NetworkManager
             networkedJob.takenBy = player.Guid;
         }
 
-        Multiplayer.Log($"OnClientboundJobTakeResponsePacket jobId: {networkedJob.job.ID}, Status: {packet.granted}");
+        Log($"OnClientboundJobTakeResponsePacket jobId: {networkedJob.job.ID}, Status: {packet.granted}");
         networkedJob.allowTake = packet.granted;
         networkedJob.jobValidator.ProcessJobOverview(networkedJob.jobOverview);
         networkedJob.jobValidator = null;
@@ -801,7 +801,7 @@ public class NetworkClient : NetworkManager
 
     public void SendPlayerPosition(Vector3 position, Vector3 moveDir, float rotationY, ushort carId, bool isJumping, bool isOnCar, bool reliable)
     {
-        //Multiplayer.LogDebug(() => $"SendPlayerPosition({position}, {moveDir}, {rotationY}, {carId}, {isJumping}, {isOnCar})");
+        //LogDebug(() => $"SendPlayerPosition({position}, {moveDir}, {rotationY}, {carId}, {isJumping}, {isOnCar})");
 
         SendPacketToServer(new ServerboundPlayerPositionPacket
         {
@@ -847,7 +847,7 @@ public class NetworkClient : NetworkManager
 
         if (couplerNetId == 0 || otherCouplerNetId == 0)
         {
-            Multiplayer.LogWarning($"SendTrainCouple failed. Coupler: {coupler.name} {couplerNetId}, OtherCoupler: {otherCoupler.name} {otherCouplerNetId}");
+            LogWarning($"SendTrainCouple failed. Coupler: {coupler.name} {couplerNetId}, OtherCoupler: {otherCoupler.name} {otherCouplerNetId}");
             return;
         }
 
@@ -868,7 +868,7 @@ public class NetworkClient : NetworkManager
 
         if (couplerNetId == 0)
         {
-            Multiplayer.LogWarning($"SendTrainUncouple failed. Coupler: {coupler.name} {couplerNetId}");
+            LogWarning($"SendTrainUncouple failed. Coupler: {coupler.name} {couplerNetId}");
             return;
         }
 
@@ -889,7 +889,7 @@ public class NetworkClient : NetworkManager
 
         if (couplerNetId == 0 || otherCouplerNetId == 0)
         {
-            Multiplayer.LogWarning($"SendHoseConnected failed. Coupler: {coupler.name} {couplerNetId}, OtherCoupler: {otherCoupler.name} {otherCouplerNetId}");
+            LogWarning($"SendHoseConnected failed. Coupler: {coupler.name} {couplerNetId}, OtherCoupler: {otherCoupler.name} {otherCouplerNetId}");
             return;
         }
 
@@ -909,7 +909,7 @@ public class NetworkClient : NetworkManager
 
         if (couplerNetId == 0)
         {
-            Multiplayer.LogWarning($"SendHoseDisconnected failed. Coupler: {coupler.name} {couplerNetId}");
+            LogWarning($"SendHoseDisconnected failed. Coupler: {coupler.name} {couplerNetId}");
             return;
         }
 
@@ -928,7 +928,7 @@ public class NetworkClient : NetworkManager
 
         if (cableNetId == 0 || otherCableNetId == 0)
         {
-            Multiplayer.LogWarning($"SendMuConnected failed. Cable: {cable.muModule.train.name} {cableNetId}, OtherCable: {otherCable.muModule.train.name} {otherCableNetId}");
+            LogWarning($"SendMuConnected failed. Cable: {cable.muModule.train.name} {cableNetId}, OtherCable: {otherCable.muModule.train.name} {otherCableNetId}");
             return;
         }
 
@@ -1011,7 +1011,7 @@ public class NetworkClient : NetworkManager
             log += $"\r\n\t{portIds[i]}: {portValues[i]}";
         }
 
-        Multiplayer.LogDebug(() => log);
+        LogDebug(() => log);
         */
     }
 
