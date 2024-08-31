@@ -341,20 +341,16 @@ namespace Multiplayer.Components.MainMenu
                 buttonDirectIP.ToggleInteractable(false);
                 buttonJoin.ToggleInteractable(false);
 
+                //not making a direct connection
+                direct = false;
+                portNumber = selectedServer.port;
+                password = null; //clear the password
+
                 if (selectedServer.HasPassword)
                 {
-                    //not making a direct connection
-                    direct = false;
-
-                    portNumber = selectedServer.port;
-
                     ShowPasswordPopup();
-
                     return;
                 }
-
-                //password not required
-                password = null;
 
                 AttemptConnection();
                
@@ -369,6 +365,7 @@ namespace Multiplayer.Components.MainMenu
 
             //making a direct connection
             direct = true;
+            password = null;
 
             ShowIpPopup();
         }
