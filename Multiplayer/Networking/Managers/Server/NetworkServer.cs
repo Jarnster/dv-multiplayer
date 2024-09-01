@@ -46,6 +46,7 @@ public class NetworkServer : NetworkManager
     public bool isPublic;
     public bool isSinglePlayer;
     public LobbyServerData serverData;
+    public RerailController rerailController;
 
     public IReadOnlyCollection<ServerPlayer> ServerPlayers => serverPlayers.Values;
     public int PlayerCount => netManager.ConnectedPeersCount;
@@ -840,7 +841,11 @@ public class NetworkServer : NetworkManager
 
         TrainCar trainCar = networkedTrainCar.TrainCar;
         Vector3 position = packet.Position + WorldMover.currentMove;
-        float cost = RerailController.CalculatePrice((networkedTrainCar.transform.position - position).magnitude, trainCar.carType, Globals.G.GameParams.RerailMaxPrice);
+
+        //Check if player is a Newbie (currently shared with all players)
+        float cost =  (TutorialHelper.InRestrictedMode  || (rerailController != null && rerailController.isPlayerNewbie)) ? 0f :
+            RerailController.CalculatePrice((networkedTrainCar.transform.position - position).magnitude, trainCar.carType, Globals.G.GameParams.RerailMaxPrice);
+
         if (!Inventory.Instance.RemoveMoney(cost))
         {
             LogWarning($"{player.Username} tried to rerail a train without enough money to do so!");

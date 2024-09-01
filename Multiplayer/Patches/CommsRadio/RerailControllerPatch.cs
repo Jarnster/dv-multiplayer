@@ -13,6 +13,16 @@ namespace Multiplayer.Patches.CommsRadio;
 [HarmonyPatch(typeof(RerailController))]
 public static class RerailControllerPatch
 {
+    [HarmonyPostfix]
+    [HarmonyPatch(nameof(RerailController.Awake))]
+    private static void OnAwake_Prefix(RerailController __instance)
+    {
+        if (!NetworkLifecycle.Instance.IsHost())
+            return;
+
+        NetworkLifecycle.Instance.Server.rerailController = __instance;
+    }
+
     [HarmonyPrefix]
     [HarmonyPatch(nameof(RerailController.OnUse))]
     private static bool OnUse_Prefix(RerailController __instance)
