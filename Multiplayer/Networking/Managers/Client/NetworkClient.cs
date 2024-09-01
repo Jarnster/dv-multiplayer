@@ -86,7 +86,6 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundPlayerDisconnectPacket>(OnClientboundPlayerDisconnectPacket);
         netPacketProcessor.SubscribeReusable<ClientboundPlayerKickPacket>(OnClientboundPlayerKickPacket);
         netPacketProcessor.SubscribeReusable<ClientboundPlayerPositionPacket>(OnClientboundPlayerPositionPacket);
-        //netPacketProcessor.SubscribeReusable<ClientboundPlayerCarPacket>(OnClientboundPlayerCarPacket);
         netPacketProcessor.SubscribeReusable<ClientboundPingUpdatePacket>(OnClientboundPingUpdatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundTickSyncPacket>(OnClientboundTickSyncPacket);
         netPacketProcessor.SubscribeReusable<ClientboundServerLoadingPacket>(OnClientboundServerLoadingPacket);
@@ -126,7 +125,7 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundGarageUnlockPacket>(OnClientboundGarageUnlockPacket);
         netPacketProcessor.SubscribeReusable<ClientboundDebtStatusPacket>(OnClientboundDebtStatusPacket);
         netPacketProcessor.SubscribeReusable<ClientboundJobsCreatePacket>(OnClientboundJobsCreatePacket);
-        //netPacketProcessor.SubscribeReusable<ClientboundJobTakeResponsePacket>(OnClientboundJobTakeResponsePacket);
+        netPacketProcessor.SubscribeReusable<ClientboundJobValidateResponsePacket>(OnClientboundJobValidateResponsePacket);
         netPacketProcessor.SubscribeReusable<CommonChatPacket>(OnCommonChatPacket); 
     }
 
@@ -249,9 +248,9 @@ public class NetworkClient : NetworkManager
 
     private void OnClientboundPlayerJoinedPacket(ClientboundPlayerJoinedPacket packet)
     {
-        Guid guid = new(packet.Guid);
-        ClientPlayerManager.AddPlayer(packet.Id, packet.Username, guid);
-        //ClientPlayerManager.UpdateCar(packet.Id, packet.TrainCar);
+        //Guid guid = new(packet.Guid);
+        ClientPlayerManager.AddPlayer(packet.Id, packet.Username);
+
         ClientPlayerManager.UpdatePosition(packet.Id, packet.Position, Vector3.zero, packet.Rotation, false, packet.CarID != 0, packet.CarID);
     }
 
@@ -271,11 +270,6 @@ public class NetworkClient : NetworkManager
     {
         ClientPlayerManager.UpdatePosition(packet.Id, packet.Position, packet.MoveDir, packet.RotationY, packet.IsJumping, packet.IsOnCar, packet.CarID);
     }
-
-    //private void OnClientboundPlayerCarPacket(ClientboundPlayerCarPacket packet)
-    //{
-    //    ClientPlayerManager.UpdateCar(packet.Id, packet.CarId);
-    //}
 
     private void OnClientboundPingUpdatePacket(ClientboundPingUpdatePacket packet)
     {
@@ -733,7 +727,6 @@ public class NetworkClient : NetworkManager
     }
     private void OnCommonChatPacket(CommonChatPacket packet)
     {
-
         chatGUI.ReceiveMessage(packet.message);
     }
 
@@ -755,29 +748,17 @@ public class NetworkClient : NetworkManager
 
     }
 
-    /*
-    private void OnClientboundJobTakeResponsePacket(ClientboundJobTakeResponsePacket packet)
+ 
+    private void OnClientboundJobValidateResponsePacket(ClientboundJobValidateResponsePacket packet)
     {
-        Log($"OnClientboundJobTakeResponsePacket jobId: {packet.netId}, Status: {packet.granted}");
+        Log($"OnClientboundJobValidateResponsePacket() JobNetId: {packet.JobNetId}, Status: {packet.Accepted}");
 
-        NetworkedJob networkedJob;
-
-        if(!NetworkedJob.Get(packet.netId, out networkedJob))
+        if(!NetworkedJob.Get(packet.JobNetId, out NetworkedJob networkedJob))
             return;
 
-        NetworkedPlayer player;
-        if (ClientPlayerManager.TryGetPlayer(packet.playerId, out player))
-        {
-            networkedJob.takenBy = player.Guid;
-        }
-
-        Log($"OnClientboundJobTakeResponsePacket jobId: {networkedJob.job.ID}, Status: {packet.granted}");
-        networkedJob.allowTake = packet.granted;
-        networkedJob.jobValidator.ProcessJobOverview(networkedJob.jobOverview);
-        networkedJob.jobValidator = null;
-        networkedJob.jobOverview = null;
+        networkedJob.ValidatorResponseReceived = true;
+        networkedJob.ValidationAccepted = packet.Accepted;
     }
-    */
     
     #endregion
 
@@ -1061,15 +1042,16 @@ public class NetworkClient : NetworkManager
         }, DeliveryMethod.ReliableUnordered);
     }
 
-    /* Temp for stable release
-    public void SendJobTakeRequest(ushort netId)
+    public void SendJobValidateRequest(ushort jobNetId, ushort stationNetId, ValidationType type)
     {
-        SendPacketToServer(new ServerboundJobTakeRequestPacket
+        SendPacketToServer(new ServerboundJobValidateRequestPacket
         {
-            netId = netId
+            JobNetId = jobNetId,
+            StationNetId = stationNetId,
+            validationType = type
         }, DeliveryMethod.ReliableUnordered);
     }
-*/
+
     public void SendChat(string message)
     {
         SendPacketToServer(new CommonChatPacket

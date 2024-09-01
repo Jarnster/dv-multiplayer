@@ -27,14 +27,14 @@ public class ClientPlayerManager
         return playerMap.TryGetValue(id, out player);
     }
 
-    public void AddPlayer(byte id, string username, Guid guid)
+    public void AddPlayer(byte id, string username)
     {
         GameObject go = Object.Instantiate(playerPrefab, WorldMover.Instance.originShiftParent);
         go.layer = LayerMask.NameToLayer(Layers.Player);
         NetworkedPlayer networkedPlayer = go.AddComponent<NetworkedPlayer>();
         networkedPlayer.Id = id;
         networkedPlayer.Username = username;
-        networkedPlayer.Guid = guid;
+        //networkedPlayer.Guid = guid;
         playerMap.Add(id, networkedPlayer);
         OnPlayerConnected?.Invoke(id, networkedPlayer);
     }

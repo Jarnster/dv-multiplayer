@@ -132,7 +132,7 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<ServerboundFireboxIgnitePacket, NetPeer>(OnServerboundFireboxIgnitePacket);
         netPacketProcessor.SubscribeReusable<CommonTrainPortsPacket, NetPeer>(OnCommonTrainPortsPacket);
         netPacketProcessor.SubscribeReusable<CommonTrainFusesPacket, NetPeer>(OnCommonTrainFusesPacket);
-        netPacketProcessor.SubscribeReusable<ServerboundJobTakeRequestPacket, NetPeer>(OnServerboundJobTakeRequestPacket);
+        netPacketProcessor.SubscribeReusable<ServerboundJobValidateRequestPacket, NetPeer>(OnServerboundJobValidateRequestPacket);
         netPacketProcessor.SubscribeReusable<CommonChatPacket, NetPeer>(OnCommonChatPacket);
     }
 
@@ -386,10 +386,22 @@ public class NetworkServer : NetworkManager
         }, DeliveryMethod.ReliableUnordered, selfPeer);
     }
 
-    public void SendJobsCreatePacket(ushort stationID, NetworkedJob[] jobs, DeliveryMethod method = DeliveryMethod.ReliableSequenced )
+    public void SendJobsCreatePacket(ushort stationNetId, NetworkedJob[] jobs, DeliveryMethod method = DeliveryMethod.ReliableSequenced )
     {
         Multiplayer.Log($"Sending JobsCreatePacket with {jobs.Count()} jobs");
-        SendPacketToAll(ClientboundJobsCreatePacket.FromNetworkedJobs(stationID, jobs), method);
+        SendPacketToAll(ClientboundJobsCreatePacket.FromNetworkedJobs(stationNetId, jobs), method);
+    }
+
+    public void SendJobsUpdatePacket(JobUpdateStruct[] jobs, NetPeer peer = null)
+    {
+        if (peer != null)
+        {
+            SendPacketToAll(new ClientboundJobsUpdatePacket { JobUpdates = jobs }, DeliveryMethod.ReliableUnordered);
+        }
+        else
+        {
+            SendPacket(peer, new ClientboundJobsUpdatePacket { JobUpdates = jobs }, DeliveryMethod.ReliableUnordered);
+        }
     }
 
     public void SendChat(string message, NetPeer exclude = null)
@@ -559,7 +571,7 @@ public class NetworkServer : NetworkManager
         {
             Id = peerId,
             Username = serverPlayer.Username,
-            Guid = serverPlayer.Guid.ToByteArray()
+            //Guid = serverPlayer.Guid.ToByteArray()
         };
         SendPacketToAll(clientboundPlayerJoinedPacket, DeliveryMethod.ReliableOrdered, peer);
 
@@ -623,7 +635,7 @@ public class NetworkServer : NetworkManager
             {
                 Id = player.Id,
                 Username = player.Username,
-                Guid = player.Guid.ToByteArray(),
+                //Guid = player.Guid.ToByteArray(),
                 CarID = player.CarId,
                 Position = player.RawPosition,
                 Rotation = player.RawRotationY
@@ -892,40 +904,83 @@ public class NetworkServer : NetworkManager
     }
 
 
-    private void OnServerboundJobTakeRequestPacket(ServerboundJobTakeRequestPacket packet, NetPeer peer)
+    private void OnServerboundJobValidateRequestPacket(ServerboundJobValidateRequestPacket packet, NetPeer peer)
     {
-        /* Temp for stable release
-        NetworkedJob networkedJob;
 
-        if (!NetworkedJob.Get(packet.netId, out networkedJob))
+        if (!NetworkedJob.Get(packet.JobNetId, out NetworkedJob networkedJob))
         {
-            Multiplayer.Log($"OnServerboundJobTakeRequestPacket netId Not Found: {packet.netId}");
+            LogWarning($"OnServerboundJobValidateRequestPacket() NetworkedJob not found: {packet.JobNetId}");
+
+            JobUpdateStruct invalidJob = new JobUpdateStruct();
+            invalidJob.JobNetID = packet.JobNetId;
+            invalidJob.Invalid = true;
+
+            SendJobsUpdatePacket([invalidJob],peer);
             return;
         }
 
-        if (networkedJob.job.State != JobState.Available) {
-
-            Multiplayer.Log($"OnServerboundJobTakeRequestPacket jobId: {networkedJob.job.ID}, DENIED");
-            ServerPlayer player = ServerPlayers.First(x => x.Guid == networkedJob.takenBy);
-            //deny the request
-            SendPacket(peer, new ClientboundJobTakeResponsePacket { netId = packet.netId, granted = false, playerId = player.Id }, DeliveryMethod.ReliableOrdered);
-        }
-        else
+        if (TryGetServerPlayer(peer,out ServerPlayer player))
         {
-            //probably need to do more here
-            ServerPlayer player;
-            if (!TryGetServerPlayer(peer, out player))
-                return;
-
-            networkedJob.takenBy = player.Guid;
-            //networkedJob.job.State = JobState.InProgress;
-
-            //todo: officially take the job
-            Multiplayer.Log($"OnServerboundJobTakeRequestPacket jobId: {networkedJob.job.ID}, GRANTED");
-            SendPacket(peer, new ClientboundJobTakeResponsePacket { netId = packet.netId, granted = true, playerId = player.Id }, DeliveryMethod.ReliableOrdered);
-
+            LogWarning($"OnServerboundJobValidateRequestPacket() ServerPlayer not found: {peer.Id}");
+            return;
         }
-        */
+
+        //Find the station and validator
+        if (!NetworkedStationController.Get(packet.StationNetId, out NetworkedStationController networkedStationController) || networkedStationController.JobValidator == null)
+        {
+            LogWarning($"OnServerboundJobValidateRequestPacket() JobValidator not found. StationNetId: {packet.StationNetId}, StationController found: {networkedStationController != null}, JobValidator found: {networkedStationController?.JobValidator != null}");
+            return;
+        }
+
+       ClientboundJobValidateResponsePacket responsePacket = new ClientboundJobValidateResponsePacket { JobNetId = packet.JobNetId, Accepted = false};
+
+        switch (packet.validationType)
+        {
+            case ValidationType.JobOverview:
+                if (networkedJob.Job.State != JobState.Available)
+                {
+                    Log($"OnServerboundJobValidateRequestPacket({networkedJob.Job?.ID}) JobState: {networkedJob.Job.State}, DENIED");
+                }
+                else if(networkedJob.JobOverview == null)
+                {
+                    Log($"OnServerboundJobValidateRequestPacket({networkedJob.Job?.ID}) JobOverview does not exist, DENIED");
+                }
+                else
+                {
+                    networkedStationController.JobValidator.ProcessJobOverview(networkedJob.JobOverview);
+                    if(networkedJob.JobBooklet != null)
+                    {
+                        Log($"OnServerboundJobValidateRequestPacket({networkedJob.Job?.ID}) JobState: {networkedJob.Job.State}, ACCEPTED");
+                        responsePacket.Accepted = true;
+                        networkedJob.OwnedBy = player.Guid;
+                        networkedJob.playerID = peer.Id;
+                        
+                    }
+                    else
+                    {
+                        Log($"OnServerboundJobValidateRequestPacket({networkedJob.Job?.ID}) Failed to generate booklet, DENIED");
+                    }
+                }
+                break;
+
+            case ValidationType.JobBooklet:
+                if (networkedJob.Job.State != JobState.InProgress)
+                {
+                    Log($"OnServerboundJobValidateRequestPacket({networkedJob.Job?.ID}) JobState: {networkedJob.Job.State}, DENIED");
+                }
+                else if (networkedJob.JobBooklet == null)
+                {
+                    Log($"OnServerboundJobValidateRequestPacket({networkedJob.Job?.ID}) JobBooklet does not exist, DENIED");
+                }
+                else
+                {
+                    networkedStationController.JobValidator.ValidateJob(networkedJob.JobBooklet);
+                    responsePacket.Accepted = true;
+                }
+            break;
+        }
+
+        SendPacket(peer, responsePacket, DeliveryMethod.ReliableOrdered);
     }
 
     private void OnCommonChatPacket(CommonChatPacket packet, NetPeer peer)

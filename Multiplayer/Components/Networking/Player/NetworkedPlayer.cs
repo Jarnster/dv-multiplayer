@@ -10,7 +10,7 @@ public class NetworkedPlayer : MonoBehaviour
     private const float LERP_SPEED = 5.0f;
 
     public byte Id;
-    public Guid Guid;
+    //public Guid Guid;
 
     private AnimationHandler animationHandler;
     private NameTag nameTag;

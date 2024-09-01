@@ -50,9 +50,13 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
     public JobBooklet JobBooklet;
     public NetworkedStationController Station;
 
-    public bool? allowTake = null;
-    public Guid OwnedBy = Guid.Empty; //GUID of player who took the job
-    public JobValidator jobValidator;
+    public Guid OwnedBy = Guid.Empty; //GUID of player who took the job (sever only)
+    public int playerID;              //ID of player who took the job (client & server)
+
+    public JobValidator jobValidator; //Job validator to print the booklet/job validation at (client only)
+    public bool ValidatorRequestSent = false;
+    public bool ValidatorResponseReceived = false;
+    public bool ValidationAccepted = false;
  
     #region Client
 

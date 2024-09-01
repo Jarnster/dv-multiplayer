@@ -17,6 +17,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
     private static readonly Dictionary<string, NetworkedStationController> stationIdToNetworkedStationController = new();
     private static readonly Dictionary<string, StationController> stationIdToStationController = new();
     private static readonly Dictionary<Station, NetworkedStationController> stationToNetworkedStationController = new();
+    private static readonly Dictionary<JobValidator, NetworkedStationController> jobValidatorToNetworkedStation = new();
 
     public static bool Get(ushort netId, out NetworkedStationController obj)
     {
@@ -62,6 +63,11 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         return stationControllerToNetworkedStationController.TryGetValue(stationController, out networkedStationController);
     }
 
+    public static bool GetFromJobValidator(JobValidator jobValidator, out NetworkedStationController networkedStationController)
+    {
+        return jobValidatorToNetworkedStation.TryGetValue(jobValidator, out networkedStationController);
+    }
+
     public static void RegisterStationController(NetworkedStationController networkedStationController, StationController stationController)
     {
         string stationID = stationController.logicStation.ID;
@@ -70,13 +76,24 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         stationIdToNetworkedStationController.Add(stationID, networkedStationController);
         stationIdToStationController.Add(stationID, stationController);
         stationToNetworkedStationController.Add(stationController.logicStation, networkedStationController);
-}
+    }
+
+    public static void RegisterJobValidator(JobValidator jobValidator, NetworkedStationController stationController)
+    {
+        if (jobValidator == null || stationController == null)
+            return;
+
+        stationController.JobValidator = jobValidator;
+        jobValidatorToNetworkedStation[jobValidator] = stationController;
+    }
     #endregion
 
 
     protected override bool IsIdServerAuthoritative => true;
 
     private StationController StationController;
+
+    public JobValidator JobValidator;
 
     public HashSet<NetworkedJob> NetworkedJobs { get; } = new HashSet<NetworkedJob>();
     private List<NetworkedJob> NewJobs = new List<NetworkedJob>();
