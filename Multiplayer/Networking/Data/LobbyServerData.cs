@@ -10,7 +10,7 @@ namespace Multiplayer.Networking.Data
 {
     public class LobbyServerData : IServerBrowserGameDetails
     {
- 
+        [JsonProperty("game_server_id")]
         public string id { get; set; }
  
         public string ipv4 { get; set; }

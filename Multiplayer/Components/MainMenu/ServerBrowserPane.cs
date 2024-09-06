@@ -18,6 +18,9 @@ using DV;
 using System.Net;
 using LiteNetLib;
 using LiteNetLib.Utils;
+using Multiplayer.Networking.Listeners;
+using System.Collections.Generic;
+using System.Timers;
 
 namespace Multiplayer.Components.MainMenu
 {
@@ -59,6 +62,8 @@ namespace Multiplayer.Components.MainMenu
         private const int AUTO_REFRESH_TIME = 30; //how often to refresh in auto
         private const int REFRESH_MIN_TIME = 10; //Stop refresh spam
 
+        private ServerBrowserClient serverBrowserClient;
+
         //connection parameters
         private string address;
         private int portNumber;
@@ -94,6 +99,10 @@ namespace Multiplayer.Components.MainMenu
             //FillDummyServers();
             RefreshAction();
 
+            //Start Server
+            serverBrowserClient = new ServerBrowserClient(Multiplayer.Settings);
+            serverBrowserClient.OnPing += this.OnPing;
+            serverBrowserClient.Start();
         }
 
         private void OnEnable()
@@ -116,6 +125,12 @@ namespace Multiplayer.Components.MainMenu
         private void OnDisable()
         {
             this.SetupListeners(false);
+        }
+
+        private void OnDestroy()
+        {
+            serverBrowserClient.OnPing -= this.OnPing;
+            serverBrowserClient.Stop();
         }
 
         private void Update()
@@ -961,6 +976,19 @@ namespace Multiplayer.Components.MainMenu
             }
 
             return input;
+        }
+
+        private void OnPing(string serverId, int ping, bool isIPv4, bool isIPv6)
+        {
+            Multiplayer.Log($"ServerBrowser.OnPing({serverId}, {ping} ms, IPv4 {isIPv4}, IPv6 {isIPv6} )");
+        }
+
+        private void SendPing()
+        {
+            if (selectedServer != null)
+            {
+                serverBrowserClient.SendUnconnectedPingPacket(selectedServer.id, selectedServer.ipv4, selectedServer.ipv6, selectedServer.port);
+            }
         }
     }
 }

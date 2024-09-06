@@ -24,7 +24,10 @@ public abstract class NetworkManager : INetEventListener, INatPunchListener
     {
         netManager = new NetManager(this)
         {
-            DisconnectTimeout = 10000
+            DisconnectTimeout = 10000,
+            UnconnectedMessagesEnabled = true,
+            BroadcastReceiveEnabled = true,
+
         };
         netPacketProcessor = new NetPacketProcessor(netManager);
         RegisterNestedTypes();
@@ -84,6 +87,11 @@ public abstract class NetworkManager : INetEventListener, INatPunchListener
     {
         peer?.Send(WritePacket(packet), deliveryMethod);
     }
+     
+    protected void SendUnconnnectedPacket<T>(T packet, string ipAddress, int port) where T : class, new()
+    {
+        netManager.SendUnconnectedMessage(WritePacket(packet), ipAddress, port);
+    }
 
     protected abstract void Subscribe();
 
@@ -113,7 +121,20 @@ public abstract class NetworkManager : INetEventListener, INatPunchListener
 
     public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
     {
-        // todo
+        Multiplayer.Log($"OnNetworkReceiveUnconnected({remoteEndPoint}, {messageType})");
+        try
+        {
+            IsProcessingPacket = true;
+            netPacketProcessor.ReadAllPackets(reader, remoteEndPoint);
+        }
+        catch (ParseException e) 
+        {
+            Multiplayer.LogWarning($"Failed to parse packet: {e.Message}");
+        }
+        finally
+        {
+            IsProcessingPacket = false;
+        }
     }
 
     //Standard networking callbacks

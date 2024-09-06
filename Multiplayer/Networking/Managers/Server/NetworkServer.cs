@@ -30,6 +30,7 @@ using UnityEngine;
 using UnityModManagerNet;
 using System.Net;
 using Multiplayer.Networking.Packets.Serverbound.Train;
+using Multiplayer.Networking.Packets.Unconnected;
 
 
 namespace Multiplayer.Networking.Listeners;
@@ -134,6 +135,7 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<CommonTrainFusesPacket, NetPeer>(OnCommonTrainFusesPacket);
         netPacketProcessor.SubscribeReusable<ServerboundJobValidateRequestPacket, NetPeer>(OnServerboundJobValidateRequestPacket);
         netPacketProcessor.SubscribeReusable<CommonChatPacket, NetPeer>(OnCommonChatPacket);
+        netPacketProcessor.SubscribeReusable<UnconnectedPingPacket, IPEndPoint>(OnUnconnectedPingPacket);
     }
 
     private void OnLoaded()
@@ -986,6 +988,14 @@ public class NetworkServer : NetworkManager
     private void OnCommonChatPacket(CommonChatPacket packet, NetPeer peer)
     {
         ChatManager.ProcessMessage(packet.message,peer);
+    }
+    #endregion
+
+    #region Unconnected Packet Handling
+    private void OnUnconnectedPingPacket(UnconnectedPingPacket packet, IPEndPoint endPoint)
+    {
+        Multiplayer.Log($"OnUnconnectedPingPacket({endPoint.Address})");
+        SendUnconnnectedPacket(packet, endPoint.Address.ToString(),endPoint.Port);
     }
     #endregion
 }

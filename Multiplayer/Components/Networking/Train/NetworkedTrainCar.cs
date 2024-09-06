@@ -576,8 +576,10 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             else
                 port.Value = value;
 
+            /*
             if (Multiplayer.Settings.DebugLogging)
-                log += $"\r\n\tPort name: {port.id}, value before: {before}, value after: {port.value}, value: {value}, port type: {port.type}";
+                log += $"\r\n\tPort name: {port.id}, value before: {before}, value after: {port.value}, value: {value}, port type: {port.type}";)
+            */
         }
 
         NetworkLifecycle.Instance.Client.LogDebug(() => log);
