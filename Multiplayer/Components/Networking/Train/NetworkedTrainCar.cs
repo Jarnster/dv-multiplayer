@@ -43,10 +43,6 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         return hoseToCoupler[hoseAndCock];
     }
 
-    //public static NetworkedTrainCar GetFromTrainCar(TrainCar trainCar)
-    //{
-    //    return trainCarsToNetworkedTrainCars[trainCar];
-    //}
     public static bool GetFromTrainId(string carId, out NetworkedTrainCar networkedTrainCar)
     {
         return trainCarIdToNetworkedTrainCars.TryGetValue(carId, out networkedTrainCar);
@@ -88,6 +84,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     public byte CargoModelIndex = byte.MaxValue;
     private bool healthDirty;
     private bool sendCouplers;
+    private bool sendCables;
     private bool fireboxDirty;
 
     public bool IsDestroying;
@@ -272,6 +269,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         healthDirty = true;
         BogieTracksDirty = true;
         sendCouplers = true;
+        sendCables = true;
         fireboxDirty = firebox != null; //only dirty if exists
 
         if (!hasSimFlow)
@@ -364,6 +362,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         Server_SendBrakePressures();
         Server_SendFireBoxState();
         Server_SendCouplers();
+        Server_SendCables();
         Server_SendCargoState();
         Server_SendHealthState();
 
@@ -401,6 +400,18 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
 
         NetworkLifecycle.Instance.Client.SendCockState(NetId, TrainCar.frontCoupler, TrainCar.frontCoupler.IsCockOpen);
         NetworkLifecycle.Instance.Client.SendCockState(NetId, TrainCar.rearCoupler, TrainCar.rearCoupler.IsCockOpen);
+    }
+    private void Server_SendCables()
+    {
+        if (!sendCables)
+            return;
+        sendCables = false;
+
+        if (TrainCar.muModule.frontCable.IsConnected)
+            NetworkLifecycle.Instance.Client.SendMuConnected(TrainCar.muModule.frontCable, TrainCar.muModule.frontCable.connectedTo, false);
+
+        if (TrainCar.muModule.rearCable.IsConnected)
+            NetworkLifecycle.Instance.Client.SendMuConnected(TrainCar.muModule.rearCable, TrainCar.muModule.rearCable.connectedTo, false);
     }
 
     private void Server_SendCargoState()

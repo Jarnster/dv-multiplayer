@@ -542,7 +542,7 @@ public class NetworkClient : NetworkManager
             return;
 
         MultipleUnitCable cable = packet.IsFront ? trainCar.muModule.frontCable : trainCar.muModule.rearCable;
-        MultipleUnitCable otherCable = packet.IsFront ? otherTrainCar.muModule.frontCable : otherTrainCar.muModule.rearCable;
+        MultipleUnitCable otherCable = packet.OtherIsFront ? otherTrainCar.muModule.frontCable : otherTrainCar.muModule.rearCable;
 
         cable.Connect(otherCable, packet.PlayAudio);
     }
