@@ -49,7 +49,7 @@ public static class WindowsBreakingController_BreakWindowsFromCollision_Patch
             return;
         }
 
-        Multiplayer.LogWarning($"RepairWindows_Postfix , {car.name}");
+        Multiplayer.LogDebug(()=>$"RepairWindows_Postfix, {car.name}");
         NetworkLifecycle.Instance.Server.SendWindowsRepaired(netId);
     }
 }
