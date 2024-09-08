@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Reflection;
-using DV.UI;
+using DV.UIFramework;
 using HarmonyLib;
 using JetBrains.Annotations;
 using Multiplayer.Components.MainMenu;
@@ -48,6 +48,7 @@ public static class Multiplayer
         Settings = Settings.Load(modEntry);//Settings.Load<Settings>(modEntry);
         ModEntry.OnGUI = Settings.Draw;
         ModEntry.OnSaveGUI = Settings.Save;
+        ModEntry.OnLateUpdate = LateUpdate;
 
         Harmony harmony = null;
 
@@ -120,23 +121,47 @@ public static class Multiplayer
         return true;
     }
 
-    //private static void LateUpdate(UnityModManager.ModEntry modEntry, float deltaTime)
-    //{
-    //    if (ModEntry.NewestVersion != null && ModEntry.NewestVersion.ToString() != "")
-    //    {
-    //        Log($"Multiplayer Latest Version: {ModEntry.NewestVersion}");
+    private static void LateUpdate(UnityModManager.ModEntry modEntry, float deltaTime)
+    {
+        if (ModEntry.NewestVersion != null && ModEntry.NewestVersion.ToString() != "")
+        {
+            Log($"Multiplayer Latest Version: {ModEntry.NewestVersion}");
 
-    //        ModEntry.OnLateUpdate -= Multiplayer.LateUpdate;
+            ModEntry.OnLateUpdate -= Multiplayer.LateUpdate;
 
-    //        if (ModEntry.NewestVersion > ModEntry.Version)
-    //        {
-    //            if (MainMenuThingsAndStuff.Instance != null)
-    //            {
+            if (ModEntry.NewestVersion > ModEntry.Version)
+            {
+                if (MainMenuThingsAndStuff.Instance != null)
+                {
+                    Popup update =  MainMenuThingsAndStuff.Instance.ShowOkPopup();
 
-    //            }
-    //        }
-    //    }
-    //}
+                    if (update == null)
+                        return;
+
+                    update.labelTMPro.text = "Multiplayer Mod Update Available!\r\n\r\n"+
+                                                $"<align=left>Latest version:\t\t{ModEntry.NewestVersion}\r\n" +
+                                                $"Installed version:\t\t<color=\"red\">{ModEntry.Version}</color>\r\n\r\n" +
+                                                "Run Unity Mod Manager Installer to apply the update.</align>";
+
+                    Vector3 currPos = update.labelTMPro.transform.localPosition;
+                    Vector2 size = update.labelTMPro.rectTransform.sizeDelta;
+
+                    float delta = size.y - update.labelTMPro.preferredHeight;
+                    currPos.y -= delta *2 ;
+                    size.y = update.labelTMPro.preferredHeight;
+
+                    update.labelTMPro.transform.localPosition = currPos;
+                    update.labelTMPro.rectTransform.sizeDelta = size;
+
+                    currPos = update.positiveButton.transform.localPosition;
+                    currPos.y += delta * 2;
+                    update.positiveButton.transform.localPosition = currPos;
+
+
+                }
+            }
+        }
+    }
 
     #region Logging
 
