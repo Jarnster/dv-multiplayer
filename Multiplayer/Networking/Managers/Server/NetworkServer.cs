@@ -908,6 +908,7 @@ public class NetworkServer : NetworkManager
 
     private void OnServerboundJobValidateRequestPacket(ServerboundJobValidateRequestPacket packet, NetPeer peer)
     {
+        NetworkedItem item;
 
         if (!NetworkedJob.Get(packet.JobNetId, out NetworkedJob networkedJob))
         {
@@ -921,7 +922,7 @@ public class NetworkServer : NetworkManager
             return;
         }
 
-        if (TryGetServerPlayer(peer,out ServerPlayer player))
+        if (!TryGetServerPlayer(peer, out ServerPlayer player))
         {
             LogWarning($"OnServerboundJobValidateRequestPacket() ServerPlayer not found: {peer.Id}");
             return;
@@ -952,11 +953,18 @@ public class NetworkServer : NetworkManager
                     networkedStationController.JobValidator.ProcessJobOverview(networkedJob.JobOverview);
                     if(networkedJob.JobBooklet != null)
                     {
-                        Log($"OnServerboundJobValidateRequestPacket({networkedJob.Job?.ID}) JobState: {networkedJob.Job.State}, ACCEPTED");
+                        if(!networkedJob.JobBooklet.TryGetComponent(out item))
+                        {
+                            LogError($"OnServerboundJobValidateRequestPacket({networkedJob.Job?.ID}) JobState: {networkedJob.Job.State}, Could not get NetworkedItem");
+                            return;
+                        }
+
+                        responsePacket.ItemNetID = item.NetId;
                         responsePacket.Accepted = true;
+
                         networkedJob.OwnedBy = player.Guid;
                         networkedJob.playerID = peer.Id;
-                        
+                        Log($"OnServerboundJobValidateRequestPacket({networkedJob.Job?.ID}) JobState: {networkedJob.Job.State}, ACCEPTED");
                     }
                     else
                     {

@@ -5,4 +5,5 @@ public class ClientboundJobValidateResponsePacket
 {
     public ushort JobNetId { get; set; }
     public bool Accepted { get; set; }
+    public ushort ItemNetID { get; set; }
 }

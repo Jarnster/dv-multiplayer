@@ -22,7 +22,7 @@ public static class JobOverview_Patch
     [HarmonyPostfix]
     private static void Start(JobOverview __instance)
     {
-        if(!NetworkedJob.TryGetFromJob(__instance.job, out NetworkedJob networkedJob))
+        if (!NetworkedJob.TryGetFromJob(__instance.job, out NetworkedJob networkedJob))
         {
             Multiplayer.LogError($"JobOverview.Start() NetworkedJob not found for Job ID: {__instance.job?.ID}");
             __instance.DestroyJobOverview();

@@ -18,33 +18,12 @@ public static class JobValidator_Patch
 {
     [HarmonyPatch(nameof(JobValidator.Start))]
     [HarmonyPostfix]
-    private static void Start_Postfix(JobValidator __instance)
+    private static void Start(JobValidator __instance)
     {
-
-        string stationName = __instance.transform.parent.name ?? "";
-
-        if (string.IsNullOrEmpty(stationName))
-        {
-            Multiplayer.LogError($"JobValidator.Start() Can not find parent's name");
-            return;
-        }
-
-        stationName += "_office_anchor";
-
-        StationController[] stations = StationController.allStations.Where(s => s.transform.parent.name.Equals(stationName,StringComparison.OrdinalIgnoreCase)).ToArray();
-
-        if (stations.Length == 1)
-        {
-            if(!NetworkedStationController.GetFromStationController(stations.First(), out NetworkedStationController networkedStationController))
-                Multiplayer.LogError($"JobValidator.Start() Could not find NetworkedStation for validator: {stationName}");
-            else
-                NetworkedStationController.RegisterJobValidator(__instance, networkedStationController);
-        }
-        else
-        {
-            Multiplayer.LogError($"JobValidator.Start() Found {stations.Length} stations for {stationName}");
-        }
+        Multiplayer.Log($"JobValidator Awake!");
+        NetworkedStationController.QueueJobValidator(__instance);
     }
+
 
     [HarmonyPatch(nameof(JobValidator.ProcessJobOverview))]
     [HarmonyPrefix]
@@ -67,32 +46,14 @@ public static class JobValidator_Patch
             return false;
         }
 
-        if(networkedJob.ValidatorRequestSent)
-        {
-            if (networkedJob.ValidatorResponseReceived && networkedJob.ValidationAccepted)
-                return true;
-        }
+        if (networkedJob.ValidatorRequestSent)
+            return (networkedJob.ValidatorResponseReceived && networkedJob.ValidationAccepted);         
         else
-        {
-            if(NetworkedStationController.GetFromJobValidator(__instance, out NetworkedStationController networkedStation))
-            {
-                //Set initial job state parameters
-                networkedJob.ValidatorRequestSent = true;
-                networkedJob.ValidatorResponseReceived = false;
-                networkedJob.ValidationAccepted = false;
-
-                NetworkLifecycle.Instance.Client.SendJobValidateRequest(networkedJob.NetId, networkedStation.NetId, ValidationType.JobOverview);
-                CoroutineManager.Instance.StartCoroutine(AwaitResponse(__instance, networkedJob, ValidationType.JobOverview));
-            }
-            else
-            {
-                NetworkLifecycle.Instance.Client.LogError($"ProcessJobOverview_Prefix({jobOverview?.job?.ID}) Failed to find NetworkedStation");
-                __instance.bookletPrinter.PlayErrorSound();
-            }
-        }
+            SendValidationRequest(__instance, networkedJob, ValidationType.JobOverview);
 
         return false;
     }
+
 
     [HarmonyPatch(nameof(JobValidator.ValidateJob))]
     [HarmonyPrefix]
@@ -116,34 +77,35 @@ public static class JobValidator_Patch
         }
 
         if (networkedJob.ValidatorRequestSent)
-        {
-            if (networkedJob.ValidatorResponseReceived && networkedJob.ValidationAccepted)
-                return true;
-        }
+            return (networkedJob.ValidatorResponseReceived && networkedJob.ValidationAccepted);
         else
-        {
-            //find the current station we're at
-            if (NetworkedStationController.GetFromJobValidator(__instance, out NetworkedStationController networkedStation))
-            {
-                //Set initial job state parameters
-                networkedJob.ValidatorRequestSent = true;
-                networkedJob.ValidatorResponseReceived = false;
-                networkedJob.ValidationAccepted = false;
-
-                NetworkLifecycle.Instance.Client.SendJobValidateRequest(networkedJob.NetId, networkedStation.NetId, ValidationType.JobBooklet);
-                CoroutineManager.Instance.StartCoroutine(AwaitResponse(__instance, networkedJob, ValidationType.JobBooklet));
-            }
-            else
-            {
-                NetworkLifecycle.Instance.Client.LogError($"ValidateJob({jobBooklet?.job?.ID}) Failed to find NetworkedStation");
-                __instance.bookletPrinter.PlayErrorSound();
-            }
-        }
+            SendValidationRequest(__instance, networkedJob, ValidationType.JobBooklet);
 
         return false;
     }
 
-    private static IEnumerator AwaitResponse(JobValidator validator, NetworkedJob networkedJob, ValidationType type)
+    private static void SendValidationRequest(JobValidator validator,NetworkedJob netJob, ValidationType type)
+    {
+        //find the current station we're at
+        if (NetworkedStationController.GetFromJobValidator(validator, out NetworkedStationController networkedStation))
+        {
+            //Set initial job state parameters
+            netJob.ValidatorRequestSent = true;
+            netJob.ValidatorResponseReceived = false;
+            netJob.ValidationAccepted = false;
+            netJob.JobValidator = validator;
+            netJob.ValidationType = type;
+
+            NetworkLifecycle.Instance.Client.SendJobValidateRequest(netJob, networkedStation);
+            CoroutineManager.Instance.StartCoroutine(AwaitResponse(validator, netJob));
+        }
+        else
+        {
+            NetworkLifecycle.Instance.Client.LogError($"SendValidation({netJob?.Job?.ID}, {type}) Failed to find NetworkedStation");
+            validator.bookletPrinter.PlayErrorSound();
+        }
+    }
+    private static IEnumerator AwaitResponse(JobValidator validator, NetworkedJob networkedJob)
     {
         yield return new WaitForSecondsRealtime(NetworkLifecycle.Instance.Client.Ping * 2);
 
@@ -154,18 +116,5 @@ public static class JobValidator_Patch
             validator.bookletPrinter.PlayErrorSound();
             yield break;
         }
-
-        switch (type)
-        {
-            case ValidationType.JobOverview:
-                validator.ProcessJobOverview(networkedJob.JobOverview);
-                break;
-
-            case ValidationType.JobBooklet:
-                validator.ValidateJob(networkedJob.JobBooklet);
-                break;
-        }
-
-
     }
 }

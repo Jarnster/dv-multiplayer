@@ -20,7 +20,7 @@ public class JobData
     public float InitialWage { get; set; }
     public JobState State { get; set; } //serialise as byte
     public float TimeLimit { get; set; }
-    public Guid OwnedBy { get; set; }
+    public int PlayerId { get; set; }
 
     public static JobData FromJob(NetworkedJob networkedJob)
     {
@@ -39,7 +39,7 @@ public class JobData
             InitialWage = job.initialWage,
             State = job.State,
             TimeLimit = job.TimeLimit,
-            OwnedBy = networkedJob.OwnedBy
+            PlayerId = networkedJob.playerID
         };
     }
 
@@ -83,6 +83,8 @@ public class JobData
         //Take on the GUID of the player
         //if(data.State != JobState.Available)
         //    writer.Put(data.OwnedBy.ToByteArray());
+
+        writer.Put(data.PlayerId);
     }
 
     public static JobData Deserialize(NetDataReader reader)
@@ -125,7 +127,8 @@ public class JobData
         float timeLimit = reader.GetFloat();
         //Multiplayer.Log("JobData.Deserialize() timeLimit: " + timeLimit);
 
-        //Guid ownedBy =  (state != JobState.Available)? new(reader.GetBytesWithLength()) : Guid.Empty;
+        //int playerId =  (state != JobState.Available)? new(reader.GetBytesWithLength()) : Guid.Empty;
+        int playerId = reader.GetInt();
 
         return new JobData
         {
@@ -140,7 +143,7 @@ public class JobData
             InitialWage = initialWage,
             State = state,
             TimeLimit = timeLimit,
-            //OwnedBy = ownedBy,
+            PlayerId = playerId,
         };
     }
 

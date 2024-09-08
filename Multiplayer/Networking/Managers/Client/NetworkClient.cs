@@ -755,6 +755,22 @@ public class NetworkClient : NetworkManager
 
         networkedJob.ValidatorResponseReceived = true;
         networkedJob.ValidationAccepted = packet.Accepted;
+
+        switch (networkedJob.ValidationType)
+        {
+            case ValidationType.JobOverview:
+                networkedJob.JobValidator.ProcessJobOverview(networkedJob.JobOverview);
+                break;
+
+            case ValidationType.JobBooklet:
+                networkedJob.JobValidator.ValidateJob(networkedJob.JobBooklet);
+                break;
+        }
+
+        if(networkedJob.ValidationItem != null)
+            networkedJob.ValidationItem.NetId = packet.ItemNetID;
+        else
+            LogError($"OnClientboundJobValidateResponsePacket() {packet.JobNetId}, ValidationItem not found!");
     }
     
     #endregion
@@ -1039,14 +1055,16 @@ public class NetworkClient : NetworkManager
         }, DeliveryMethod.ReliableUnordered);
     }
 
-    public void SendJobValidateRequest(ushort jobNetId, ushort stationNetId, ValidationType type)
+    public void SendJobValidateRequest(NetworkedJob job, NetworkedStationController station)
     {
+        /* disabled for stable release
         SendPacketToServer(new ServerboundJobValidateRequestPacket
         {
-            JobNetId = jobNetId,
-            StationNetId = stationNetId,
-            validationType = type
+            JobNetId = job.NetId,
+            StationNetId = station.NetId,
+            validationType = job.ValidationType
         }, DeliveryMethod.ReliableUnordered);
+        */
     }
 
     public void SendChat(string message)

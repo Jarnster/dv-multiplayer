@@ -3,8 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using DV.Logic.Job;
-using Multiplayer.Components.Networking.Train;
 using Multiplayer.Components.Networking.World;
+using Multiplayer.Networking.Packets.Clientbound.Jobs;
 using UnityEngine;
 
 
@@ -33,15 +33,21 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
     }
 
 
-    public static NetworkedJob GetFromJob(Job job)
-    {
-        return jobToNetworkedJob[job];
-    }
+    //public static NetworkedJob GetFromJob(Job job)
+    //{
+    //    return jobToNetworkedJob[job];
+    //}
 
     public static bool TryGetFromJob(Job job, out NetworkedJob networkedJob)
     {
         return jobToNetworkedJob.TryGetValue(job, out networkedJob);
     }
+
+    public static bool TryGetFromJobId(string jobId, out NetworkedJob networkedJob)
+    {
+        return jobIdToNetworkedJob.TryGetValue(jobId, out networkedJob);
+    }
+
     #endregion
     protected override bool IsIdServerAuthoritative => true;
 
@@ -53,14 +59,16 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
     public Guid OwnedBy = Guid.Empty; //GUID of player who took the job (sever only)
     public int playerID;              //ID of player who took the job (client & server)
 
-    public JobValidator jobValidator; //Job validator to print the booklet/job validation at (client only)
+    public JobValidator JobValidator; //Job validator to print the booklet/job validation at (client only)
     public bool ValidatorRequestSent = false;
     public bool ValidatorResponseReceived = false;
     public bool ValidationAccepted = false;
- 
+    public ValidationType ValidationType;
+    public NetworkedItem ValidationItem;
+
     #region Client
 
-  
+
 
     #endregion
 

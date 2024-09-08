@@ -1,5 +1,7 @@
+using DV.Logic.Job;
 using HarmonyLib;
 using Multiplayer.Components.Networking.Jobs;
+using Multiplayer.Components.Networking.World;
 
 
 namespace Multiplayer.Patches.Jobs;
@@ -7,17 +9,19 @@ namespace Multiplayer.Patches.Jobs;
 [HarmonyPatch(typeof(JobBooklet))]
 public static class JobBooklet_Patch
 {
-    [HarmonyPatch(nameof(JobBooklet.Awake))]
+    [HarmonyPatch(nameof(JobBooklet.AssignJob))]
     [HarmonyPostfix]
-    private static void Awake(JobBooklet __instance)
+    private static void AssignJob(JobBooklet __instance, Job jobToAssign)
     {
-        if(!NetworkedJob.TryGetFromJob(__instance.job, out NetworkedJob networkedJob))
+        if (!NetworkedJob.TryGetFromJob(__instance.job, out NetworkedJob networkedJob))
         {
-            Multiplayer.LogError($"JobBooklet.Awake() NetworkedJob not found for Job ID: {__instance.job?.ID}");
+            Multiplayer.LogError($"JobBooklet.AssignJob() NetworkedJob not found for Job ID: {__instance.job?.ID}");
             return;
         }
 
         networkedJob.JobBooklet = __instance;
+        if(networkedJob.TryGetComponent(out NetworkedItem netItem))
+            networkedJob.ValidationItem = netItem;
     }
 
 

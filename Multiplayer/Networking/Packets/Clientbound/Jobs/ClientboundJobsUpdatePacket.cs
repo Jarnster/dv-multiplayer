@@ -1,49 +1,49 @@
-using System;
-using System.Collections.Generic;
 using DV.ThingTypes;
 using LiteNetLib.Utils;
-using Multiplayer.Components.Networking.Jobs;
-using Multiplayer.Networking.Data;
+
 namespace Multiplayer.Networking.Packets.Clientbound.Jobs;
 
-public struct JobUpdateStruct : INetSerializable
+public struct JobUpdateStruct
 {
     public ushort JobNetID;
     public bool Invalid;
     public JobState JobState;
     public float StartTime;
     public float FinishTime;
-    public Guid OwnedBy;
+    public ushort OwnedBy;
 
-    public void Serialize(NetDataWriter writer)
+    public static void Serialize(NetDataWriter writer, JobUpdateStruct data)
     {
-        writer.Put(JobNetID);
-        writer.Put(Invalid);
+        writer.Put(data.JobNetID);
+        writer.Put(data.Invalid);
 
         //Invalid jobs will be deleted / deregistered
-        if (Invalid)
+        if (data.Invalid)
             return;
 
-        writer.Put((byte)JobState);
-        writer.Put(StartTime);
-        writer.Put(FinishTime);
+        writer.Put((byte)data.JobState);
+        writer.Put(data.StartTime);
+        writer.Put(data.FinishTime);
 
-        if(JobState == JobState.InProgress)
-            writer.Put(OwnedBy.ToByteArray());
+        writer.Put(data.OwnedBy);
     }
 
-    public void Deserialize(NetDataReader reader)
+    public static JobUpdateStruct Deserialize(NetDataReader reader)
     {
-        JobNetID = reader.GetUShort();
-        Invalid = reader.GetBool();
+        JobUpdateStruct deserialised = new JobUpdateStruct();
 
-        if (Invalid)
-            return;
+        deserialised.JobNetID = reader.GetUShort();
+        deserialised.Invalid = reader.GetBool();
 
-        JobState = (JobState) reader.GetByte();
-        StartTime = reader.GetFloat();
-        FinishTime = reader.GetFloat();
-        OwnedBy = (JobState == JobState.InProgress) ? new(reader.GetBytesWithLength()) : Guid.Empty;
+        if (deserialised.Invalid)
+            return deserialised;
+
+        deserialised.JobState = (JobState) reader.GetByte();
+        deserialised.StartTime = reader.GetFloat();
+        deserialised.FinishTime = reader.GetFloat();
+        deserialised.OwnedBy = reader.GetUShort();
+
+        return deserialised;
     }
 }
 public class ClientboundJobsUpdatePacket
