@@ -407,6 +407,9 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             return;
         sendCables = false;
 
+        if(TrainCar.muModule == null)
+            return;
+
         if (TrainCar.muModule.frontCable.IsConnected)
             NetworkLifecycle.Instance.Client.SendMuConnected(TrainCar.muModule.frontCable, TrainCar.muModule.frontCable.connectedTo, false);
 
