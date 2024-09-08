@@ -14,7 +14,7 @@ public class Settings : UnityModManager.ModSettings, IDrawable
 
     public static Action<Settings> OnSettingsUpdated;
 
-    public int SettingsVer = 0;
+    public int SettingsVer = 1;
 
     [Header("Player")]
     [Draw("Username", Tooltip = "Your username in-game")]
@@ -41,7 +41,7 @@ public class Settings : UnityModManager.ModSettings, IDrawable
     [Draw("Lobby Server address", Tooltip = "Address of lobby server for finding multiplayer games")]
     public string LobbyServerAddress = "https://dv.mineit.space";//"http://localhost:8080";
     [Draw("IPv4 Check Address", Tooltip = "Do not modify unless the service is unavailable")]
-    public string Ipv4AddressCheck = "http://checkip.dyndns.org";
+    public string Ipv4AddressCheck = "https://api.ipify.org/";
     [Header("Last Server Connected to by IP")]
     [Draw("Last Remote IP", Tooltip = "The IP for the last server connected to by IP.")]
     public string LastRemoteIP = "";
@@ -154,6 +154,10 @@ public class Settings : UnityModManager.ModSettings, IDrawable
                     data.LobbyServerAddress = new Settings().LobbyServerAddress;
 
                 MigrateSettings(ref data);
+                break;
+            case 1:
+                if (data.Ipv4AddressCheck == "http://checkip.dyndns.org")
+                    data.Ipv4AddressCheck = new Settings().Ipv4AddressCheck;
                 break;
 
             default:

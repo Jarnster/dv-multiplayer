@@ -20,7 +20,7 @@ public class LobbyServerManager : MonoBehaviour
     private const string ENDPOINT_REMOVE_SERVER = "remove_game_server";
 
     //RegEx
-    private readonly Regex IPv4Match = new Regex(@"\b(?:(?:2[0-5]{2}|1[0-9]{2}|[1-9]?[0-9])\.){3}(?:2[0-5]{2}|1[0-9]{2}|[1-9]?[0-9])\b");
+    private readonly Regex IPv4Match = new Regex(@"(\b25[0-5]|\b2[0-4][0-9]|\b[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}");
 
     private const int REDIRECT_MAX = 5;
 
@@ -50,7 +50,6 @@ public class LobbyServerManager : MonoBehaviour
     {
         server.serverData.ipv6 = GetStaticIPv6Address();
         StartCoroutine(GetIPv4(Multiplayer.Settings.Ipv4AddressCheck));
-
         yield return new WaitUntil(() => initialised);
 
         Multiplayer.Log("Public IPv4: " + server.serverData.ipv4);
@@ -172,9 +171,8 @@ public class LobbyServerManager : MonoBehaviour
  
         Multiplayer.Log("Preparing to get IPv4: " + uri);
 
-        yield return SendWebRequest(
+        yield return SendWebRequestGET(
             uri,
-            string.Empty,
             webRequest =>
             {
                 Match match = IPv4Match.Match(webRequest.downloadHandler.text);
@@ -228,6 +226,48 @@ public class LobbyServerManager : MonoBehaviour
                 if (redirectUrl != null && redirectUrl.StartsWith("https://") && redirectUrl.Replace("https://", "http://") == uri)
                 {
                     yield return SendWebRequest(redirectUrl, json, onSuccess, onError, ++depth);
+                }
+            }
+            else
+            {
+                if (webRequest.isNetworkError || webRequest.isHttpError)
+                {
+                    Multiplayer.LogError($"Error: {webRequest.error}\r\n{webRequest.downloadHandler.text}");
+                    onError?.Invoke(webRequest);
+                }
+                else
+                {
+                    Multiplayer.Log($"Received: {webRequest.downloadHandler.text}");
+                    onSuccess?.Invoke(webRequest);
+                }
+            }
+        }
+    }
+
+    private IEnumerator SendWebRequestGET(string uri, Action<UnityWebRequest> onSuccess, Action<UnityWebRequest> onError, int depth = 0)
+    {
+        if (depth > REDIRECT_MAX)
+        {
+            Multiplayer.LogError($"Reached maximum redirects: {uri}");
+            yield break;
+        }
+
+        using (UnityWebRequest webRequest = UnityWebRequest.Get(uri))
+        {
+            webRequest.redirectLimit = 0;
+            webRequest.downloadHandler = new DownloadHandlerBuffer();
+
+            yield return webRequest.SendWebRequest();
+
+            //check for redirect
+            if (webRequest.responseCode >= 300 && webRequest.responseCode < 400)
+            {
+                string redirectUrl = webRequest.GetResponseHeader("Location");
+                Multiplayer.LogWarning($"Lobby Server redirected, check address is up to date: '{redirectUrl}'");
+
+                if (redirectUrl != null && redirectUrl.StartsWith("https://") && redirectUrl.Replace("https://", "http://") == uri)
+                {
+                    yield return SendWebRequestGET(redirectUrl, onSuccess, onError, ++depth);
                 }
             }
             else
