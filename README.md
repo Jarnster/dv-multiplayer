@@ -112,4 +112,4 @@ See [LICENSE][license-url] for more information.
 [contributing-quickstart-url]: https://docs.github.com/en/get-started/quickstart/contributing-to-projects
 [asset-studio-url]: https://github.com/Perfare/AssetStudio
 [mapify-building-docs]: https://dv-mapify.readthedocs.io/en/latest/contributing/building/
-[project-board-url]: https://github.com/users/Insprill/projects/8
+[project-board-url]: https://github.com/users/AMacro/projects/2
