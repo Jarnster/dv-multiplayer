@@ -37,7 +37,11 @@
   </ol>
 </details>
 
+# Important!
+At present, assume all other mods are incompatible!
+Some mods may work, but many do cause issues and break multiplayer capabilities.
 
+Our primary focus is to have the vanilla game working in multiplayer; once this is achieved we will then work on compatibility with other mods.
 
 
 <!-- ABOUT THE PROJECT -->
