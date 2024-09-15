@@ -90,7 +90,7 @@ public abstract class NetworkManager : INetEventListener, INatPunchListener
         peer?.Send(WritePacket(packet), deliveryMethod);
     }
      
-    protected void SendUnconnnectedPacket<T>(T packet, string ipAddress, int port) where T : class, new()
+    protected void SendUnconnectedPacket<T>(T packet, string ipAddress, int port) where T : class, new()
     {
         netManager.SendUnconnectedMessage(WritePacket(packet), ipAddress, port);
     }
@@ -101,6 +101,7 @@ public abstract class NetworkManager : INetEventListener, INatPunchListener
 
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
+        Log($"NetworkManager.OnNetworkReceive()");
         try
         {
             IsProcessingPacket = true;

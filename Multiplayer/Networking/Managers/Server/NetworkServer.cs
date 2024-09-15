@@ -1003,7 +1003,7 @@ public class NetworkServer : NetworkManager
     private void OnUnconnectedPingPacket(UnconnectedPingPacket packet, IPEndPoint endPoint)
     {
         Multiplayer.Log($"OnUnconnectedPingPacket({endPoint.Address})");
-        SendUnconnnectedPacket(packet, endPoint.Address.ToString(),endPoint.Port);
+        SendUnconnectedPacket(packet, endPoint.Address.ToString(),endPoint.Port);
     }
     #endregion
 }

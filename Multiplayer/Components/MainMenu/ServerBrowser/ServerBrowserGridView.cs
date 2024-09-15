@@ -13,7 +13,7 @@ namespace Multiplayer.Components.MainMenu
     public class ServerBrowserGridView : AGridView<IServerBrowserGameDetails>
     {
          
-        private void Awake()
+        protected override void Awake()
         {
             Multiplayer.Log("serverBrowserGridview Awake()");
 
@@ -34,6 +34,11 @@ namespace Multiplayer.Components.MainMenu
             this.viewElementPrefab.SetActive(true);
             this.dummyElementPrefab.SetActive(true);
 
+        }
+
+        public ServerBrowserElement GetElementAt(int index)
+        {
+            return transform.GetChild(index + indexOffset).GetComponent<ServerBrowserElement>();
         }
     }
 }

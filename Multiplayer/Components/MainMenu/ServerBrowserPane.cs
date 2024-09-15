@@ -17,15 +17,46 @@ using Multiplayer.Networking.Data;
 using DV;
 using System.Net;
 using LiteNetLib;
-using LiteNetLib.Utils;
 using Multiplayer.Networking.Listeners;
 using System.Collections.Generic;
-using System.Timers;
 
 namespace Multiplayer.Components.MainMenu
 {
     public class ServerBrowserPane : MonoBehaviour
     {
+        private class PingRecord
+        {
+            public int ping1;
+            public int ping2;
+            int received;
+
+            public PingRecord()
+            {
+                ping1 = -1;
+                ping2 = -1;
+            }
+
+            public int Avg()
+            {
+                Multiplayer.Log($"Avg() {ping1}, {ping2}");
+
+                if (received >= 2 && ping1 >-1 && ping2 > -1)
+                    return (ping1 + ping2) / 2;
+                else
+                    return Math.Max(ping1, ping2);
+            }
+
+            public void AddPing(int ping)
+            {
+                Multiplayer.Log($"AddPing() ping1 {ping1}, ping2 {ping2}, new {ping}, {received}");
+                ping1 = ping2;
+                ping2 = ping;
+
+                if(received < 2)
+                    received++;
+            }
+        }
+
         // Regular expressions for IP and port validation
         // @formatter:off
         // Patterns from https://ihateregex.io/
@@ -44,6 +75,15 @@ namespace Multiplayer.Components.MainMenu
         private ScrollRect parentScroller;
         private string serverIDOnRefresh;
         private IServerBrowserGameDetails selectedServer;
+
+        //ping tracking
+        private List<IServerBrowserGameDetails> serversToPing = new List<IServerBrowserGameDetails>();
+        private Dictionary<string, (PingRecord IPv4Ping, PingRecord IPv6Ping)> serverPings = new Dictionary<string, (PingRecord, PingRecord)>();
+
+        private float pingTimer = 0f;
+        private const float PING_INTERVAL = 30f; // base interval to refresh all pings
+        private const float PING_BATCH_INTERVAL = 0.5f; //gap bwetween ping batches
+        private const int SERVERS_PER_BATCH = 10;
 
         //Button variables
         private ButtonDV buttonJoin;
@@ -98,11 +138,6 @@ namespace Multiplayer.Components.MainMenu
             SetupServerBrowser();
             //FillDummyServers();
             RefreshAction();
-
-            //Start Server
-            serverBrowserClient = new ServerBrowserClient(Multiplayer.Settings);
-            serverBrowserClient.OnPing += this.OnPing;
-            serverBrowserClient.Start();
         }
 
         private void OnEnable()
@@ -119,12 +154,24 @@ namespace Multiplayer.Components.MainMenu
 
             buttonDirectIP.ToggleInteractable(true);
             buttonRefresh.ToggleInteractable(true);
+
+            //Start the server browser network client
+            serverBrowserClient = new ServerBrowserClient(Multiplayer.Settings);
+            serverBrowserClient.OnPing += this.OnPing;
+            serverBrowserClient.Start();
         }
 
         // Disable listeners
         private void OnDisable()
         {
             this.SetupListeners(false);
+
+            if (serverBrowserClient != null)
+            {
+                serverBrowserClient.OnPing -= this.OnPing;
+                serverBrowserClient.Stop();
+                serverBrowserClient = null;
+            }
         }
 
         private void OnDestroy()
@@ -135,7 +182,11 @@ namespace Multiplayer.Components.MainMenu
 
         private void Update()
         {
-            
+            //Poll for any LAN discovery or ping packets
+            if (serverBrowserClient != null)
+                serverBrowserClient.PollEvents();
+
+            //Handle server refresh interval
             timePassed += Time.deltaTime;
 
             if (autoRefresh && !serverRefreshing)
@@ -148,6 +199,15 @@ namespace Multiplayer.Components.MainMenu
                 {
                     buttonRefresh.ToggleInteractable(true);
                 }
+            }
+
+            //Handle pinging servers
+            pingTimer += Time.deltaTime;
+
+            if (pingTimer >= (serversToPing.Count > 0 ? PING_BATCH_INTERVAL : GetPingInterval()))
+            {
+                PingNextBatch();
+                pingTimer = 0f;
             }
         }
 
@@ -325,9 +385,7 @@ namespace Multiplayer.Components.MainMenu
             {
                 this.gridView.SelectedIndexChanged -= this.IndexChanged;
             }
-
         }
-
         #endregion
 
         #region UI callbacks
@@ -415,6 +473,19 @@ namespace Multiplayer.Components.MainMenu
             }
         }
 
+        private void UpdateElement(IServerBrowserGameDetails element)
+        {
+            int index = gridViewModel.IndexOf(element);
+
+            if (index >= 0)
+            {
+                var viewElement = gridView.GetElementAt(index);
+                if (viewElement != null)
+                {
+                    viewElement.UpdateView();
+                }
+            }
+        }
         #endregion
 
         private void UpdateDetailsPane()
@@ -629,7 +700,6 @@ namespace Multiplayer.Components.MainMenu
             };
             
         }
-
         private void AttemptConnection()
         {
 
@@ -690,7 +760,6 @@ namespace Multiplayer.Components.MainMenu
             SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, OnDisconnect);
 
         }
-
         private void AttemptIPv6Punch()
         {
             Multiplayer.Log($"AttemptIPv6Punch() {address}");
@@ -707,7 +776,6 @@ namespace Multiplayer.Components.MainMenu
             SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, password, false, OnDisconnect);
  
         }
-
         private void AttemptIPv4()
         {
             Multiplayer.Log($"AttemptIPv4() {address}, {connectionState}");
@@ -781,7 +849,6 @@ namespace Multiplayer.Components.MainMenu
             if(buttonDirectIP != null)
                 buttonDirectIP.ToggleInteractable(true);
         }
-
 
         private void OnDisconnect(DisconnectReason reason, string message)
         {
@@ -895,9 +962,43 @@ namespace Multiplayer.Components.MainMenu
                     {
                         gridView.showDummyElement = false;
                     }
-                    gridViewModel.Clear();
+
+                    bool startPing = gridViewModel.Count == 0;
+
+
+                    //Get Server update lists
+                    List<IServerBrowserGameDetails> serversClosed = gridViewModel.Where(element => !response.Any(resp => resp.id == element.id)).ToList();
+                    List<(IServerBrowserGameDetails, LobbyServerData)> serversUpdate = gridViewModel.Join(
+                                                                                                            response,
+                                                                                                            element => element.id,
+                                                                                                            resp => resp.id,
+                                                                                                            (element, resp) => (element, resp)
+                                                                                                          ).ToList();
+                    LobbyServerData[] serversNew = response.Where(element => !gridViewModel.Any(resp => resp.id == element.id)).ToArray();
+
+                    Multiplayer.Log($"servers closed: {serversClosed.Count()}, servers new: {serversNew.Count()}, servers update: {serversUpdate.Count()}");
+
+                    //Remove expired
+                    foreach(IServerBrowserGameDetails server in serversClosed)
+                    {
+                        if(serverPings.ContainsKey(server.id))
+                            serverPings.Remove(server.id);
+
+                        gridViewModel.Remove(server);
+                    }
+
+                    //Add new servers
+                    gridViewModel.AddRange(serversNew);
+
+                    //Update existing servers
+                    foreach((IServerBrowserGameDetails, LobbyServerData) server in serversUpdate)
+                    {
+                        server.Item1.TimePassed = server.Item2.TimePassed;
+                        server.Item1.CurrentPlayers = server.Item2.CurrentPlayers;
+                    }
+
+                    //Update the gridview rendering
                     gridView.SetModel(gridViewModel);
-                    gridViewModel.AddRange(response);
 
                     //if we have a server selected, we need to re-select it after refresh
                     if (serverIDOnRefresh != null)
@@ -912,12 +1013,14 @@ namespace Multiplayer.Components.MainMenu
                                 this.parentScroller.verticalNormalizedPosition = 1f - (float)selID / (float)gridView.Model.Count;
                             }
                         }
-
                         serverIDOnRefresh = null;
                     }
 
-                    
+                    //trigger ping to start
+                    if (startPing)
+                        PingNextBatch();
                 }
+
             }
 
             serverRefreshing = false;
@@ -930,33 +1033,6 @@ namespace Multiplayer.Components.MainMenu
                 button.SetActive(true);
             }
         }
-
-        //private void FillDummyServers()
-        //{
-        //    gridView.showDummyElement = false;
-        //    gridViewModel.Clear();
-
-
-        //    IServerBrowserGameDetails item = null;
-
-        //    for (int i = 0; i < UnityEngine.Random.Range(1, 50); i++)
-        //    {
-
-        //        item = new LobbyServerData();
-        //        item.Name = testNames[UnityEngine.Random.Range(0, testNames.Length - 1)];
-        //        item.MaxPlayers = UnityEngine.Random.Range(1, 10);
-        //        item.CurrentPlayers = UnityEngine.Random.Range(1, item.MaxPlayers);
-        //        item.Ping = UnityEngine.Random.Range(5, 1500);
-        //        item.HasPassword = UnityEngine.Random.Range(0, 10) > 5;
-
-        //        item.GameVersion = UnityEngine.Random.Range(1, 10) > 3 ? BuildInfo.BUILD_VERSION_MAJOR.ToString() : "97";
-        //        item.MultiplayerVersion = UnityEngine.Random.Range(1, 10) > 3 ? Multiplayer.Ver : "0.1.0";
-
-        //        gridViewModel.Add(item);
-        //    }
-
-        //    gridView.SetModel(gridViewModel);
-        //}
 
         private string ExtractDomainName(string input)
         {
@@ -978,17 +1054,74 @@ namespace Multiplayer.Components.MainMenu
             return input;
         }
 
-        private void OnPing(string serverId, int ping, bool isIPv4, bool isIPv6)
+        #region Network Utils
+        private void OnPing(string serverId, int ping, bool isIPv4)
         {
-            Multiplayer.Log($"ServerBrowser.OnPing({serverId}, {ping} ms, IPv4 {isIPv4}, IPv6 {isIPv6} )");
-        }
+            Multiplayer.Log($"OnPing() Ping: {ping}, {(isIPv4?"IPv4" : "IPv6")}");
 
-        private void SendPing()
-        {
-            if (selectedServer != null)
+            if (!serverPings.ContainsKey(serverId))
+                serverPings[serverId] = (new PingRecord(), new PingRecord());
+
+            if (isIPv4)
+                serverPings[serverId].IPv4Ping.AddPing(ping);
+            else
+                serverPings[serverId].IPv6Ping.AddPing(ping);
+
+            var server = gridViewModel.FirstOrDefault(s => s.id == serverId);
+            if (server != null)
             {
-                serverBrowserClient.SendUnconnectedPingPacket(selectedServer.id, selectedServer.ipv4, selectedServer.ipv6, selectedServer.port);
+                server.Ping = GetBestPing(serverPings[serverId].IPv4Ping.Avg(), serverPings[serverId].IPv6Ping.Avg());
+                UpdateElement(server);
             }
         }
+        private void SendPing(IServerBrowserGameDetails server)
+        {
+            serverBrowserClient.SendUnconnectedPingPacket(server.id, server.ipv4, server.ipv6, server.port);
+        }
+
+        private float GetPingInterval() 
+        {
+            int serverCount = gridViewModel.Count;
+            if (serverCount < 10) return PING_INTERVAL;
+            if (serverCount < 50) return PING_INTERVAL * 2;
+            if (serverCount < 100) return PING_INTERVAL * 4;
+            return PING_INTERVAL * 10;
+        }
+
+        private void PingNextBatch()
+        {
+            if (serversToPing.Count == 0)
+            {
+                serversToPing.AddRange(gridViewModel);
+            }
+
+            var batch = serversToPing.Take(SERVERS_PER_BATCH).ToList();
+            foreach (var server in batch)
+            {
+                SendPing(server);
+            }
+            serversToPing.RemoveRange(0, batch.Count);
+
+            if (serversToPing.Count == 0)
+                pingTimer = 0;  //Get ready to start from the beginning
+        }
+
+        private int GetBestPing(int ipv4Ping, int ipv6Ping)
+        {
+            if (ipv4Ping > -1 && ipv6Ping > -1)
+            {
+                return Math.Min(ipv4Ping, ipv6Ping);
+            }
+            else if (ipv4Ping > -1)
+            {
+                return ipv4Ping;
+            }
+            else if (ipv6Ping > -1)
+            {
+                return ipv6Ping;
+            }
+            return -1; // No ping available
+        }
+        #endregion
     }
 }

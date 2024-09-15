@@ -1,6 +1,5 @@
 using DV.UIFramework;
 using Multiplayer.Utils;
-using System.ComponentModel;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -19,7 +18,7 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
         private const int PING_WIDTH = 124; // Adjusted width for the ping text
         private const int PING_POS_X = 650; // X position for the ping text
 
-        private void Awake()
+        protected override void Awake()
         {
             // Find and assign TextMeshProUGUI components for displaying server details
             networkName = this.FindChildByName("name [noloc]").GetComponent<TextMeshProUGUI>();
@@ -62,17 +61,34 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
             UpdateView();
         }
 
-        private void UpdateView(object sender = null, PropertyChangedEventArgs e = null)
+        public void UpdateView()
         {
             // Update the text fields with the data from the server
             networkName.text = data.Name;
             playerCount.text = $"{data.CurrentPlayers} / {data.MaxPlayers}";
-            ping.text = $"{data.Ping} ms";
+            ping.text = $"<color={GetColourForPing(data.Ping)}>{(data.Ping < 0 ? "?" : data.Ping)} ms</color>";
 
             // Hide the icon if the server does not have a password
             if (!data.HasPassword)
             {
                 goIcon.SetActive(false);
+            }
+        }
+
+        private string GetColourForPing(int ping)
+        {
+            switch (ping)
+            {
+                case -1:
+                    return "#808080";  // Mid-range gray for unknown
+                case < 60:
+                    return "#00ff00";  // Bright green for excellent ping
+                case < 100:
+                    return "#ffa500";  // Orange for good ping
+                case < 150:
+                    return "#ff4500";  // OrangeRed for high ping
+                default:
+                    return "#ff0000";  // Red for don't even bother
             }
         }
     }
