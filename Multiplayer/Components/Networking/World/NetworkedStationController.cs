@@ -105,7 +105,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
     private List<NetworkedJob> NewJobs = new List<NetworkedJob>();
     private List<NetworkedJob> DirtyJobs = new List<NetworkedJob>();
 
-    private void Awake()
+    protected override void Awake()
     {
         base.Awake();
         StationController = GetComponent<StationController>();

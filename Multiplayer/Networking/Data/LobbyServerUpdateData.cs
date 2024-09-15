@@ -1,6 +1,5 @@
 using Newtonsoft.Json;
 
-
 namespace Multiplayer.Networking.Data
 {
     public class LobbyServerUpdateData

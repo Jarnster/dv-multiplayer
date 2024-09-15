@@ -12,15 +12,8 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
     public class ServerBrowserDummyElement : AViewElement<IServerBrowserGameDetails>
     {
         private TextMeshProUGUI networkName;
-        private TextMeshProUGUI playerCount;
-        private TextMeshProUGUI ping;
-        private GameObject goIcon;
-        private Image icon;
-        private IServerBrowserGameDetails data;
 
-
-
-        private void Awake()
+        protected override void Awake()
         {
             // Find and assign TextMeshProUGUI components for displaying server details
             GameObject networkNameGO = this.FindChildByName("name [noloc]");

@@ -1,11 +1,3 @@
-using Multiplayer.Components.MainMenu;
-using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
 namespace Multiplayer.Networking.Data
 {
     public class LobbyServerResponseData
