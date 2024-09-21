@@ -1001,16 +1001,16 @@ namespace Multiplayer.Components.MainMenu
             // Get all active IDs
             List<string> activeIDs = allServers.Select(s => s.id).Distinct().ToList();
 
-            Multiplayer.Log($"RefreshGridView() Active servers: {activeIDs.Count}\r\n{string.Join("\r\n", activeIDs)}");
+            //Multiplayer.Log($"RefreshGridView() Active servers: {activeIDs.Count}\r\n{string.Join("\r\n", activeIDs)}");
 
             // Find servers to remove
             List<IServerBrowserGameDetails> removeList = gridViewModel.Where(gv => !activeIDs.Contains(gv.id)).ToList();
-            Multiplayer.Log($"RefreshGridView() Remove List: {removeList.Count}\r\n{string.Join("\r\n", removeList.Select(l => l.id))}");
+            //Multiplayer.Log($"RefreshGridView() Remove List: {removeList.Count}\r\n{string.Join("\r\n", removeList.Select(l => l.id))}");
 
             // Remove expired servers
             foreach (var remove in removeList)
             {
-                Multiplayer.Log($"RefreshGridView() Removing: {remove.id}");
+                //Multiplayer.Log($"RefreshGridView() Removing: {remove.id}");
                 if (serverPings.ContainsKey(remove.id))
                     serverPings.Remove(remove.id);
                 gridViewModel.Remove(remove);

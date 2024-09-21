@@ -88,7 +88,7 @@ public class ServerBrowserClient : NetworkManager, IDisposable
         if (pingInfos.TryGetValue(serverId, out PingInfo pingInfo))
         {
             pingInfo.Stopwatch.Stop();
-            LogDebug(() => $"Ping timeout for {serverId}, elapsed: {pingInfo.Stopwatch.ElapsedMilliseconds}, IPv4: ({pingInfo.IPv4Sent}, {pingInfo.IPv4Received}), IPv6: ({pingInfo.IPv6Sent}, {pingInfo.IPv6Received}) ");
+            //LogDebug(() => $"Ping timeout for {serverId}, elapsed: {pingInfo.Stopwatch.ElapsedMilliseconds}, IPv4: ({pingInfo.IPv4Sent}, {pingInfo.IPv4Received}), IPv6: ({pingInfo.IPv6Sent}, {pingInfo.IPv6Received}) ");
 
             if (!pingInfo.IPv4Received && pingInfo.IPv4Sent)
                 OnPing?.Invoke(serverId, -1, true);
@@ -185,7 +185,7 @@ public class ServerBrowserClient : NetworkManager, IDisposable
         PingInfo pingInfo = new PingInfo();
         pingInfos[serverId] = pingInfo;
 
-        LogDebug(()=>$"Sending ping to {serverId} at IPv4: {ipv4}, IPv6: {ipv6}, Port: {port}");
+        //LogDebug(()=>$"Sending ping to {serverId} at IPv4: {ipv4}, IPv6: {ipv6}, Port: {port}");
         var packet = new UnconnectedPingPacket { ServerID = server.ToByteArray() };
 
         pingInfo.Start();
