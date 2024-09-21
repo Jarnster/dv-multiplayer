@@ -10,6 +10,11 @@ using DV.WeatherSystem;
 using System.Text.RegularExpressions;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using LiteNetLib;
+using LiteNetLib.Utils;
+using Multiplayer.Networking.Packets.Unconnected;
+using System.Net;
+using LocoSim.Implementations;
 
 namespace Multiplayer.Networking.Managers.Server;
 public class LobbyServerManager : MonoBehaviour
@@ -33,12 +38,17 @@ public class LobbyServerManager : MonoBehaviour
     private string private_key { get; set; }
 
     private bool initialised = false;
-
-
-
     private bool sendUpdates = false;
     private float timePassed = 0f;
 
+    //LAN discovery
+    private NetManager discoveryManager;
+    private NetPacketProcessor packetProcessor;
+    private EventBasedNetListener discoveryListener;
+    private NetDataWriter cachedWriter = new();
+    public static int[] discoveryPorts = { 8888, 8889, 8890 };
+
+    #region MonoBehavior
     private void Awake()
     {
         server = NetworkLifecycle.Instance.Server;
@@ -49,15 +59,38 @@ public class LobbyServerManager : MonoBehaviour
     private IEnumerator Start()
     {
         server.serverData.ipv6 = GetStaticIPv6Address();
+        server.serverData.LocalIPv4 = GetLocalIPv4Address();
+
         StartCoroutine(GetIPv4(Multiplayer.Settings.Ipv4AddressCheck));
-        yield return new WaitUntil(() => initialised);
 
-        Multiplayer.Log("Public IPv4: " + server.serverData.ipv4);
-        Multiplayer.Log("Public IPv6: " + server.serverData.ipv6);
+        while(!initialised)
+            yield return null;
 
-        Multiplayer.Log("Registering server at: " + Multiplayer.Settings.LobbyServerAddress + "/add_game_server");
+        server.Log("Public IPv4: " + server.serverData.ipv4);
+        server.Log("Public IPv6: " + server.serverData.ipv6);
+        server.Log("Private IPv4: " + server.serverData.LocalIPv4);
 
-        StartCoroutine(RegisterWithLobbyServer(Multiplayer.Settings.LobbyServerAddress + "/add_game_server"));
+        if (server.serverData.isPublic)
+        {
+            Multiplayer.Log($"Registering server at: {Multiplayer.Settings.LobbyServerAddress}/{ENDPOINT_ADD_SERVER}");
+            StartCoroutine(RegisterWithLobbyServer($"{Multiplayer.Settings.LobbyServerAddress}/{ENDPOINT_ADD_SERVER}"));
+
+            //allow the server some time to register (should take less than a second)
+            float timeout = 5f;
+            while (server_id == null || server_id == string.Empty  || (timeout -= Time.deltaTime) <= 0)
+                yield return null;
+
+
+        }
+
+        if(server_id == null || server_id == string.Empty)
+        {
+            server_id = $"LAN-{Guid.NewGuid()}";
+        }
+
+        server.serverData.id = server_id;
+
+        StartDiscoveryServer();
     }
 
     private void OnDestroy()
@@ -66,6 +99,8 @@ public class LobbyServerManager : MonoBehaviour
         sendUpdates = false;
         StopAllCoroutines();
         StartCoroutine(RemoveFromLobbyServer($"{Multiplayer.Settings.LobbyServerAddress}/{ENDPOINT_REMOVE_SERVER}"));
+
+        discoveryManager?.Stop();
     }
 
     private void Update()
@@ -80,9 +115,18 @@ public class LobbyServerManager : MonoBehaviour
                 server.serverData.CurrentPlayers = server.PlayerCount;
                 StartCoroutine(UpdateLobbyServer($"{Multiplayer.Settings.LobbyServerAddress}/{ENDPOINT_UPDATE_SERVER}"));
             }
+        }else if (!server.serverData.isPublic || !sendUpdates)
+        {
+            server.serverData.CurrentPlayers = server.PlayerCount;
         }
+
+        //Keep LAN discovery running
+        discoveryManager?.PollEvents();
     }
 
+    #endregion
+
+    #region Lobby Server
     public void RemoveFromLobbyServer()
     {
         Multiplayer.Log($"RemoveFromLobbyServer OnDestroy()");
@@ -285,7 +329,7 @@ public class LobbyServerManager : MonoBehaviour
             }
         }
     }
-
+    #endregion
     public static string GetStaticIPv6Address()
     {
         foreach (NetworkInterface networkInterface in NetworkInterface.GetAllNetworkInterfaces())
@@ -309,4 +353,94 @@ public class LobbyServerManager : MonoBehaviour
         }
         return null;
     }
+
+    public static string GetLocalIPv4Address()
+    {
+        foreach (NetworkInterface networkInterface in NetworkInterface.GetAllNetworkInterfaces())
+        {
+            bool flag = !networkInterface.Supports(NetworkInterfaceComponent.IPv4) || networkInterface.OperationalStatus != OperationalStatus.Up || networkInterface.NetworkInterfaceType == NetworkInterfaceType.Loopback;
+            if (!flag)
+            {
+                IPInterfaceProperties properties = networkInterface.GetIPProperties();
+                if (properties.GatewayAddresses.Count == 0)
+                    continue;
+
+                foreach (UnicastIPAddressInformation unicastIPAddressInformation in properties.UnicastAddresses)
+                {
+                    bool flag2 = unicastIPAddressInformation.Address.AddressFamily == AddressFamily.InterNetwork;
+                    if (flag2)
+                    {
+                        return unicastIPAddressInformation.Address.ToString();
+                    }
+                }
+            }
+        }
+        return null;
+    }
+
+    #region LAN Discovery
+    public void StartDiscoveryServer()
+    {
+        server.Log($"StartDiscoveryServer()");
+        discoveryListener = new EventBasedNetListener();
+        discoveryManager = new NetManager(discoveryListener)
+                            {
+                                UnconnectedMessagesEnabled = true,
+                                BroadcastReceiveEnabled = true,
+                            };
+        packetProcessor = new NetPacketProcessor(discoveryManager);
+
+        discoveryListener.NetworkReceiveUnconnectedEvent += OnNetworkReceiveUnconnected;
+
+        packetProcessor.RegisterNestedType(LobbyServerData.Serialize, LobbyServerData.Deserialize);
+        packetProcessor.SubscribeReusable<UnconnectedDiscoveryPacket, IPEndPoint>(OnUnconnectedDiscoveryPacket);
+
+        foreach (int port in discoveryPorts)
+        {
+            if (discoveryManager.Start(port))
+                server.LogDebug(()=>$"Discovery server started on port {port}");
+            else
+                server.LogError($"Failed to start discovery server on port {port}");
+        }
+    }
+    protected NetDataWriter WritePacket<T>(T packet) where T : class, new()
+    {
+        cachedWriter.Reset();
+        packetProcessor.Write(cachedWriter, packet);
+        return cachedWriter;
+    }
+    protected void SendUnconnectedPacket<T>(T packet, string ipAddress, int port) where T : class, new()
+    {
+        discoveryManager.SendUnconnectedMessage(WritePacket(packet), ipAddress, port);
+    }
+    public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
+    {
+        //server.Log($"LobbyServerManager.OnNetworkReceiveUnconnected({remoteEndPoint}, {messageType})");
+        try
+        {
+            packetProcessor.ReadAllPackets(reader, remoteEndPoint);
+        }
+        catch (ParseException e)
+        {
+            server.LogWarning($"LobbyServerManager.OnNetworkReceiveUnconnected() Failed to parse packet: {e.Message}");
+        }
+    }
+
+    private void OnUnconnectedDiscoveryPacket(UnconnectedDiscoveryPacket packet, IPEndPoint endPoint)
+    {
+        //server.LogDebug(()=>$"OnUnconnectedDiscoveryPacket({packet.PacketType}, {endPoint.Address},{endPoint.Port})");
+
+        switch (packet.PacketType)
+        {
+            case DiscoveryPacketType.Discovery:
+                packet.PacketType = DiscoveryPacketType.Response;
+                packet.data = server.serverData;
+                break;
+            default:
+                return;
+        }
+
+        SendUnconnectedPacket(packet, endPoint.Address.ToString(), endPoint.Port);
+    }
+    #endregion
 }

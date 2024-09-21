@@ -16,6 +16,7 @@ namespace Multiplayer.Components.MainMenu
         string id { get; set; }
         string ipv6 { get; set; }
         string ipv4 { get; set; }
+        string LocalIPv4 { get; set; }
         int port { get; set; }
         string Name { get; set; }
         bool HasPassword { get; set; }
@@ -28,7 +29,8 @@ namespace Multiplayer.Components.MainMenu
         string GameVersion { get; set; }
         string MultiplayerVersion { get; set; }
         string ServerDetails { get; set; }
-        int Ping { get; set; }
-        
+        int Ping {get; set; }
+        bool isPublic { get; set; }
+        int LastSeen { get; set; }
     }
 }

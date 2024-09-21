@@ -1,13 +1,13 @@
 using System;
 using System.Net;
-using System.Text;
 using System.Collections.Generic;
 using LiteNetLib;
 using Multiplayer.Networking.Packets.Unconnected;
-using Newtonsoft.Json.Linq;
 using System.Threading.Tasks;
 using System.Diagnostics;
 using System.Linq;
+using Multiplayer.Networking.Managers.Server;
+using Multiplayer.Networking.Data;
 
 
 namespace Multiplayer.Networking.Listeners;
@@ -33,6 +33,9 @@ public class ServerBrowserClient : NetworkManager, IDisposable
 
     private Dictionary<string, PingInfo> pingInfos = new Dictionary<string, PingInfo>();
     public Action<string, int, bool> OnPing; // serverId, pingTime, isIPv4
+    public Action<IPEndPoint, LobbyServerData> OnDiscovery; // endPoint, serverId, serverData
+
+    private int[] discoveryPorts = { 8888, 8889, 8890 };
 
     private const int PingTimeoutMs = 5000; // 5 seconds timeout
 
@@ -43,6 +46,8 @@ public class ServerBrowserClient : NetworkManager, IDisposable
     public void Start()
     {
         netManager.Start();
+        netManager.UseNativeSockets = true;
+        netManager.UpdateTime = 0;
     }
     public override void Stop()
     {
@@ -77,9 +82,30 @@ public class ServerBrowserClient : NetworkManager, IDisposable
         }
     }
 
+    private async Task StartTimeoutTask(string serverId)
+    {
+        await Task.Delay(PingTimeoutMs);
+        if (pingInfos.TryGetValue(serverId, out PingInfo pingInfo))
+        {
+            pingInfo.Stopwatch.Stop();
+            LogDebug(() => $"Ping timeout for {serverId}, elapsed: {pingInfo.Stopwatch.ElapsedMilliseconds}, IPv4: ({pingInfo.IPv4Sent}, {pingInfo.IPv4Received}), IPv6: ({pingInfo.IPv6Sent}, {pingInfo.IPv6Received}) ");
+
+            if (!pingInfo.IPv4Received && pingInfo.IPv4Sent)
+                OnPing?.Invoke(serverId, -1, true);
+
+            if (!pingInfo.IPv6Received && pingInfo.IPv6Sent)
+                OnPing?.Invoke(serverId, -1, false);
+
+
+            pingInfos.Remove(serverId);
+        }
+    }
+
     protected override void Subscribe()
     {
+        netPacketProcessor.RegisterNestedType(LobbyServerData.Serialize, LobbyServerData.Deserialize);
         netPacketProcessor.SubscribeReusable<UnconnectedPingPacket, IPEndPoint>(OnUnconnectedPingPacket);
+        netPacketProcessor.SubscribeReusable<UnconnectedDiscoveryPacket, IPEndPoint>(OnUnconnectedDiscoveryPacket);
     }
 
     #region Net Events
@@ -122,13 +148,26 @@ public class ServerBrowserClient : NetworkManager, IDisposable
 
             OnPing?.Invoke(serverId, pingTime, isIPv4);
 
-            LogDebug(()=>$"OnUnconnectedPingPacket() serverId {serverId}, IPv4 ({pingInfo.IPv4Sent}, {pingInfo.IPv4Received}), IPv6 ({pingInfo.IPv6Sent}, {pingInfo.IPv6Received})");
+            //LogDebug(()=>$"OnUnconnectedPingPacket() serverId {serverId}, IPv4 ({pingInfo.IPv4Sent}, {pingInfo.IPv4Received}), IPv6 ({pingInfo.IPv6Sent}, {pingInfo.IPv6Received})");
             if ((!pingInfo.IPv4Sent || pingInfo.IPv4Received) && (!pingInfo.IPv6Sent || pingInfo.IPv6Received))
             {
                 pingInfo.Stopwatch.Stop();
                 pingInfos.Remove(serverId);
-                LogDebug(()=>$"OnUnconnectedPingPacket() removed {serverId}");
+                //LogDebug(()=>$"OnUnconnectedPingPacket() removed {serverId}");
             }
+        }
+    }
+
+    private void OnUnconnectedDiscoveryPacket(UnconnectedDiscoveryPacket packet, IPEndPoint endPoint)
+    {
+        //Log($"OnUnconnectedDiscoveryPacket({packet.PacketType}, {endPoint?.Address})");
+
+        switch (packet.PacketType)
+        {
+            case DiscoveryPacketType.Response:
+                //Log($"OnUnconnectedDiscoveryPacket({packet.PacketType}, {endPoint?.Address}) id: {packet.data.id}");
+                OnDiscovery?.Invoke(endPoint,packet.data);
+                break;
         }
     }
 
@@ -139,7 +178,7 @@ public class ServerBrowserClient : NetworkManager, IDisposable
     {
         if (!Guid.TryParse(serverId, out Guid server))
         {
-            LogError($"SendUnconnectedPingPacket({serverId}) failed to parse GUID");
+            //LogError($"SendUnconnectedPingPacket({serverId}) failed to parse GUID");
             return;
         }
 
@@ -169,22 +208,18 @@ public class ServerBrowserClient : NetworkManager, IDisposable
         _ = StartTimeoutTask(serverId);
     }
 
-    private async Task StartTimeoutTask(string serverId)
+    public void SendDiscoveryRequest()
     {
-        await Task.Delay(PingTimeoutMs);
-        if (pingInfos.TryGetValue(serverId, out PingInfo pingInfo))
+        foreach (int port in discoveryPorts)
         {
-            pingInfo.Stopwatch.Stop();
-            LogDebug(() => $"Ping timeout for {serverId}, elapsed: {pingInfo.Stopwatch.ElapsedMilliseconds}, IPv4: ({pingInfo.IPv4Sent}, {pingInfo.IPv4Received}), IPv6: ({pingInfo.IPv6Sent}, {pingInfo.IPv6Received}) ");
-
-            if(!pingInfo.IPv4Received && pingInfo.IPv4Sent)
-                OnPing?.Invoke(serverId, -1, true);
-
-            if (!pingInfo.IPv6Received && pingInfo.IPv6Sent)
-                OnPing?.Invoke(serverId, -1, false);
-
-
-            pingInfos.Remove(serverId);
+            try
+            {
+                netManager.SendBroadcast(WritePacket(new UnconnectedDiscoveryPacket()), port);
+            }
+            catch (Exception ex)
+            {
+                Multiplayer.Log($"SendDiscoveryRequest() Broadcast error: {ex.Message}\r\n{ex.StackTrace}");
+            }
         }
     }
 

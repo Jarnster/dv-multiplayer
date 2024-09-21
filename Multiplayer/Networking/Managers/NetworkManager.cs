@@ -101,7 +101,7 @@ public abstract class NetworkManager : INetEventListener, INatPunchListener
 
     public void OnNetworkReceive(NetPeer peer, NetPacketReader reader, byte channelNumber, DeliveryMethod deliveryMethod)
     {
-        Log($"NetworkManager.OnNetworkReceive()");
+        //Log($"NetworkManager.OnNetworkReceive()");
         try
         {
             IsProcessingPacket = true;
@@ -124,7 +124,7 @@ public abstract class NetworkManager : INetEventListener, INatPunchListener
 
     public void OnNetworkReceiveUnconnected(IPEndPoint remoteEndPoint, NetPacketReader reader, UnconnectedMessageType messageType)
     {
-        Multiplayer.Log($"OnNetworkReceiveUnconnected({remoteEndPoint}, {messageType})");
+        //Multiplayer.Log($"OnNetworkReceiveUnconnected({remoteEndPoint}, {messageType})");
         try
         {
             IsProcessingPacket = true;

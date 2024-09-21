@@ -13,5 +13,6 @@ namespace Multiplayer.Editor
         public Sprite lockIcon;
         public Sprite refreshIcon;
         public Sprite connectIcon;
+        public Sprite lanIcon;
     }
 }

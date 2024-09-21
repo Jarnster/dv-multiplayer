@@ -135,10 +135,9 @@ public class NetworkLifecycle : SingletonBehaviour<NetworkLifecycle>
         }
 
         Multiplayer.Log($"Starting server on port {port}");
-        NetworkServer server = new(difficulty, Multiplayer.Settings, isPublicGame, isSinglePlayer, serverData);
+        NetworkServer server = new(difficulty, Multiplayer.Settings, isSinglePlayer, serverData);
 
         //reset for next game
-        isPublicGame = false;
         isSinglePlayer = true;
         serverData = null;
 

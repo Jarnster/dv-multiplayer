@@ -26,8 +26,8 @@ namespace Multiplayer.Components.MainMenu
     {
         private class PingRecord
         {
-            public int ping1;
-            public int ping2;
+            int ping1;
+            int ping2;
             int received;
 
             public PingRecord()
@@ -38,8 +38,6 @@ namespace Multiplayer.Components.MainMenu
 
             public int Avg()
             {
-                Multiplayer.Log($"Avg() {ping1}, {ping2}");
-
                 if (received >= 2 && ping1 >-1 && ping2 > -1)
                     return (ping1 + ping2) / 2;
                 else
@@ -48,13 +46,24 @@ namespace Multiplayer.Components.MainMenu
 
             public void AddPing(int ping)
             {
-                Multiplayer.Log($"AddPing() ping1 {ping1}, ping2 {ping2}, new {ping}, {received}");
+                //Multiplayer.Log($"AddPing() ping1 {ping1}, ping2 {ping2}, new {ping}, {received}");
                 ping1 = ping2;
                 ping2 = ping;
 
                 if(received < 2)
                     received++;
             }
+        }
+
+        private enum ConnectionState
+        {
+            NotConnected,
+            AttemptingIPv6,
+            AttemptingIPv6Punch,
+            AttemptingIPv4,
+            AttemptingIPv4Punch,
+            Failed,
+            Aborted
         }
 
         // Regular expressions for IP and port validation
@@ -81,9 +90,16 @@ namespace Multiplayer.Components.MainMenu
         private Dictionary<string, (PingRecord IPv4Ping, PingRecord IPv6Ping)> serverPings = new Dictionary<string, (PingRecord, PingRecord)>();
 
         private float pingTimer = 0f;
-        private const float PING_INTERVAL = 30f; // base interval to refresh all pings
+        private const float PING_INTERVAL = 2f; // base interval to refresh all pings
         private const float PING_BATCH_INTERVAL = 0.5f; //gap bwetween ping batches
         private const int SERVERS_PER_BATCH = 10;
+
+        //LAN tracking
+        private List<IServerBrowserGameDetails> localServers = new List<IServerBrowserGameDetails>();
+        private const int LAN_TIMEOUT = 60;         //How long to hold a LAN server without a response
+        private const int DISCOVERY_TIMEOUT = 2;    //how long to wait for servers to respond
+        private bool localRefreshComplete;
+        private float discoveryTimer = 0f;
 
         //Button variables
         private ButtonDV buttonJoin;
@@ -93,14 +109,14 @@ namespace Multiplayer.Components.MainMenu
         //Misc GUI Elements
         private TextMeshProUGUI serverName;
         private TextMeshProUGUI detailsPane;
-        //private ScrollRect serverInfo;
 
-
+        //Remote server tracking
+        private List<IServerBrowserGameDetails> remoteServers = new List<IServerBrowserGameDetails>();
         private bool serverRefreshing = false;
-        private bool autoRefresh = false;
         private float timePassed = 0f; //time since last refresh
         private const int AUTO_REFRESH_TIME = 30; //how often to refresh in auto
         private const int REFRESH_MIN_TIME = 10; //Stop refresh spam
+        private bool remoteRefreshComplete;
 
         private ServerBrowserClient serverBrowserClient;
 
@@ -114,18 +130,7 @@ namespace Multiplayer.Components.MainMenu
         private Popup connectingPopup;
         private int attempt;
 
-        private enum ConnectionState
-        {
-            NotConnected,
-            AttemptingIPv6,
-            AttemptingIPv6Punch,
-            AttemptingIPv4,
-            AttemptingIPv4Punch,
-            Failed,
-            Aborted
-        }
 
-        //private string[] testNames = new string[] { "ChooChooExpress", "RailwayRascals", "FreightFrenzy", "SteamDream", "DieselDynasty", "CargoKings", "TrackMasters", "RailwayRevolution", "ExpressElders", "IronHorseHeroes", "LocomotiveLegends", "TrainTitans", "HeavyHaulers", "RapidRails", "TimberlineTransport", "CoalCountry", "SilverRailway", "GoldenGauge", "SteelStream", "MountainMoguls", "RailRiders", "TrackTrailblazers", "FreightFanatics", "SteamSensation", "DieselDaredevils", "CargoChampions", "TrackTacticians", "RailwayRoyals", "ExpressExperts", "IronHorseInnovators", "LocomotiveLeaders", "TrainTacticians", "HeavyHitters", "RapidRunners", "TimberlineTrains", "CoalCrushers", "SilverStreamliners", "GoldenGears", "SteelSurge", "MountainMovers", "RailwayWarriors", "TrackTerminators", "FreightFighters", "SteamStreak", "DieselDynamos", "CargoCommanders", "TrackTrailblazers", "RailwayRangers", "ExpressEngineers", "IronHorseInnovators", "LocomotiveLovers", "TrainTrailblazers", "HeavyHaulersHub", "RapidRailsRacers", "TimberlineTrackers", "CoalCountryCarriers", "SilverSpeedsters", "GoldenGaugeGang", "SteelStalwarts", "MountainMoversClub", "RailRunners", "TrackTitans", "FreightFalcons", "SteamSprinters", "DieselDukes", "CargoCommandos", "TrackTracers", "RailwayRebels", "ExpressElite", "IronHorseIcons", "LocomotiveLunatics", "TrainTornadoes", "HeavyHaulersCrew", "RapidRailsRunners", "TimberlineTrackMasters", "CoalCountryCrew", "SilverSprinters", "GoldenGale", "SteelSpeedsters", "MountainMarauders", "RailwayRiders", "TrackTactics", "FreightFury", "SteamSquires", "DieselDefenders", "CargoCrusaders", "TrackTechnicians", "RailwayRaiders", "ExpressEnthusiasts", "IronHorseIlluminati", "LocomotiveLoyalists", "TrainTurbulence", "HeavyHaulersHeroes", "RapidRailsRiders", "TimberlineTrackTitans", "CoalCountryCaravans", "SilverSpeedRacers", "GoldenGaugeGangsters", "SteelStorm", "MountainMasters", "RailwayRoadrunners", "TrackTerror", "FreightFleets", "SteamSurgeons", "DieselDragons", "CargoCrushers", "TrackTaskmasters", "RailwayRevolutionaries", "ExpressExplorers", "IronHorseInquisitors", "LocomotiveLegion", "TrainTriumph", "HeavyHaulersHorde", "RapidRailsRenegades", "TimberlineTrackTeam", "CoalCountryCrusade", "SilverSprintersSquad", "GoldenGaugeGroup", "SteelStrike", "MountainMonarchs", "RailwayRaid", "TrackTacticiansTeam", "FreightForce", "SteamSquad", "DieselDynastyClan", "CargoCrew", "TrackTeam", "RailwayRalliers", "ExpressExpedition", "IronHorseInitiative", "LocomotiveLeague", "TrainTribe", "HeavyHaulersHustle", "RapidRailsRevolution", "TimberlineTrackersTeam", "CoalCountryConvoy", "SilverSprint", "GoldenGaugeGuild", "SteelSpirits", "MountainMayhem", "RailwayRaidersCrew", "TrackTrailblazersTribe", "FreightFleetForce", "SteamStalwarts", "DieselDragonsDen", "CargoCaptains", "TrackTrailblazersTeam", "RailwayRidersRevolution", "ExpressEliteExpedition", "IronHorseInsiders", "LocomotiveLords", "TrainTacticiansTribe", "HeavyHaulersHeroesHorde", "RapidRailsRacersTeam", "TimberlineTrackMastersTeam", "CoalCountryCarriersCrew", "SilverSpeedstersSprint", "GoldenGaugeGangGuild", "SteelSurgeStrike", "MountainMoversMonarchs" };
 
         #region setup
 
@@ -136,7 +141,7 @@ namespace Multiplayer.Components.MainMenu
             BuildUI();
 
             SetupServerBrowser();
-            //FillDummyServers();
+            RefreshGridView();
             RefreshAction();
         }
 
@@ -158,6 +163,7 @@ namespace Multiplayer.Components.MainMenu
             //Start the server browser network client
             serverBrowserClient = new ServerBrowserClient(Multiplayer.Settings);
             serverBrowserClient.OnPing += this.OnPing;
+            serverBrowserClient.OnDiscovery += this.OnDiscovery;
             serverBrowserClient.Start();
         }
 
@@ -176,6 +182,9 @@ namespace Multiplayer.Components.MainMenu
 
         private void OnDestroy()
         {
+            if (serverBrowserClient == null)
+                return;
+
             serverBrowserClient.OnPing -= this.OnPing;
             serverBrowserClient.Stop();
         }
@@ -188,8 +197,9 @@ namespace Multiplayer.Components.MainMenu
 
             //Handle server refresh interval
             timePassed += Time.deltaTime;
+            discoveryTimer += Time.deltaTime;
 
-            if (autoRefresh && !serverRefreshing)
+            if (!serverRefreshing)
             {              
                 if (timePassed >= AUTO_REFRESH_TIME)
                 {
@@ -200,6 +210,22 @@ namespace Multiplayer.Components.MainMenu
                     buttonRefresh.ToggleInteractable(true);
                 }
             }
+            else if(localRefreshComplete && remoteRefreshComplete)
+            {
+                ExpireLocalServers();   //remove any that have not been seen in a while
+                RefreshGridView();
+
+                localRefreshComplete = false;
+                remoteRefreshComplete = false;
+                serverRefreshing = false;
+                timePassed = 0;
+            }
+            else
+            {
+                if (discoveryTimer >= DISCOVERY_TIMEOUT)
+                    localRefreshComplete = true;
+            }
+
 
             //Handle pinging servers
             pingTimer += Time.deltaTime;
@@ -374,6 +400,8 @@ namespace Multiplayer.Components.MainMenu
 
             //Don't forget to re-enable!
             GridviewGO.SetActive(true);
+
+            gridView.showDummyElement = true;
         }
         private void SetupListeners(bool on)
         {
@@ -395,17 +423,19 @@ namespace Multiplayer.Components.MainMenu
                 return;          
 
             if (selectedServer != null)
-            {
                 serverIDOnRefresh = selectedServer.id;
-            }
+
+            remoteServers.Clear();
 
             serverRefreshing = true;
-            autoRefresh = true;
             buttonJoin.ToggleInteractable(false);
             buttonRefresh.ToggleInteractable(false);
 
             StartCoroutine(GetRequest($"{Multiplayer.Settings.LobbyServerAddress}/list_game_servers"));
 
+            //Send a message to find local peers
+            discoveryTimer = 0f;
+            serverBrowserClient?.SendDiscoveryRequest();
         }
         private void JoinAction()
         {
@@ -665,13 +695,11 @@ namespace Multiplayer.Components.MainMenu
                     Multiplayer.Settings.LastRemoteIP = address;
                     Multiplayer.Settings.LastRemotePort = portNumber;
                     Multiplayer.Settings.LastRemotePassword = result.data;
-
                 }
 
                 password = result.data;
 
                 AttemptConnection();
-                //SingletonBehaviour<NetworkLifecycle>.Instance.StartClient(address, portNumber, result.data, false, OnDisconnect);
             };
         }
 
@@ -953,78 +981,92 @@ namespace Multiplayer.Components.MainMenu
                         Multiplayer.Log($"Server name: \"{server.Name}\", IPv4: {server.ipv4}, IPv6: {server.ipv6}, Port: {server.port}");
                     }
 
-                    if (response.Length == 0)
-                    {
-                        gridView.showDummyElement = true;
-                        buttonJoin.ToggleInteractable(false);
-                    }
-                    else
-                    {
-                        gridView.showDummyElement = false;
-                    }
+                    remoteServers.AddRange(response);
 
-                    bool startPing = gridViewModel.Count == 0;
-
-
-                    //Get Server update lists
-                    List<IServerBrowserGameDetails> serversClosed = gridViewModel.Where(element => !response.Any(resp => resp.id == element.id)).ToList();
-                    List<(IServerBrowserGameDetails, LobbyServerData)> serversUpdate = gridViewModel.Join(
-                                                                                                            response,
-                                                                                                            element => element.id,
-                                                                                                            resp => resp.id,
-                                                                                                            (element, resp) => (element, resp)
-                                                                                                          ).ToList();
-                    LobbyServerData[] serversNew = response.Where(element => !gridViewModel.Any(resp => resp.id == element.id)).ToArray();
-
-                    Multiplayer.Log($"servers closed: {serversClosed.Count()}, servers new: {serversNew.Count()}, servers update: {serversUpdate.Count()}");
-
-                    //Remove expired
-                    foreach(IServerBrowserGameDetails server in serversClosed)
-                    {
-                        if(serverPings.ContainsKey(server.id))
-                            serverPings.Remove(server.id);
-
-                        gridViewModel.Remove(server);
-                    }
-
-                    //Add new servers
-                    gridViewModel.AddRange(serversNew);
-
-                    //Update existing servers
-                    foreach((IServerBrowserGameDetails, LobbyServerData) server in serversUpdate)
-                    {
-                        server.Item1.TimePassed = server.Item2.TimePassed;
-                        server.Item1.CurrentPlayers = server.Item2.CurrentPlayers;
-                    }
-
-                    //Update the gridview rendering
-                    gridView.SetModel(gridViewModel);
-
-                    //if we have a server selected, we need to re-select it after refresh
-                    if (serverIDOnRefresh != null)
-                    {
-                        int selID = Array.FindIndex(gridViewModel.ToArray(), server => server.id == serverIDOnRefresh);
-                        if (selID >= 0)
-                        {
-                            gridView.SetSelected(selID);
-
-                            if (this.parentScroller)
-                            {
-                                this.parentScroller.verticalNormalizedPosition = 1f - (float)selID / (float)gridView.Model.Count;
-                            }
-                        }
-                        serverIDOnRefresh = null;
-                    }
-
-                    //trigger ping to start
-                    if (startPing)
-                        PingNextBatch();
                 }
 
+                remoteRefreshComplete = true;
+            }
+        }
+
+        private void RefreshGridView()
+        {
+
+            bool startPing = gridViewModel.Count == 0;
+
+            var allServers = new List<IServerBrowserGameDetails>();
+            allServers.AddRange(localServers);
+            allServers.AddRange(remoteServers.Where(r => !localServers.Any(l => l.id == r.id)));
+
+            // Get all active IDs
+            List<string> activeIDs = allServers.Select(s => s.id).Distinct().ToList();
+
+            Multiplayer.Log($"RefreshGridView() Active servers: {activeIDs.Count}\r\n{string.Join("\r\n", activeIDs)}");
+
+            // Find servers to remove
+            List<IServerBrowserGameDetails> removeList = gridViewModel.Where(gv => !activeIDs.Contains(gv.id)).ToList();
+            Multiplayer.Log($"RefreshGridView() Remove List: {removeList.Count}\r\n{string.Join("\r\n", removeList.Select(l => l.id))}");
+
+            // Remove expired servers
+            foreach (var remove in removeList)
+            {
+                Multiplayer.Log($"RefreshGridView() Removing: {remove.id}");
+                if (serverPings.ContainsKey(remove.id))
+                    serverPings.Remove(remove.id);
+                gridViewModel.Remove(remove);
             }
 
-            serverRefreshing = false;
-            timePassed = 0;
+            // Update existing servers and add new ones
+            foreach (var server in allServers)
+            {
+                var existingServer = gridViewModel.FirstOrDefault(gv => gv.id == server.id);
+                if (existingServer != null)
+                {
+                    // Update existing server
+                    existingServer.TimePassed = server.TimePassed;
+                    existingServer.CurrentPlayers = server.CurrentPlayers;
+                    existingServer.LocalIPv4 = server.LocalIPv4;
+                    existingServer.LastSeen = server.LastSeen;
+                }
+                else
+                {
+                    // Add new server
+                    gridViewModel.Add(server);
+                }
+            }
+
+            if (gridViewModel.Count() == 0)
+            {
+                gridView.showDummyElement = true;
+                buttonJoin.ToggleInteractable(false);
+            }
+            else
+            {
+                gridView.showDummyElement = false;
+            }
+
+            //Update the gridview rendering
+            gridView.SetModel(gridViewModel);
+
+            //if we have a server selected, we need to re-select it after refresh
+            if (serverIDOnRefresh != null)
+            {
+                int selID = Array.FindIndex(gridViewModel.ToArray(), server => server.id == serverIDOnRefresh);
+                if (selID >= 0)
+                {
+                    gridView.SetSelected(selID);
+
+                    if (this.parentScroller)
+                    {
+                        this.parentScroller.verticalNormalizedPosition = 1f - (float)selID / (float)gridView.Model.Count;
+                    }
+                }
+                serverIDOnRefresh = null;
+            }
+
+            //trigger ping to start
+            if (startPing && gridViewModel.Count() > 0)
+                PingNextBatch();
         }
         private void SetButtonsActive(params GameObject[] buttons)
         {
@@ -1057,7 +1099,7 @@ namespace Multiplayer.Components.MainMenu
         #region Network Utils
         private void OnPing(string serverId, int ping, bool isIPv4)
         {
-            Multiplayer.Log($"OnPing() Ping: {ping}, {(isIPv4?"IPv4" : "IPv6")}");
+            //Multiplayer.Log($"OnPing() Ping: {ping}, {(isIPv4?"IPv4" : "IPv6")}");
 
             if (!serverPings.ContainsKey(serverId))
                 serverPings[serverId] = (new PingRecord(), new PingRecord());
@@ -1076,7 +1118,12 @@ namespace Multiplayer.Components.MainMenu
         }
         private void SendPing(IServerBrowserGameDetails server)
         {
-            serverBrowserClient.SendUnconnectedPingPacket(server.id, server.ipv4, server.ipv6, server.port);
+            string ipv4 = server.ipv4;
+
+            if(!string.IsNullOrEmpty(server.LocalIPv4))
+                ipv4 = server.LocalIPv4;
+                
+            serverBrowserClient.SendUnconnectedPingPacket(server.id, ipv4, server.ipv6, server.port);
         }
 
         private float GetPingInterval() 
@@ -1121,6 +1168,43 @@ namespace Multiplayer.Components.MainMenu
                 return ipv6Ping;
             }
             return -1; // No ping available
+        }
+
+        private void OnDiscovery(IPEndPoint endpoint, LobbyServerData data)
+        {
+            //Multiplayer.Log($"OnDiscovery({endpoint}) ID: {data.id}, Name: {data.Name}");
+
+            IServerBrowserGameDetails existing = localServers.FirstOrDefault(element => element.id == data.id);
+            if (existing != default(IServerBrowserGameDetails))
+            {
+                localServers.Remove(existing);
+            }
+
+            data.LastSeen = (int)Time.time;
+            localServers.Add(data);
+
+            existing = gridViewModel.FirstOrDefault(element => element.id == data.id);
+            if (existing != default(IServerBrowserGameDetails))
+            {
+                existing.LastSeen = (int)Time.time;
+                existing.LocalIPv4 = data.LocalIPv4;
+            }
+
+            data.LastSeen = (int)Time.time;
+            localServers.Add(data);
+        }
+
+        private void ExpireLocalServers()
+        {
+            List<IServerBrowserGameDetails> timedOut = localServers.Where(s => (s.LastSeen + LAN_TIMEOUT) < Time.time ).ToList();
+
+            foreach (IServerBrowserGameDetails expired in timedOut)
+            {
+                if (serverPings.ContainsKey(expired.id))
+                        serverPings.Remove(expired.id);
+
+                localServers.Remove(expired);
+            }
         }
         #endregion
     }

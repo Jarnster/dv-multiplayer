@@ -342,6 +342,7 @@ private void SetupListeners(bool on)
         serverData.port = (port.text == "") ? Multiplayer.Settings.Port : int.Parse(port.text); ;
         serverData.Name = serverName.text.Trim();
         serverData.HasPassword = password.text != "";
+        serverData.isPublic = gamePublic.isOn;
 
         serverData.GameMode = 0; //replaced with details from save / new game
         serverData.Difficulty = 0; //replaced with details from save / new game
@@ -375,7 +376,7 @@ private void SetupListeners(bool on)
 
         Multiplayer.Settings.ServerName = serverData.Name;
         Multiplayer.Settings.Password = password.text;
-        Multiplayer.Settings.PublicGame = gamePublic.isOn;
+        Multiplayer.Settings.PublicGame = serverData.isPublic;
         Multiplayer.Settings.Port = serverData.port;
         Multiplayer.Settings.MaxPlayers = serverData.MaxPlayers;
         Multiplayer.Settings.Details = serverData.ServerDetails;
@@ -383,8 +384,6 @@ private void SetupListeners(bool on)
 
         //Pass the server data to the NetworkLifecycle manager
         NetworkLifecycle.Instance.serverData = serverData;
-        //Mark the game as public/private
-        NetworkLifecycle.Instance.isPublicGame = gamePublic.isOn;
         //Mark it as a real multiplayer game
         NetworkLifecycle.Instance.isSinglePlayer = false;
 

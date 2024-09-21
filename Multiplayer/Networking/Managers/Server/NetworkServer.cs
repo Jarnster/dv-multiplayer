@@ -44,7 +44,6 @@ public class NetworkServer : NetworkManager
     private readonly Dictionary<byte, NetPeer> netPeers = new();
 
     private LobbyServerManager lobbyServerManager;
-    public bool isPublic;
     public bool isSinglePlayer;
     public LobbyServerData serverData;
     public RerailController rerailController;
@@ -62,9 +61,8 @@ public class NetworkServer : NetworkManager
     //we don't care if the client doesn't have these mods
     private string[] modWhiteList = { "RuntimeUnityEditor" };
 
-    public NetworkServer(IDifficulty difficulty, Settings settings, bool isPublic, bool isSinglePlayer, LobbyServerData serverData) : base(settings)
+    public NetworkServer(IDifficulty difficulty, Settings settings, bool isSinglePlayer, LobbyServerData serverData) : base(settings)
     {
-        this.isPublic = isPublic;
         this.isSinglePlayer = isSinglePlayer;
         this.serverData = serverData;
 
@@ -141,7 +139,7 @@ public class NetworkServer : NetworkManager
     private void OnLoaded()
     {
         //Debug.Log($"Server loaded, isSinglePlayer: {isSinglePlayer} isPublic: {isPublic}");
-        if (!isSinglePlayer && isPublic)
+        if (!isSinglePlayer)
         {
             lobbyServerManager = NetworkLifecycle.Instance.GetOrAddComponent<LobbyServerManager>();
         }

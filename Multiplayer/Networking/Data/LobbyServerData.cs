@@ -1,10 +1,9 @@
+using LiteNetLib.Utils;
 using Multiplayer.Components.MainMenu;
 using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Newtonsoft.Json.Linq;
+using System.Reflection;
+using UnityEngine.Profiling;
 
 namespace Multiplayer.Networking.Data
 {
@@ -16,6 +15,9 @@ namespace Multiplayer.Networking.Data
         public string ipv4 { get; set; }
         public string ipv6 { get; set; }
         public int port { get; set; }
+
+        [JsonIgnore]
+        public string LocalIPv4 { get; set; }
 
         [JsonProperty("server_name")]
         public string Name { get; set; }
@@ -61,7 +63,11 @@ namespace Multiplayer.Networking.Data
         public string ServerDetails { get; set; }
 
         [JsonIgnore]
-        public int Ping { get; set; }
+        public int Ping { get; set; } = -1;
+        [JsonIgnore]
+        public bool isPublic { get; set; }
+        [JsonIgnore]
+        public int LastSeen { get; set; } = int.MaxValue;
 
 
         public void Dispose() { }
@@ -147,5 +153,26 @@ namespace Multiplayer.Networking.Data
             return diff;
         }
 
+        public static void Serialize(NetDataWriter writer, LobbyServerData data)
+        {
+            //Multiplayer.Log($"LobbyServerData.Serialize() {writer != null }, {data != null} ");
+
+            //have we got data?
+            writer.Put(data != null);
+
+            if (data != null)
+                writer.Put(new NetSerializer().Serialize(data));
+
+            //Multiplayer.Log($"LobbyServerData.Serialize() {writer != null}, {data != null} POST");
+
+        }
+
+        public static LobbyServerData Deserialize(NetDataReader reader)
+        {
+            if(reader.GetBool())
+                return new NetSerializer().Deserialize<LobbyServerData>(reader);
+            else
+                return null;
+        }
     }
 }

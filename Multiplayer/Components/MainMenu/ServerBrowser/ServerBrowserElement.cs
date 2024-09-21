@@ -1,5 +1,6 @@
 using DV.UIFramework;
 using Multiplayer.Utils;
+using System;
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
@@ -11,8 +12,10 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
         private TextMeshProUGUI networkName;
         private TextMeshProUGUI playerCount;
         private TextMeshProUGUI ping;
-        private GameObject goIcon;
-        private Image icon;
+        private GameObject goIconPassword;
+        private Image iconPassword;
+        private GameObject goIconLAN;
+        private Image iconLAN;
         private IServerBrowserGameDetails data;
 
         private const int PING_WIDTH = 124; // Adjusted width for the ping text
@@ -24,8 +27,8 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
             networkName = this.FindChildByName("name [noloc]").GetComponent<TextMeshProUGUI>();
             playerCount = this.FindChildByName("date [noloc]").GetComponent<TextMeshProUGUI>();
             ping = this.FindChildByName("time [noloc]").GetComponent<TextMeshProUGUI>();
-            goIcon = this.FindChildByName("autosave icon");
-            icon = goIcon.GetComponent<Image>();
+            goIconPassword = this.FindChildByName("autosave icon");
+            iconPassword = goIconPassword.GetComponent<Image>();
 
             // Fix alignment of the player count text relative to the network name text
             Vector3 namePos = networkName.transform.position;
@@ -41,8 +44,25 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
             ping.transform.position = new Vector3(PING_POS_X, pingPos.y, pingPos.z);
             ping.alignment = TextAlignmentOptions.Right;
 
-            // Set change icon
-            icon.sprite = Multiplayer.AssetIndex.lockIcon;
+            // Set password icon
+            iconPassword.sprite = Multiplayer.AssetIndex.lockIcon;
+
+            // Set LAN icon
+            try
+            {
+                goIconLAN = this.FindChildByName("LAN Icon");
+            }
+            catch (Exception e)
+            {
+                goIconLAN = Instantiate(goIconPassword, goIconPassword.transform.parent);
+                goIconLAN.name = "LAN Icon";
+                Vector3 LANpos = goIconLAN.transform.localPosition;
+                Vector3 LANSize = goIconLAN.GetComponent<RectTransform>().sizeDelta;
+                LANpos.x += (PING_POS_X - LANpos.x - LANSize.x) / 2;
+                goIconLAN.transform.localPosition = LANpos;
+                iconLAN = goIconLAN.GetComponent<Image>();
+                iconLAN.sprite = Multiplayer.AssetIndex.lanIcon;
+            }
         }
 
         public override void SetData(IServerBrowserGameDetails data, AGridView<IServerBrowserGameDetails> _)
@@ -69,10 +89,8 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
             ping.text = $"<color={GetColourForPing(data.Ping)}>{(data.Ping < 0 ? "?" : data.Ping)} ms</color>";
 
             // Hide the icon if the server does not have a password
-            if (!data.HasPassword)
-            {
-                goIcon.SetActive(false);
-            }
+            goIconPassword.SetActive(data.HasPassword); 
+            goIconLAN.SetActive(!string.IsNullOrEmpty(data.LocalIPv4));
         }
 
         private string GetColourForPing(int ping)
