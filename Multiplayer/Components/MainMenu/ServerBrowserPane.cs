@@ -142,6 +142,8 @@ namespace Multiplayer.Components.MainMenu
 
             SetupServerBrowser();
             RefreshGridView();
+
+            buttonRefresh.ToggleInteractable(true);
             RefreshAction();
         }
 
@@ -934,6 +936,13 @@ namespace Multiplayer.Components.MainMenu
                     if (message == null || message.Length == 0)
                     {
                         message = "Server Shutting Down"; //TODO: add translations
+                    }
+                    break;
+
+                case DisconnectReason.Timeout:
+                    if (message == null || message.Length == 0)
+                    {
+                        message = "Server Timed out"; //TODO: add translations
                     }
                     break;
             }

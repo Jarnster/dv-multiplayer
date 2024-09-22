@@ -72,6 +72,12 @@ public static class Multiplayer
                 RemoteDispatchPatch.Patch(harmony, remoteDispatch.Assembly);
             }
 
+            //if (passengerJobs?.Enabled == true)
+            //{
+            //    Log("Found PassengerJobs, initialising...");
+            //    PassengerJobsMod.Init();
+            //}
+
             if (!LoadAssets())
                 return false;
 

@@ -137,7 +137,7 @@ public class ServerBrowserClient : NetworkManager, IDisposable
 
         if (pingInfos.TryGetValue(serverId, out PingInfo pingInfo))
         {
-            int pingTime = (int)pingInfo.Stopwatch.ElapsedMilliseconds;
+            int pingTime = (int)pingInfo.Stopwatch.ElapsedMilliseconds / 2; //game reports one-way ping, so we should do the same in the server browser 
 
             bool isIPv4 = endPoint.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork;
 
