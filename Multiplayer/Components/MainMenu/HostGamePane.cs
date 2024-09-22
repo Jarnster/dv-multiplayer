@@ -151,8 +151,8 @@ public class HostGamePane : MonoBehaviour
         serverWindowGO.name = "Host Details";
         serverDetails = serverDetailsGO.GetComponent<TextMeshProUGUI>();
         serverDetails.textWrappingMode = TextWrappingModes.Normal;
-        serverDetails.text = "Please note: Use of other mods is currently not supported and may cause unexpected behaviour.<br>" +
-                             "It is recommended that other mods are disabled and the game restarted prior to playing in multiplayer.<br><br>" +
+        serverDetails.text = "Please note:<br>Use of other mods is currently not supported and may cause unexpected behaviour.<br><br>" +
+                             "It is recommended that other mods are disabled and Derail Valley restarted prior to playing in multiplayer.<br><br>" +
                              "We hope to make your favourite mods work with multiplayer in the future.";
 
 
