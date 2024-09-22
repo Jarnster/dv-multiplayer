@@ -121,6 +121,7 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundLicenseAcquiredPacket>(OnClientboundLicenseAcquiredPacket);
         netPacketProcessor.SubscribeReusable<ClientboundGarageUnlockPacket>(OnClientboundGarageUnlockPacket);
         netPacketProcessor.SubscribeReusable<ClientboundDebtStatusPacket>(OnClientboundDebtStatusPacket);
+        netPacketProcessor.SubscribeReusable<ClientboundJobsUpdatePacket>(OnClientboundJobsUpdatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundJobsCreatePacket>(OnClientboundJobsCreatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundJobValidateResponsePacket>(OnClientboundJobValidateResponsePacket);
         netPacketProcessor.SubscribeReusable<CommonChatPacket>(OnCommonChatPacket); 
@@ -744,33 +745,32 @@ public class NetworkClient : NetworkManager
         networkedStationController.AddJobs(packet.Jobs);
 
     }
+    
+    private void OnClientboundJobsUpdatePacket(ClientboundJobsUpdatePacket packet)
+    {
+        Log($"OnClientboundJobsUpdatePacket() for station {packet.StationNetId}, containing {packet.JobUpdates.Length}");
+
+        if (NetworkLifecycle.Instance.IsHost())
+            return;
+
+        if (!NetworkedStationController.Get(packet.StationNetId, out NetworkedStationController networkedStationController))
+        {
+            LogError($"OnClientboundJobsUpdatePacket() {packet.StationNetId} does not exist!");
+            return;
+        }
+
+        networkedStationController.UpdateJobs(packet.JobUpdates);
+    }
 
  
     private void OnClientboundJobValidateResponsePacket(ClientboundJobValidateResponsePacket packet)
     {
-        Log($"OnClientboundJobValidateResponsePacket() JobNetId: {packet.JobNetId}, Status: {packet.Accepted}");
+        Log($"OnClientboundJobValidateResponsePacket() JobNetId: {packet.JobNetId}, Status: {packet.Invalid}");
 
         if(!NetworkedJob.Get(packet.JobNetId, out NetworkedJob networkedJob))
             return;
 
-        networkedJob.ValidatorResponseReceived = true;
-        networkedJob.ValidationAccepted = packet.Accepted;
-
-        switch (networkedJob.ValidationType)
-        {
-            case ValidationType.JobOverview:
-                networkedJob.JobValidator.ProcessJobOverview(networkedJob.JobOverview);
-                break;
-
-            case ValidationType.JobBooklet:
-                networkedJob.JobValidator.ValidateJob(networkedJob.JobBooklet);
-                break;
-        }
-
-        if(networkedJob.ValidationItem != null)
-            networkedJob.ValidationItem.NetId = packet.ItemNetID;
-        else
-            LogError($"OnClientboundJobValidateResponsePacket() {packet.JobNetId}, ValidationItem not found!");
+        GameObject.Destroy(networkedJob.gameObject);
     }
     
     #endregion
@@ -1057,14 +1057,12 @@ public class NetworkClient : NetworkManager
 
     public void SendJobValidateRequest(NetworkedJob job, NetworkedStationController station)
     {
-        /* disabled for stable release
         SendPacketToServer(new ServerboundJobValidateRequestPacket
         {
             JobNetId = job.NetId,
             StationNetId = station.NetId,
             validationType = job.ValidationType
         }, DeliveryMethod.ReliableUnordered);
-        */
     }
 
     public void SendChat(string message)

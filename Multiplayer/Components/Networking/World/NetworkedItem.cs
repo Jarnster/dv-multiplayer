@@ -71,7 +71,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         {
             //Job related items
             case "JobOverview":
-                SetupJobOverview();
+                //SetupJobOverview();
                 break;
 
             case "JobBooklet":
@@ -79,11 +79,11 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
                 break;
 
             case "JobMissingLicenseReport":
-                SetupJobMissingLicenseReport();
+                //SetupJobMissingLicenseReport();
                 break;
 
             case "JobDebtWarningReport":
-                SetupJobDebtWarningReport();
+                //SetupJobDebtWarningReport();
                 break;
 
             //Loco related items
@@ -122,24 +122,24 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         Multiplayer.LogDebug(() => $"OnItemInventoryStateChanged() {name}, InventoryActionType: {actionType}, InventoryItemState: {itemState}");
     }
 
-    private void SetupJobOverview()
-    {
-        if(!TryGetComponent(out JobOverview jobOverview))
-        {
-            Multiplayer.LogError($"SetupJobOverview() Could not find JobOverview");
-            return;
-        }
+    //private void SetupJobOverview()
+    //{
+    //    if(!TryGetComponent(out JobOverview jobOverview))
+    //    {
+    //        Multiplayer.LogError($"SetupJobOverview() Could not find JobOverview");
+    //        return;
+    //    }
 
-        if (!NetworkedJob.TryGetFromJob(jobOverview.job, out NetworkedJob networkedJob))
-        {
-            Multiplayer.LogError($"SetupJobOverview() NetworkedJob not found for Job ID: {jobOverview?.job?.ID}");
-            jobOverview.DestroyJobOverview();
-            return;
-        }
+    //    if (!NetworkedJob.TryGetFromJob(jobOverview.job, out NetworkedJob networkedJob))
+    //    {
+    //        Multiplayer.LogError($"SetupJobOverview() NetworkedJob not found for Job ID: {jobOverview?.job?.ID}");
+    //        jobOverview.DestroyJobOverview();
+    //        return;
+    //    }
 
-        networkedJob.JobOverview = jobOverview;
-        networkedJob.ValidationItem = this;
-    }
+    //    networkedJob.JobOverview = jobOverview;
+    //    networkedJob.ValidationItem = this;
+    //}
 
     //private IEnumerator SetupJobBooklet()
     //{

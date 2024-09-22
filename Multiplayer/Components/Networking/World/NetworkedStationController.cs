@@ -2,11 +2,18 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
+using DV.Booklets;
 using DV.Logic.Job;
+using DV.ServicePenalty;
+using DV.Utils;
 using Multiplayer.Components.Networking.Jobs;
 using Multiplayer.Components.Networking.Train;
 using Multiplayer.Networking.Data;
+using Multiplayer.Utils;
+using Unity.Jobs;
 using UnityEngine;
+using UnityEngine.Assertions.Must;
+
 
 namespace Multiplayer.Components.Networking.World;
 
@@ -66,6 +73,12 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
 
     public static bool GetFromJobValidator(JobValidator jobValidator, out NetworkedStationController networkedStationController)
     {
+        if (jobValidator == null)
+        {
+            networkedStationController = null;
+            return false;
+        }
+
         return jobValidatorToNetworkedStation.TryGetValue(jobValidator, out networkedStationController);
     }
 
@@ -97,13 +110,19 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
 
     protected override bool IsIdServerAuthoritative => true;
 
-    private StationController StationController;
+    public StationController StationController;
 
     public JobValidator JobValidator;
 
     public HashSet<NetworkedJob> NetworkedJobs { get; } = new HashSet<NetworkedJob>();
     private List<NetworkedJob> NewJobs = new List<NetworkedJob>();
     private List<NetworkedJob> DirtyJobs = new List<NetworkedJob>();
+
+    private List<Job> availableJobs;
+    private List<Job> takenJobs;
+    private List<Job> abandonedJobs;
+    private List<Job> completedJobs;
+
 
     protected override void Awake()
     {
@@ -125,7 +144,13 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         while (StationController.logicStation == null)
             yield return null;
 
-        NetworkedStationController.RegisterStationController(this, StationController);
+        RegisterStationController(this, StationController);
+
+        availableJobs = StationController.logicStation.availableJobs;
+        takenJobs = StationController.logicStation.takenJobs;
+        abandonedJobs = StationController.logicStation.abandonedJobs;
+        completedJobs = StationController.logicStation.completedJobs;
+
         Multiplayer.Log($"NetworkedStation.Awake({StationController.logicStation.ID})");
 
         foreach (JobValidator validator in jobValidators)
@@ -156,26 +181,43 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         job.JobAbandoned += OnJobAbandoned;
         job.JobCompleted += OnJobCompleted;
         job.JobExpired += OnJobExpired;
+
+        networkedJob.OverviewGenerated += OnOverviewGeneration;
+    }
+
+    public void OnOverviewGeneration(NetworkedJob job)
+    {
+        if(!DirtyJobs.Contains(job))
+            DirtyJobs.Add(job);
+
     }
 
     private void OnJobTaken(Job job, bool viaLoadGame)
     {
+        if (viaLoadGame)
+            return;
 
+        Multiplayer.Log($"NetworkedStationController.OnJobTaken({job.ID})");
+        if(NetworkedJob.TryGetFromJob(job, out NetworkedJob networkedJob))
+            DirtyJobs.Add(networkedJob);
     }
 
     private void OnJobAbandoned(Job job)
     {
-
+        if (NetworkedJob.TryGetFromJob(job, out NetworkedJob networkedJob))
+            DirtyJobs.Add(networkedJob);
     }
 
     private void OnJobCompleted(Job job)
     {
-
+        if (NetworkedJob.TryGetFromJob(job, out NetworkedJob networkedJob))
+            DirtyJobs.Add(networkedJob);
     }
 
     private void OnJobExpired(Job job)
     {
-
+        if (NetworkedJob.TryGetFromJob(job, out NetworkedJob networkedJob))
+            DirtyJobs.Add(networkedJob);
     }
 
     private void Server_OnTick(uint tick)
@@ -183,7 +225,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         //Send new jobs
         if (NewJobs.Count > 0)
         {
-            NetworkLifecycle.Instance.Server.SendJobsCreatePacket(NetId, NewJobs.ToArray());
+            NetworkLifecycle.Instance.Server.SendJobsCreatePacket(this, NewJobs.ToArray());
             NewJobs.Clear();
         }
 
@@ -191,6 +233,8 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         if (DirtyJobs.Count > 0)
         {
             //todo send packet with updates
+            NetworkLifecycle.Instance.Server.SendJobsUpdatePacket(NetId, DirtyJobs.ToArray());
+            DirtyJobs.Clear();
         }
     }
 
@@ -198,14 +242,12 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
     #region Client
     public void AddJobs(JobData[] jobs)
     {
-        //NetworkLifecycle.Instance.Client.Log($"AddJobs() jobs[] exists: {jobs != null}, job count: {jobs?.Count()}");
+        NetworkLifecycle.Instance.Client.Log($"AddJobs() jobs[] exists: {jobs != null}, job count: {jobs?.Count()}");
 
-        //NetworkLifecycle.Instance.Client.Log($"AddJobs() preloop");
         foreach (JobData job in jobs)
         {
-            //NetworkLifecycle.Instance.Client.Log($"AddJobs() inloop");
-
-            //NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {jobData?.ID ?? ""}, netID: {jobData?.NetID}, task count: {jobData?.Tasks?.Count()}");
+            NetworkLifecycle.Instance.Client.Log($"AddJobs() inloop");
+            NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {job?.ID ?? ""}, netID: {job?.NetID}, task count: {job?.Tasks?.Count()}");
 
             // Convert TaskNetworkData to Task objects
             List<Task> tasks = new List<Task>();
@@ -217,11 +259,11 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
                     continue;
                 }
 
-                //NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {jobData?.ID}, task type: {taskData.TaskType}");
+                NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {job?.ID}, task type: {taskData.TaskType}");
                 tasks.Add(taskData.ToTask());
             }
 
-            //NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {jobData?.ID}, netID: {jobData?.NetID}, StationsChainData");
+            NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {job?.ID}, netID: {job?.NetID}, StationsChainData");
             // Create StationsChainData from ChainData
             StationsChainData chainData = new StationsChainData(
                 job.ChainData.ChainOriginYardId,
@@ -229,7 +271,7 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
             );
 
 
-            //NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {jobData?.ID}, netID: {jobData?.NetID}, newJob");
+            NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {job?.ID}, netID: {job?.NetID}, newJob");
             // Create a new local Job
             Job newJob = new Job(
                 tasks,
@@ -241,35 +283,40 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
                 job.RequiredLicenses
             );
 
-            //NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {jobData?.ID}, netID: {jobData?.NetID}, properties");
+            NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {job?.ID}, netID: {job?.NetID}, properties");
             // Set additional properties
             newJob.startTime = job.StartTime;
             newJob.finishTime = job.FinishTime;
             newJob.State = job.State;
 
-            //NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {jobData?.ID}, netID: {jobData?.NetID}, netjob");
+            NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {job?.ID}, netID: {job?.NetID}, netjob");
 
             // Create a new NetworkedJob
             NetworkedJob networkedJob = new GameObject($"NetworkedJob {newJob.ID}").AddComponent<NetworkedJob>();
             networkedJob.NetId = job.NetID;
             networkedJob.Job = newJob;
             networkedJob.Station = this;
-            networkedJob.playerID = job.PlayerId;
+            //networkedJob.playerID = job.PlayerId;
 
-            //NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {jobData?.ID}, netID: {jobData?.NetID}, NetJob Add");
+            NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {job?.ID}, netID: {job?.NetID}, NetJob Add");
             NetworkedJobs.Add(networkedJob);
 
-            //NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {jobData?.ID}, netID: {jobData?.NetID}, CarPlates");
+            NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {job?.ID}, netID: {job?.NetID}, CarPlates");
             // Start coroutine to update car plates
             StartCoroutine(UpdateCarPlates(tasks, newJob.ID));
 
             //If the job is not owned by anyone, we can add it to the station
             //if(networkedJob.OwnedBy == Guid.Empty)
+            NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {job?.ID}, netID: {job?.NetID}, AddJobToStation()");
             StationController.logicStation.AddJobToStation(newJob);
-            
+            StationController.processedNewJobs.Add(newJob);
+
+            NetworkLifecycle.Instance.Client.Log($"AddJobs() ID: {job?.ID}, netID: {job?.NetID}, job state {job.State}, itemNetId {job.ItemNetID}");
 
             //start coroutine for generating overviews and booklets
-            //StartCoroutine(CreatePaperWork());
+            NetworkLifecycle.Instance.Client.Log($"AddJobs() {newJob?.ID} Generating Overview {(newJob.State == DV.ThingTypes.JobState.Available && job.ItemNetID != 0)}");
+            if (newJob.State == DV.ThingTypes.JobState.Available && job.ItemNetID != 0)
+                GenerateOverview(networkedJob, job.ItemNetID, job.ItemPosition);
 
             // Log the addition of the new job
             NetworkLifecycle.Instance.Client.Log($"AddJobs() {newJob?.ID} to NetworkedStationController {StationController?.logicStation?.ID}");
@@ -279,9 +326,125 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         StationController.attemptJobOverviewGeneration = true;
     }
 
-    public void UpdateJob()
+    public void UpdateJobs(JobUpdateStruct[] jobs)
     {
+        foreach (JobUpdateStruct job in jobs)
+        {
+            if (!NetworkedJob.Get(job.JobNetID, out NetworkedJob netJob))
+                continue;
 
+            JobValidator validator = null;
+            if(job.ItemNetID != 0 &&  job.ValidationStationId != 0)
+                if (Get(job.ValidationStationId, out var netStation))
+                    validator = netStation.JobValidator;
+
+            Multiplayer.Log($"NetworkedStation.UpdateJobs() jobNetId: {job.JobNetID}, Validator found: {validator != null}");
+
+            //state change updates
+            if (netJob.Job.State != job.JobState)
+            {
+                netJob.Job.State = job.JobState;
+                bool printed = false;
+
+                switch (netJob.Job.State)
+                {
+                    case DV.ThingTypes.JobState.InProgress:
+                        availableJobs.Remove(netJob.Job);
+                        takenJobs.Add(netJob.Job);
+
+                        netJob.JobBooklet = BookletCreator.CreateJobBooklet(netJob.Job, validator.bookletPrinter.spawnAnchor.position, validator.bookletPrinter.spawnAnchor.rotation, WorldMover.OriginShiftParent, true);
+
+                        netJob.ValidationItem.NetId = job.ItemNetID;
+                        printed = true;
+                        netJob.JobOverview.DestroyJobOverview();
+                        break;
+                    case DV.ThingTypes.JobState.Completed:
+                        takenJobs.Remove(netJob.Job);
+                        completedJobs.Add(netJob.Job);
+
+                        DisplayableDebt displayableDebt = SingletonBehaviour<JobDebtController>.Instance.LastStagedJobDebt;
+                        netJob.JobReport = BookletCreator.CreateJobReport(netJob.Job, displayableDebt, validator.bookletPrinter.spawnAnchor.position, validator.bookletPrinter.spawnAnchor.rotation, WorldMover.OriginShiftParent);
+
+                        netJob.ValidationItem.NetId = job.ItemNetID;
+                        printed = true;
+                        netJob.JobBooklet.DestroyJobBooklet();
+                        break;
+                    case DV.ThingTypes.JobState.Abandoned:
+                        takenJobs.Remove(netJob.Job);
+                        abandonedJobs.Add(netJob.Job);
+
+                        //netJob.JobExpiredReport = BookletCreator.CreateJobExpiredReport(netJob.Job, validator.bookletPrinter.spawnAnchor.position, validator.bookletPrinter.spawnAnchor.rotation, WorldMover.OriginShiftParent);
+                        //netJob.ValidationItem.NetId = job.ItemNetID;
+                        //printed = true;
+
+                        break;
+                    case DV.ThingTypes.JobState.Expired:
+                        if(availableJobs.Contains(netJob.Job))
+                            availableJobs.Remove(netJob.Job);
+
+                        //netJob.JobExpiredReport = BookletCreator.CreateJobExpiredReport(netJob.Job, validator.bookletPrinter.spawnAnchor.position, validator.bookletPrinter.spawnAnchor.rotation, WorldMover.OriginShiftParent);
+                        //netJob.ValidationItem.NetId = job.ItemNetID;
+                        //printed = true;
+
+                        break;
+                    default:
+                        NetworkLifecycle.Instance.Client.LogError($"NetworkedStation.UpdateJobs() Unrecognised Job State for JobId: {job.JobNetID}, {netJob.Job.ID}");
+                        break;
+                }
+
+                if (printed)
+                {
+                    Multiplayer.Log($"NetworkedStation.UpdateJobs() jobNetId: {job.JobNetID}, Playing sounds");
+                    netJob.ValidatorResponseReceived = true;
+                    netJob.ValidationAccepted = true;
+                    validator.jobValidatedSound.Play(validator.bookletPrinter.spawnAnchor.position, 1f, 1f, 0f, 1f, 500f, default(AudioSourceCurves), null, validator.transform, false, 0f, null);
+                    validator.bookletPrinter.Print(false);
+                }
+            }
+
+            //job overview generation update
+            if(job.JobState == DV.ThingTypes.JobState.Available && job.ItemNetID !=0)
+            {
+                
+                if (netJob.JobOverview == null)
+                {
+                    //create overview
+                    Multiplayer.LogDebug(()=>$"NetworkedStation.UpdateJobs() Creating JobOverview");
+                    if (job.JobState == DV.ThingTypes.JobState.Available && job.ItemNetID != 0)
+                        GenerateOverview(netJob, job.ItemNetID, job.ItemPositionData);
+                }
+                else
+                {
+                    Multiplayer.LogDebug(() => $"NetworkedStation.UpdateJobs() Setting JobOverview");
+                    netJob.ValidationItem.NetId = job.ItemNetID;
+                }
+            }
+
+            //generic update
+            netJob.Job.startTime = job.StartTime;
+            netJob.Job.finishTime = job.FinishTime;
+        }
+    }
+
+    public void RemoveJob(NetworkedJob job)
+    {
+        if (availableJobs.Contains(job.Job))
+            availableJobs.Remove(job.Job);
+
+        if (takenJobs.Contains(job.Job))
+            takenJobs.Remove(job.Job);
+
+        if (completedJobs.Contains(job.Job))
+            completedJobs.Remove(job.Job);
+
+        if (abandonedJobs.Contains(job.Job))
+            abandonedJobs.Remove(job.Job);
+
+        job.JobOverview?.DestroyJobOverview();
+        job.JobBooklet?.DestroyJobBooklet();
+
+        NetworkedJobs.Remove(job);
+        GameObject.Destroy(job);
     }
 
     public static IEnumerator UpdateCarPlates(List<DV.Logic.Job.Task> tasks, string jobId)
@@ -344,20 +507,12 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
                     //Multiplayer.Log($"NetworkedStation.UpdateCarPlatesRecursive() SequentialTask Adding node");
                     seqTask.Add(node.Value);
                 }
-
-                //Multiplayer.Log($"NetworkedStation.UpdateCarPlatesRecursive() SequentialTask Node Count:{seqTask.Count}");
-
-                //Multiplayer.Log("NetworkedStation.UpdateCarPlatesRecursive() Calling UpdateCarPlates()");
                 //drill down
                 UpdateCarPlatesRecursive(seqTask, jobId, ref cars);
                 //Multiplayer.Log($"NetworkedStation.UpdateCarPlatesRecursive() SequentialTask RETURNED");
             }
             else if (task is ParallelTasks)
             {
-                //not implemented
-                //Multiplayer.Log("NetworkedStation.UpdateCarPlatesRecursive() ParallelTasks");
-
-                //Multiplayer.Log("NetworkedStation.UpdateCarPlatesRecursive() Calling UpdateCarPlates()");
                 //drill down
                 UpdateCarPlatesRecursive(((ParallelTasks)task).tasks, jobId, ref cars);
             }
@@ -368,6 +523,15 @@ public class NetworkedStationController : IdMonoBehaviour<ushort, NetworkedStati
         }
 
         //Multiplayer.Log("NetworkedStation.UpdateCarPlatesRecursive() Returning");
+    }
+
+    private void GenerateOverview(NetworkedJob networkedJob, ushort itemNetId, ItemPositionData posData)
+    {
+        networkedJob.JobOverview = BookletCreator_JobOverview.Create(networkedJob.Job, posData.Position + WorldMover.currentMove, posData.Rotation);
+        NetworkedItem netItem = networkedJob.JobOverview.GetOrAddComponent<NetworkedItem>();
+        netItem.NetId = itemNetId;
+        networkedJob.ValidationItem = netItem;
+        StationController.spawnedJobOverviews.Add(networkedJob.JobOverview);
     }
 
     private void OnDisable()

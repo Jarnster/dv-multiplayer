@@ -1,14 +1,10 @@
-using System;
 using System.Collections;
-using System.Linq;
-using DV;
 using DV.ThingTypes;
 using HarmonyLib;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Jobs;
 using Multiplayer.Components.Networking.World;
-using Multiplayer.Networking.Packets.Clientbound.Jobs;
-
+using Multiplayer.Networking.Data;
 using UnityEngine;
 
 namespace Multiplayer.Patches.Jobs;
@@ -29,8 +25,6 @@ public static class JobValidator_Patch
     [HarmonyPrefix]
     private static bool ProcessJobOverview_Prefix(JobValidator __instance, JobOverview jobOverview)
     {
-        if (NetworkLifecycle.Instance.IsHost())
-            return true;
 
         if(__instance.bookletPrinter.IsOnCooldown)
         {
@@ -46,9 +40,16 @@ public static class JobValidator_Patch
             return false;
         }
 
-        if (networkedJob.ValidatorRequestSent)
-            return (networkedJob.ValidatorResponseReceived && networkedJob.ValidationAccepted);         
-        else
+        if (NetworkLifecycle.Instance.IsHost())
+        {
+            Multiplayer.Log($"ProcessJobOverview_Prefix({jobOverview?.job?.ID}) IsHost");
+            networkedJob.JobValidator = __instance;
+            return true;
+        }
+
+        if (!networkedJob.ValidatorRequestSent)
+        //    return (networkedJob.ValidatorResponseReceived && networkedJob.ValidationAccepted);         
+        //else
             SendValidationRequest(__instance, networkedJob, ValidationType.JobOverview);
 
         return false;
@@ -59,9 +60,6 @@ public static class JobValidator_Patch
     [HarmonyPrefix]
     private static bool ValidateJob_Prefix(JobValidator __instance, JobBooklet jobBooklet)
     {
-        if (NetworkLifecycle.Instance.IsHost())
-            return true;
-
         if (__instance.bookletPrinter.IsOnCooldown)
         {
             __instance.bookletPrinter.PlayErrorSound();
@@ -74,6 +72,12 @@ public static class JobValidator_Patch
             __instance.bookletPrinter.PlayErrorSound();
             jobBooklet.DestroyJobBooklet();
             return false;
+        }
+
+        if (NetworkLifecycle.Instance.IsHost())
+        {
+            networkedJob.JobValidator = __instance;
+            return true;
         }
 
         if (networkedJob.ValidatorRequestSent)

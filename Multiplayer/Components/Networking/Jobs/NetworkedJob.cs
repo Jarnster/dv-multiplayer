@@ -4,7 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using DV.Logic.Job;
 using Multiplayer.Components.Networking.World;
-using Multiplayer.Networking.Packets.Clientbound.Jobs;
+using Multiplayer.Networking.Data;
 using UnityEngine;
 
 
@@ -51,9 +51,13 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
     #endregion
     protected override bool IsIdServerAuthoritative => true;
 
+    public Action<NetworkedJob> OverviewGenerated;
+
     public Job Job;
     public JobOverview JobOverview;
     public JobBooklet JobBooklet;
+    public JobReport JobReport;
+    public JobExpiredReport JobExpiredReport;
     public NetworkedStationController Station;
 
     public Guid OwnedBy = Guid.Empty; //GUID of player who took the job (sever only)
@@ -102,6 +106,13 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
     }
 
     #region Server
+
+    public void JobOverviewGenerated(JobOverview jobOverview)
+    {
+        JobOverview = jobOverview;
+
+        OverviewGenerated?.Invoke(this);
+    }
 
     private void Server_OnTick(uint tick)
     {

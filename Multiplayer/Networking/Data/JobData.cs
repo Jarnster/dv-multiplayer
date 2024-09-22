@@ -3,7 +3,10 @@ using DV.ThingTypes;
 using LiteNetLib.Utils;
 using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.Jobs;
+using Multiplayer.Components.Networking.World;
 using System;
+using System.IO;
+using System.Linq;
 
 namespace Multiplayer.Networking.Data;
 
@@ -20,11 +23,32 @@ public class JobData
     public float InitialWage { get; set; }
     public JobState State { get; set; } //serialise as byte
     public float TimeLimit { get; set; }
-    public int PlayerId { get; set; }
+    public ushort ItemNetID { get; set; }
+    public ItemPositionData ItemPosition { get; set; }
 
-    public static JobData FromJob(NetworkedJob networkedJob)
+    public static JobData FromJob(NetworkedStationController netStation, NetworkedJob networkedJob)
     {
         Job job = networkedJob.Job;
+        ushort itemNetId = 0;
+        ItemPositionData itemPos = new ItemPositionData();
+
+        if (networkedJob.Job.State == JobState.Available)
+        {
+            JobOverview jobOverview = netStation.StationController.spawnedJobOverviews.Where(jo => jo.job == job).FirstOrDefault();
+            if (jobOverview != default(JobOverview))
+            {
+                NetworkedItem netItem = jobOverview.GetComponent<NetworkedItem>();
+                if (netItem != null)
+                {
+                    itemNetId = netItem.NetId;
+                    itemPos = ItemPositionData.FromItem(netItem);
+                }
+            }
+        }else if(job.State == JobState.InProgress || job.State == JobState.Completed)
+        {
+            itemNetId = networkedJob.ValidationItem.NetId;
+            itemPos = ItemPositionData.FromItem(networkedJob.ValidationItem);
+        }
 
         return new JobData
         {
@@ -39,112 +63,121 @@ public class JobData
             InitialWage = job.initialWage,
             State = job.State,
             TimeLimit = job.TimeLimit,
-            PlayerId = networkedJob.playerID
+            ItemNetID = itemNetId,
+            ItemPosition = itemPos,
         };
     }
 
     public static void Serialize(NetDataWriter writer, JobData data)
     {
         NetworkLifecycle.Instance.Server.Log($"JobData.Serialize({data.ID}) NetID {data.NetID}");
+
         writer.Put(data.NetID);
-        //Multiplayer.Log($"JobData.Serialize({data.ID}) JobType {(byte)data.JobType}, {data.JobType}");
         writer.Put((byte)data.JobType);
-        //Multiplayer.Log($"JobData.Serialize({data.ID}) JobID {data.ID}");
         writer.Put(data.ID);
 
-        //Multiplayer.Log($"JobData.Serialize({data.ID}) task length {data.Tasks.Length}");
-        //task data
-        writer.Put((byte)data.Tasks.Length);
-        foreach (var task in data.Tasks)
+        //task data - add compression
+        using (MemoryStream ms = new MemoryStream())
+        using (BinaryWriter bw = new BinaryWriter(ms))
         {
-            //Multiplayer.Log($"JobData.Serialize({data.ID}) TaskType {(byte)task.TaskType}, {task.TaskType}");
+            bw.Write((byte)data.Tasks.Length);
+            foreach (var task in data.Tasks)
+            {
+                NetDataWriter taskSerialiser = new NetDataWriter();
 
-            writer.Put((byte)task.TaskType);
-            task.Serialize(writer);
+                bw.Write((byte)task.TaskType);
+                task.Serialize(taskSerialiser);
+
+                bw.Write(taskSerialiser.Data.Length);
+                bw.Write(taskSerialiser.Data);
+            }
+
+            byte[] compressedData = PacketCompression.Compress(ms.ToArray());
+
+            Multiplayer.Log($"JobData.Serialize() Uncompressed: {ms.Length} Compressed: {compressedData.Length}");
+            writer.PutBytesWithLength(compressedData);
         }
 
-        //Multiplayer.Log($"JobData.Serialize({data.ID}) calling StationsChainDataData.Serialize()");
         StationsChainNetworkData.Serialize(writer, data.ChainData);
 
-        //Multiplayer.Log($"JobData.Serialize({data.ID}) RequiredLicenses {data.RequiredLicenses}");
         writer.Put((int)data.RequiredLicenses);
-        //Multiplayer.Log($"JobData.Serialize({data.ID}) StartTime {data.StartTime}");
         writer.Put(data.StartTime);
-        //Multiplayer.Log($"JobData.Serialize({data.ID}) FinishTime {data.FinishTime}");
         writer.Put(data.FinishTime);
-        //Multiplayer.Log($"JobData.Serialize({data.ID}) InitialWage {data.InitialWage}");
         writer.Put(data.InitialWage);
-        //Multiplayer.Log($"JobData.Serialize({data.ID}) State {(byte)data.State}, {data.State}");
         writer.Put((byte)data.State);
-        //Multiplayer.Log($"JobData.Serialize({data.ID}) TimeLimit {data.TimeLimit}");
         writer.Put(data.TimeLimit);
-        //Multiplayer.Log(JsonConvert.SerializeObject(data, Formatting.None));
-
-        //Take on the GUID of the player
-        //if(data.State != JobState.Available)
-        //    writer.Put(data.OwnedBy.ToByteArray());
-
-        writer.Put(data.PlayerId);
+        writer.Put(data.ItemNetID);
+        ItemPositionData.Serialize(writer, data.ItemPosition);
     }
 
     public static JobData Deserialize(NetDataReader reader)
     {
-        //Multiplayer.LogDebug(() => $"JobData.Deserialize(): [{string.Join(", ", reader.RawData?.Select(id => id.ToString()))}]");
-        ushort netID = reader.GetUShort();
-        //Multiplayer.Log($"JobData.Deserialize() netID {netID}");
-        JobType jobType = (JobType)reader.GetByte();
-        //Multiplayer.Log($"JobData.Deserialize() jobType {jobType}");
-        string id = reader.GetString();
-        //Multiplayer.Log($"JobData.Deserialize() id {id}");
-
-        byte tasksLength = reader.GetByte();
-        //Multiplayer.Log($"JobData.Deserialize() tasksLength {tasksLength}");
-
-        TaskNetworkData[] tasks = new TaskNetworkData[tasksLength];
-        for (int i = 0; i < tasksLength; i++)
+        try
         {
-            TaskType taskType = (TaskType)reader.GetByte();
-            //Multiplayer.Log($"JobData.Deserialize() taskType {taskType}");
-            tasks[i] = TaskNetworkDataFactory.ConvertTask(taskType);
-            //Multiplayer.Log($"JobData.Deserialize() TaskNetworkData not null: {tasks[i] != null}, {tasks[i].GetType().FullName}");
-            tasks[i].Deserialize(reader);
-            //Multiplayer.Log($"JobData.Deserialize() TaskNetworkData Deserialised");
+
+            ushort netID = reader.GetUShort();
+            JobType jobType = (JobType)reader.GetByte();
+            string id = reader.GetString();
+
+            //Decompress task data
+            byte[] compressedData = reader.GetBytesWithLength();
+            byte[] decompressedData = PacketCompression.Decompress(compressedData);
+
+            Multiplayer.Log($"JobData.Deserialize() Compressed: {compressedData.Length} Decompressed: {decompressedData.Length}");
+
+            TaskNetworkData[] tasks;
+
+            using (MemoryStream ms = new MemoryStream(decompressedData))
+            using (BinaryReader br = new BinaryReader(ms))
+            {
+                byte tasksLength = br.ReadByte();
+                tasks = new TaskNetworkData[tasksLength];
+
+                for (int i = 0; i < tasksLength; i++)
+                {
+                    TaskType taskType = (TaskType)br.ReadByte();
+
+                    int taskLength = br.ReadInt32();
+                    NetDataReader taskReader = new NetDataReader(br.ReadBytes(taskLength));
+
+                    tasks[i] = TaskNetworkDataFactory.ConvertTask(taskType);
+                    tasks[i].Deserialize(taskReader);
+                }
+            }
+
+            StationsChainNetworkData chainData = StationsChainNetworkData.Deserialize(reader);
+
+            JobLicenses requiredLicenses = (JobLicenses)reader.GetInt();
+            float startTime = reader.GetFloat();
+            float finishTime = reader.GetFloat();
+            float initialWage = reader.GetFloat();
+            JobState state = (JobState)reader.GetByte();
+            float timeLimit = reader.GetFloat();
+            ushort itemNetId = reader.GetUShort();
+            ItemPositionData itemPositionData = ItemPositionData.Deserialize(reader);
+
+            return new JobData
+            {
+                NetID = netID,
+                JobType = jobType,
+                ID = id,
+                Tasks = tasks,
+                ChainData = chainData,
+                RequiredLicenses = requiredLicenses,
+                StartTime = startTime,
+                FinishTime = finishTime,
+                InitialWage = initialWage,
+                State = state,
+                TimeLimit = timeLimit,
+                ItemNetID = itemNetId,
+                ItemPosition = itemPositionData
+            };
         }
-
-        StationsChainNetworkData chainData = StationsChainNetworkData.Deserialize(reader);
-        //Multiplayer.Log($"JobData.Deserialize() chainData {chainData.ChainOriginYardId}, {chainData.ChainDestinationYardId}");
-
-        JobLicenses requiredLicenses = (JobLicenses)reader.GetInt();
-        //Multiplayer.Log("JobData.Deserialize() requiredLicenses: " + requiredLicenses);
-        float startTime = reader.GetFloat();
-        //Multiplayer.Log("JobData.Deserialize() startTime: " + startTime);
-        float finishTime = reader.GetFloat();
-        //Multiplayer.Log("JobData.Deserialize() finishTime: " + finishTime);
-        float initialWage = reader.GetFloat();
-        //Multiplayer.Log("JobData.Deserialize() initialWage: " + initialWage);
-        JobState state = (JobState)reader.GetByte();
-        //Multiplayer.Log("JobData.Deserialize() state: " + state);
-        float timeLimit = reader.GetFloat();
-        //Multiplayer.Log("JobData.Deserialize() timeLimit: " + timeLimit);
-
-        //int playerId =  (state != JobState.Available)? new(reader.GetBytesWithLength()) : Guid.Empty;
-        int playerId = reader.GetInt();
-
-        return new JobData
+        catch (Exception ex)
         {
-            NetID = netID,
-            JobType = jobType,
-            ID = id,
-            Tasks = tasks,
-            ChainData = chainData,
-            RequiredLicenses = requiredLicenses,
-            StartTime = startTime,
-            FinishTime = finishTime,
-            InitialWage = initialWage,
-            State = state,
-            TimeLimit = timeLimit,
-            PlayerId = playerId,
-        };
+            Multiplayer.Log($"JobData.Deserialize() Failed! {ex.Message}\r\n{ex.StackTrace}");
+            return null;
+        }
     }
 
 }

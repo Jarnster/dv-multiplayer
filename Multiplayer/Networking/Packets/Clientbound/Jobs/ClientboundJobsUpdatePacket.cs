@@ -1,69 +1,44 @@
-using DV.ThingTypes;
-using LiteNetLib.Utils;
+using Multiplayer.Networking.Data;
+using Multiplayer.Components.Networking.Jobs;
+using Multiplayer.Components.Networking.World;
+using System.Collections.Generic;
 
 namespace Multiplayer.Networking.Packets.Clientbound.Jobs;
-
-public struct JobUpdateStruct
-{
-    public ushort JobNetID;
-    public bool Invalid;
-    public JobState JobState;
-    public float StartTime;
-    public float FinishTime;
-    public ushort OwnedBy;
-
-    public static void Serialize(NetDataWriter writer, JobUpdateStruct data)
-    {
-        writer.Put(data.JobNetID);
-        writer.Put(data.Invalid);
-
-        //Invalid jobs will be deleted / deregistered
-        if (data.Invalid)
-            return;
-
-        writer.Put((byte)data.JobState);
-        writer.Put(data.StartTime);
-        writer.Put(data.FinishTime);
-
-        writer.Put(data.OwnedBy);
-    }
-
-    public static JobUpdateStruct Deserialize(NetDataReader reader)
-    {
-        JobUpdateStruct deserialised = new JobUpdateStruct();
-
-        deserialised.JobNetID = reader.GetUShort();
-        deserialised.Invalid = reader.GetBool();
-
-        if (deserialised.Invalid)
-            return deserialised;
-
-        deserialised.JobState = (JobState) reader.GetByte();
-        deserialised.StartTime = reader.GetFloat();
-        deserialised.FinishTime = reader.GetFloat();
-        deserialised.OwnedBy = reader.GetUShort();
-
-        return deserialised;
-    }
-}
 public class ClientboundJobsUpdatePacket
 {
+    public ushort StationNetId { get; set; }
     public JobUpdateStruct[] JobUpdates { get; set; }
 
-    /*
-    public static ClientboundJobsUpdatePacket FromNetworkedJobs(ushort stationID, NetworkedJob[] jobs)
+    
+    public static ClientboundJobsUpdatePacket FromNetworkedJobs(ushort stationNetID, NetworkedJob[] jobs)
     {
-        List<JobData> jobData = new List<JobData>();
+        Multiplayer.Log($"ClientboundJobsUpdatePacket.FromNetworkedJobs({stationNetID}, {jobs.Length})");
+
+        List<JobUpdateStruct> jobData = new List<JobUpdateStruct>();
         foreach (var job in jobs)
         {
-            jobData.Add(JobData.FromJob(job));
+            ushort validationNetId = 0;
+
+            if (NetworkedStationController.GetFromJobValidator(job.JobValidator, out NetworkedStationController netValidationStation))
+                validationNetId = netValidationStation.NetId;
+
+            JobUpdateStruct data = new JobUpdateStruct
+            {
+                JobNetID = job.NetId,
+                JobState = job.Job.State,
+                StartTime = job.Job.startTime,
+                FinishTime = job.Job.finishTime,
+                ItemNetID = job.ValidationItem.NetId,
+                ValidationStationId = validationNetId
+            };
+
+            jobData.Add(data);
         }
 
-        return new ClientboundJobsCreatePacket
-                                            {
-                                                StationNetId = stationID,
-                                                Jobs = jobData.ToArray()
-                                            };
+        return new ClientboundJobsUpdatePacket
+                                                {
+                                                    StationNetId = stationNetID,
+                                                    JobUpdates = jobData.ToArray()
+                                                };
     }
-    */
 }
