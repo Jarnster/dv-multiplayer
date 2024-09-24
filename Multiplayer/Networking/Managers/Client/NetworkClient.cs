@@ -36,6 +36,7 @@ using UnityEngine;
 using UnityModManagerNet;
 using Object = UnityEngine.Object;
 using Multiplayer.Networking.Packets.Serverbound.Train;
+using System.Linq;
 
 namespace Multiplayer.Networking.Listeners;
 
@@ -124,7 +125,8 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundJobsUpdatePacket>(OnClientboundJobsUpdatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundJobsCreatePacket>(OnClientboundJobsCreatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundJobValidateResponsePacket>(OnClientboundJobValidateResponsePacket);
-        netPacketProcessor.SubscribeReusable<CommonChatPacket>(OnCommonChatPacket); 
+        netPacketProcessor.SubscribeReusable<CommonChatPacket>(OnCommonChatPacket);
+        netPacketProcessor.SubscribeReusable<CommonItemChangePacket, NetPeer>(OnCommonItemChangePacket);
     }
 
     #region Net Events
@@ -772,7 +774,32 @@ public class NetworkClient : NetworkManager
 
         GameObject.Destroy(networkedJob.gameObject);
     }
-    
+
+    private void OnCommonItemChangePacket(CommonItemChangePacket packet, NetPeer peer)
+    {
+        Multiplayer.LogDebug(() => $"OnCommonItemChangePacket({packet.Items.Count}, {peer.Id})");
+
+        string debug = "";
+
+        foreach (var item in packet.Items)
+        {
+            debug += "UpdateType: {" + item.UpdateType + "}";
+            debug += "itemNetId: " + item.ItemNetId;
+            debug += "PrefabName: " + item.PrefabName;
+            debug += "Equipped: " + item.Equipped;
+            debug += "Dropped: " + item.Dropped;
+            debug += "Position: " + item.PositionData.Position;
+            debug += "Rotation: " + item.PositionData.Rotation;
+
+            debug += "States:";
+
+            foreach (var state in item.States)
+                debug += "\r\n\t" + state.Key + ": " + state.Value;
+        }
+
+        Multiplayer.LogDebug(() => debug);
+    }
+
     #endregion
 
     #region Senders
@@ -1071,6 +1098,13 @@ public class NetworkClient : NetworkManager
         {
             message = message
         }, DeliveryMethod.ReliableUnordered);
+    }
+
+    public void SendItemsChangePacket(List<ItemUpdateData> items, NetPeer peer = null)
+    {
+        Multiplayer.Log($"Sending SendItemsChangePacket with {items.Count()} items");
+        SendPacketToServer(new CommonItemChangePacket { Items = items },
+            DeliveryMethod.ReliableUnordered);
     }
 
     #endregion

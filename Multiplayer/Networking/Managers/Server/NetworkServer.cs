@@ -133,6 +133,7 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<ServerboundJobValidateRequestPacket, NetPeer>(OnServerboundJobValidateRequestPacket);
         netPacketProcessor.SubscribeReusable<CommonChatPacket, NetPeer>(OnCommonChatPacket);
         netPacketProcessor.SubscribeReusable<UnconnectedPingPacket, IPEndPoint>(OnUnconnectedPingPacket);
+        netPacketProcessor.SubscribeReusable<CommonItemChangePacket, NetPeer>(OnCommonItemChangePacket);
     }
 
     private void OnLoaded()
@@ -388,13 +389,20 @@ public class NetworkServer : NetworkManager
     public void SendJobsCreatePacket(NetworkedStationController networkedStation, NetworkedJob[] jobs, DeliveryMethod method = DeliveryMethod.ReliableSequenced )
     {
         Multiplayer.Log($"Sending JobsCreatePacket for stationNetId {networkedStation.NetId} with {jobs.Count()} jobs");
-        SendPacketToAll(ClientboundJobsCreatePacket.FromNetworkedJobs(networkedStation, jobs), method);
+        SendPacketToAll(ClientboundJobsCreatePacket.FromNetworkedJobs(networkedStation, jobs), method, selfPeer);
     }
 
     public void SendJobsUpdatePacket(ushort stationNetId, NetworkedJob[] jobs, NetPeer peer = null)
     {
         Multiplayer.Log($"Sending JobsUpdatePacket for stationNetId {stationNetId} with {jobs.Count()} jobs");
-        SendPacketToAll(ClientboundJobsUpdatePacket.FromNetworkedJobs(stationNetId, jobs), DeliveryMethod.ReliableUnordered);
+        SendPacketToAll(ClientboundJobsUpdatePacket.FromNetworkedJobs(stationNetId, jobs), DeliveryMethod.ReliableUnordered,selfPeer);
+    }
+
+    public void SendItemsChangePacket(List<ItemUpdateData> items, NetPeer peer = null)
+    {
+        Multiplayer.Log($"Sending SendItemsChangePacket with {items.Count()} items");
+        SendPacketToAll(new CommonItemChangePacket { Items = items },
+            DeliveryMethod.ReliableUnordered, selfPeer);
     }
 
     public void SendChat(string message, NetPeer exclude = null)
@@ -899,7 +907,7 @@ public class NetworkServer : NetworkManager
 
     private void OnServerboundJobValidateRequestPacket(ServerboundJobValidateRequestPacket packet, NetPeer peer)
     {
-        LogWarning($"OnServerboundJobValidateRequestPacket(): {packet.JobNetId}");
+        Log($"OnServerboundJobValidateRequestPacket(): {packet.JobNetId}");
 
         if (!NetworkedJob.Get(packet.JobNetId, out NetworkedJob networkedJob))
         {
@@ -926,13 +934,15 @@ public class NetworkServer : NetworkManager
         switch (packet.validationType)
         {
             case ValidationType.JobOverview:
-                networkedStationController.JobValidator.ProcessJobOverview(networkedJob.JobOverview);
+                networkedStationController.JobValidator.ProcessJobOverview(networkedJob.JobOverview.GetTrackedItem<JobOverview>());
                 break;
 
             case ValidationType.JobBooklet:
-                networkedStationController.JobValidator.ValidateJob(networkedJob.JobBooklet);
+                networkedStationController.JobValidator.ValidateJob(networkedJob.JobBooklet.GetTrackedItem<JobBooklet>());
                 break;
         }
+
+        //SendPacket(peer, new ClientboundJobValidateResponsePacket { JobNetId = packet.JobNetId, Invalid = false }, DeliveryMethod.ReliableUnordered);
     }
 
     private void OnCommonChatPacket(CommonChatPacket packet, NetPeer peer)
@@ -946,6 +956,31 @@ public class NetworkServer : NetworkManager
     {
         Multiplayer.Log($"OnUnconnectedPingPacket({endPoint.Address})");
         SendUnconnectedPacket(packet, endPoint.Address.ToString(),endPoint.Port);
+    }
+
+    private void OnCommonItemChangePacket(CommonItemChangePacket packet, NetPeer peer)
+    {
+        Multiplayer.LogDebug(()=>$"OnCommonItemChangePacket({packet.Items.Count}, {peer.Id})");
+
+        string debug = "";
+
+        foreach(var item in packet.Items)
+        {
+            debug += "UpdateType: {" + item.UpdateType + "}";
+            debug += "itemNetId: " + item.ItemNetId;
+            debug += "PrefabName: " + item.PrefabName;
+            debug += "Equipped: " + item.Equipped;
+            debug += "Dropped: " + item.Dropped;
+            debug += "Position: " + item.PositionData.Position;
+            debug += "Rotation: " + item.PositionData.Rotation;
+
+            debug += "States:";
+
+            foreach(var state in item.States)
+                debug += "\r\n\t" + state.Key + ": " + state.Value;
+        }
+
+        Multiplayer.LogDebug(()=> debug);
     }
     #endregion
 }

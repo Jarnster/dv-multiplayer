@@ -29,25 +29,35 @@ public class JobData
     public static JobData FromJob(NetworkedStationController netStation, NetworkedJob networkedJob)
     {
         Job job = networkedJob.Job;
+
         ushort itemNetId = 0;
         ItemPositionData itemPos = new ItemPositionData();
 
+        Multiplayer.Log($"JobData.FromJob({netStation.name}, {job.ID}, {networkedJob.Job.State})");
+
         if (networkedJob.Job.State == JobState.Available)
         {
-            JobOverview jobOverview = netStation.StationController.spawnedJobOverviews.Where(jo => jo.job == job).FirstOrDefault();
-            if (jobOverview != default(JobOverview))
+            if (networkedJob.JobOverview != null)
             {
-                NetworkedItem netItem = jobOverview.GetComponent<NetworkedItem>();
-                if (netItem != null)
-                {
-                    itemNetId = netItem.NetId;
-                    itemPos = ItemPositionData.FromItem(netItem);
-                }
+                itemNetId = networkedJob.JobOverview.NetId;
+                itemPos = ItemPositionData.FromItem(networkedJob.JobOverview);
             }
-        }else if(job.State == JobState.InProgress || job.State == JobState.Completed)
+        }
+        else if (job.State == JobState.InProgress)
         {
-            itemNetId = networkedJob.ValidationItem.NetId;
-            itemPos = ItemPositionData.FromItem(networkedJob.ValidationItem);
+            if (networkedJob.JobBooklet != null)
+            {
+                itemNetId = networkedJob.JobBooklet.NetId;
+                itemPos = ItemPositionData.FromItem(networkedJob.JobBooklet);
+            }
+        }
+        else if(job.State == JobState.Completed)
+        {
+            if (networkedJob.JobReport != null)
+            {
+                itemNetId = networkedJob.JobReport.NetId;
+                itemPos = ItemPositionData.FromItem(networkedJob.JobReport);
+            }
         }
 
         return new JobData

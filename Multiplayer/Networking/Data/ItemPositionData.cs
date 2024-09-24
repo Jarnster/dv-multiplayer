@@ -9,15 +9,14 @@ public struct ItemPositionData
 {
     public Vector3 Position;
     public Quaternion Rotation;
-    //public bool held;
 
     public static ItemPositionData FromItem(NetworkedItem item)
     {
+        //Multiplayer.Log($"ItemPositionData.FromItem() Position: {item.Item.transform.position}, Less currentMove: {item.Item.transform.position - WorldMover.currentMove } ");
         return new ItemPositionData
         {
             Position = item.Item.transform.position - WorldMover.currentMove,
             Rotation = item.Item.transform.rotation,
-            //held = item.Item. //Todo: track if item is held by a player
         };
     }
 

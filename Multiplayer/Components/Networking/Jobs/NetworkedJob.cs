@@ -1,10 +1,12 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.Linq;
 using DV.Logic.Job;
 using Multiplayer.Components.Networking.World;
 using Multiplayer.Networking.Data;
+using Newtonsoft.Json.Linq;
 using UnityEngine;
 
 
@@ -32,12 +34,6 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
         return b;
     }
 
-
-    //public static NetworkedJob GetFromJob(Job job)
-    //{
-    //    return jobToNetworkedJob[job];
-    //}
-
     public static bool TryGetFromJob(Job job, out NetworkedJob networkedJob)
     {
         return jobToNetworkedJob.TryGetValue(job, out networkedJob);
@@ -50,90 +46,207 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
 
     #endregion
     protected override bool IsIdServerAuthoritative => true;
+    public enum DirtyCause
+    {
+        JobOverview,
+        JobBooklet,
+        JobReport,
+        JobState
+    }
 
-    public Action<NetworkedJob> OverviewGenerated;
+    public Job Job { get; private set; }
+    public NetworkedStationController Station { get; private set; }
 
-    public Job Job;
-    public JobOverview JobOverview;
-    public JobBooklet JobBooklet;
-    public JobReport JobReport;
-    public JobExpiredReport JobExpiredReport;
-    public NetworkedStationController Station;
+    private NetworkedItem _jobOverview;
+    public NetworkedItem JobOverview
+    {
+        get => _jobOverview;
+        set
+        {
+            if (value != null && value.GetTrackedItem<JobOverview>() == null)
+                return;
 
-    public Guid OwnedBy = Guid.Empty; //GUID of player who took the job (sever only)
-    public int playerID;              //ID of player who took the job (client & server)
+            _jobOverview = value;
 
-    public JobValidator JobValidator; //Job validator to print the booklet/job validation at (client only)
-    public bool ValidatorRequestSent = false;
-    public bool ValidatorResponseReceived = false;
-    public bool ValidationAccepted = false;
-    public ValidationType ValidationType;
-    public NetworkedItem ValidationItem;
+            if (value != null)
+            {
+                Cause = DirtyCause.JobOverview;
+                OnJobDirty?.Invoke(this);
+            }
+        }
+    }
 
-    #region Client
+    private NetworkedItem _jobBooklet;
+    public NetworkedItem JobBooklet
+    {
+        get => _jobBooklet;
+        set
+        {
+            if (value != null && value.GetTrackedItem<JobBooklet>() == null)
+                return;
 
+            _jobBooklet = value;
+            if (value != null)
+            {
+                Cause = DirtyCause.JobBooklet;
+                OnJobDirty?.Invoke(this);
+            }
+        }
+    }
+    private NetworkedItem _jobReport;
+    public NetworkedItem JobReport
+    {
+        get => _jobReport;
+        set
+        {
+            if (value != null && value.GetTrackedItem<JobReport>() == null)
+                return;
 
+            _jobReport = value;
+            if (value != null)
+            {
+                Cause = DirtyCause.JobReport;
+                OnJobDirty?.Invoke(this);
+            }
+        }
+    }
 
-    #endregion
+    private List<NetworkedItem> JobReports = new List<NetworkedItem>();
 
+    public Guid OwnedBy { get; set; } = Guid.Empty;
+    public JobValidator JobValidator { get; set; }
+
+    public bool ValidatorRequestSent { get; set; } = false;
+    public bool ValidatorResponseReceived { get; set; } = false;
+    public bool ValidationAccepted { get; set; } = false;
+    public ValidationType ValidationType { get; set; }
+
+    public DirtyCause Cause { get; private set; }
+
+    public Action<NetworkedJob> OnJobDirty;
+
+    protected override void Awake()
+    {
+        base.Awake();
+    }
 
     private void Start()
     {
-        //startup stuff
-        Multiplayer.Log($"NetworkedJob.Start({Job.ID})");
+        if (Job != null)
+        {
+            AddToCache();
+        }
+        else
+        {
+            Multiplayer.LogError($"NetworkedJob Start(): Job is null for {gameObject.name}");
+        }
+    }
 
+    public void Initialize(Job job, NetworkedStationController station)
+    {
+        Job = job;
+        Station = station;
+
+        // Setup handlers
+        job.JobTaken += OnJobTaken;
+        job.JobAbandoned += OnJobAbandoned;
+        job.JobCompleted += OnJobCompleted;
+        job.JobExpired += OnJobExpired;
+
+        // If this is called after Start(), we need to add to cache here
+        if (gameObject.activeInHierarchy)
+        {
+            AddToCache();
+        }
+    }
+
+    private void AddToCache()
+    {
         jobToNetworkedJob[Job] = this;
         jobIdToNetworkedJob[Job.ID] = this;
         jobIdToJob[Job.ID] = Job;
-         
-        Multiplayer.Log("NetworkedJob.Start() Started");
+        Multiplayer.Log($"NetworkedJob added to cache: {Job.ID}");
+    }
+
+    private void OnJobTaken(Job job, bool viaLoadGame)
+    {
+        if (viaLoadGame)
+            return;
+
+        Cause = DirtyCause.JobState;
+        OnJobDirty?.Invoke(this);
+    }
+
+    private void OnJobAbandoned(Job job)
+    {
+        Cause = DirtyCause.JobState;
+        OnJobDirty?.Invoke(this);
+    }
+
+    private void OnJobCompleted(Job job)
+    {
+        Cause = DirtyCause.JobState;
+        OnJobDirty?.Invoke(this);
+    }
+
+    private void OnJobExpired(Job job)
+    {
+        Cause = DirtyCause.JobState;
+        OnJobDirty?.Invoke(this);
+    }
+
+    public void AddReport(NetworkedItem item)
+    {
+        if (item == null || !item.UsefulItem)
+        {
+            Multiplayer.LogError($"Attempted to add a null or uninitialised report: JobId: {Job?.ID}, JobNetID: {NetId}");
+            return;
+        }
+
+        Type reportType = item.TrackedItemType;
+        if(    reportType == typeof(JobReport) ||
+               reportType == typeof(JobExpiredReport) ||
+               reportType == typeof(JobMissingLicenseReport) /*||
+               reportType == typeof(Debtre) ||*/
+           )
+        {
+            JobReports.Add(item);
+            Cause = DirtyCause.JobReport;
+            OnJobDirty?.Invoke(this);
+        }
+    }
+
+    public void RemoveReport(NetworkedItem item)
+    {
+
+    }
+
+    public void ClearReports()
+    {
+        foreach (var report in JobReports)
+        {
+            Destroy(report.gameObject);
+        }
+
+        JobReports.Clear();
     }
 
     private void OnDisable()
     {
-        if (UnloadWatcher.isQuitting)
+        if (UnloadWatcher.isQuitting || UnloadWatcher.isUnloading)
             return;
 
-
-        if (UnloadWatcher.isUnloading)
-            return;
-
+        // Remove from lookup caches
         jobToNetworkedJob.Remove(Job);
         jobIdToNetworkedJob.Remove(Job.ID);
-        jobIdToNetworkedJob.Remove(Job.ID);
+        jobIdToJob.Remove(Job.ID);
+
+        // Unsubscribe from events
+        Job.JobTaken -= OnJobTaken;
+        Job.JobAbandoned -= OnJobAbandoned;
+        Job.JobCompleted -= OnJobCompleted;
+        Job.JobExpired -= OnJobExpired;
 
         Destroy(this);
     }
-
-    #region Server
-
-    public void JobOverviewGenerated(JobOverview jobOverview)
-    {
-        JobOverview = jobOverview;
-
-        OverviewGenerated?.Invoke(this);
-    }
-
-    private void Server_OnTick(uint tick)
-    {
-        if (UnloadWatcher.isUnloading)
-            return;
-
-    }
-
-    #endregion
-
-    #region Common
-
-    private void Common_OnTick(uint tick)
-    {
-        if (UnloadWatcher.isUnloading)
-            return;
-    }
-
-    #endregion
-
-    #region Client
-
-    #endregion
 }

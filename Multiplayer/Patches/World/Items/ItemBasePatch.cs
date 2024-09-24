@@ -3,7 +3,7 @@ using HarmonyLib;
 using Multiplayer.Components.Networking.World;
 using Multiplayer.Utils;
 
-namespace Multiplayer.Patches.World;
+namespace Multiplayer.Patches.World.Items;
 
 [HarmonyPatch(typeof(ItemBase))]
 public static class ItemBase_Patch
@@ -12,8 +12,8 @@ public static class ItemBase_Patch
     [HarmonyPostfix]
     private static void Awake(ItemBase __instance)
     {
-            Multiplayer.Log($"ItemBase.Awake() ItemSpec: {__instance?.InventorySpecs?.itemPrefabName}");
-            __instance.GetOrAddComponent<NetworkedItem>();
-            return;
-     }
+        //Multiplayer.Log($"ItemBase.Awake() ItemSpec: {__instance?.InventorySpecs?.itemPrefabName}");
+        __instance.GetOrAddComponent<NetworkedItem>();
+        return;
+    }
 }

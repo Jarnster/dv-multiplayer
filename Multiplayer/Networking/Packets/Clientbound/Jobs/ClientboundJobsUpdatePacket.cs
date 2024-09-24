@@ -17,10 +17,28 @@ public class ClientboundJobsUpdatePacket
         List<JobUpdateStruct> jobData = new List<JobUpdateStruct>();
         foreach (var job in jobs)
         {
-            ushort validationNetId = 0;
+            ushort validationStationNetId = 0;
+            ushort validationItemNetId = 0;
+            ItemPositionData itemPositionData = new ItemPositionData();
 
             if (NetworkedStationController.GetFromJobValidator(job.JobValidator, out NetworkedStationController netValidationStation))
-                validationNetId = netValidationStation.NetId;
+                validationStationNetId = netValidationStation.NetId;
+
+            switch (job.Cause)
+            {
+                case NetworkedJob.DirtyCause.JobOverview:
+                    validationItemNetId = job.JobOverview.NetId;
+                    itemPositionData = ItemPositionData.FromItem(job.JobOverview);
+                    break;
+                case NetworkedJob.DirtyCause.JobBooklet:
+                    validationItemNetId = job.JobBooklet.NetId;
+                    itemPositionData = ItemPositionData.FromItem(job.JobBooklet);
+                    break;
+                case NetworkedJob.DirtyCause.JobReport:
+                    validationItemNetId = job.JobReport.NetId;
+                    itemPositionData = ItemPositionData.FromItem(job.JobReport);
+                    break;
+            }
 
             JobUpdateStruct data = new JobUpdateStruct
             {
@@ -28,8 +46,9 @@ public class ClientboundJobsUpdatePacket
                 JobState = job.Job.State,
                 StartTime = job.Job.startTime,
                 FinishTime = job.Job.finishTime,
-                ItemNetID = job.ValidationItem.NetId,
-                ValidationStationId = validationNetId
+                ValidationStationId = validationStationNetId,
+                ItemNetID = validationItemNetId,
+                ItemPositionData = itemPositionData
             };
 
             jobData.Add(data);
