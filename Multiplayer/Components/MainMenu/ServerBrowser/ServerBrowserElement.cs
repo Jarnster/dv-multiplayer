@@ -48,12 +48,12 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
             iconPassword.sprite = Multiplayer.AssetIndex.lockIcon;
 
             // Set LAN icon
-            try
+            if(this.HasChildWithName("LAN Icon"))
             {
                 goIconLAN = this.FindChildByName("LAN Icon");
             }
-            catch (Exception e)
-            {
+            else
+            { 
                 goIconLAN = Instantiate(goIconPassword, goIconPassword.transform.parent);
                 goIconLAN.name = "LAN Icon";
                 Vector3 LANpos = goIconLAN.transform.localPosition;
@@ -63,6 +63,7 @@ namespace Multiplayer.Components.MainMenu.ServerBrowser
                 iconLAN = goIconLAN.GetComponent<Image>();
                 iconLAN.sprite = Multiplayer.AssetIndex.lanIcon;
             }
+
         }
 
         public override void SetData(IServerBrowserGameDetails data, AGridView<IServerBrowserGameDetails> _)
