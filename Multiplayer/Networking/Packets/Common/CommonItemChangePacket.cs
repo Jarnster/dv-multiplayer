@@ -38,14 +38,17 @@ public class CommonItemChangePacket : INetSerializable
 
     private void DeserializeCompressed(NetDataReader reader)
     {
-        Multiplayer.Log("CommonItemChangePacket.DeserializeCompressed()");
+        int itemCount = reader.GetInt();
         byte[] compressedData = reader.GetBytesWithLength();
+        Multiplayer.Log($"CommonItemChangePacket.DeserializeCompressed() itemCount {itemCount} length: {compressedData.Length}");
+
         byte[] decompressedData = PacketCompression.Decompress(compressedData);
-        Multiplayer.Log($"Compressed: {compressedData.Length} Decompressed: {decompressedData.Length}");
+        Multiplayer.Log($"CommonItemChangePacket.DeserializeCompressed() Compressed: {compressedData.Length} Decompressed: {decompressedData.Length}");
 
         NetDataReader decompressedReader = new NetDataReader(decompressedData);
-        int itemCount = decompressedReader.GetInt();
+        
         Items.Capacity = itemCount;
+
         for (int i = 0; i < itemCount; i++)
         {
             var item = new ItemUpdateData();
@@ -56,9 +59,11 @@ public class CommonItemChangePacket : INetSerializable
 
     private void DeserializeRaw(NetDataReader reader)
     {
-        Multiplayer.Log("CommonItemChangePacket.DeserializeRaw()");
         int itemCount = reader.GetInt();
+        Multiplayer.Log($"CommonItemChangePacket.DeserializeRaw() itemCount: {itemCount}");
+
         Items.Capacity = itemCount;
+
         for (int i = 0; i < itemCount; i++)
         {
             var item = new ItemUpdateData();
@@ -91,10 +96,10 @@ public class CommonItemChangePacket : INetSerializable
     {
         Multiplayer.Log($"CommonItemChangePacket.Serialize() Compressing. Item Count: {Items.Count}");
         writer.Put(true); // compressed data stream
+        writer.Put(Items.Count);
 
         NetDataWriter dataWriter = new NetDataWriter();
 
-        dataWriter.Put(Items.Count);
         foreach (var item in Items)
         {
             item.Serialize(dataWriter);

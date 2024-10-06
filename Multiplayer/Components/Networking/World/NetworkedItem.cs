@@ -16,6 +16,10 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
     #region Lookup Cache
     private static readonly Dictionary<ItemBase, NetworkedItem> itemBaseToNetworkedItem = new();
 
+    public static List<NetworkedItem> GetAll()
+    {
+        return itemBaseToNetworkedItem.Values.ToList();
+    }
     public static bool Get(ushort netId, out NetworkedItem obj)
     {
         bool b = Get(netId, out IdMonoBehaviour<ushort, NetworkedItem> rawObj);
@@ -44,6 +48,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
     private List<object> trackedValues = new List<object>();
     public bool UsefulItem { get; private set; } = false;
     public Type TrackedItemType { get; private set; }
+    public bool BlockSync { get; set; } = false;
 
     //Track dirty states
     private bool CreatedDirty = true;   //if set, we created this item dirty and have not sent an update
@@ -66,6 +71,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
     {
         base.Awake();
         Multiplayer.LogDebug(() => $"NetworkedItem.Awake() {name}");
+        NetworkedItemManager.Instance.CheckInstance(); //Ensure the NetworkedItemManager is initialised
 
         Register();
     }
@@ -104,23 +110,32 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
     private bool Register()
     {
-        if (!TryGetComponent(out ItemBase itemBase))
+        try
         {
-            Multiplayer.LogError($"Unable to find ItemBase for {name}");
-            return false;
+
+            if (!TryGetComponent(out ItemBase itemBase))
+            {
+                Multiplayer.LogError($"Unable to find ItemBase for {name}");
+                return false;
+            }
+
+            Item = itemBase;
+            itemBaseToNetworkedItem[Item] = this;
+
+            Item.Grabbed += OnGrabbed;
+            Item.Ungrabbed += OnUngrabbed;
+            Item.ItemInventoryStateChanged += OnItemInventoryStateChanged;
+
+            lastPosition = Item.transform.position - WorldMover.currentMove;
+            lastRotation = Item.transform.rotation;
+
+            return true;
         }
-
-        Item = itemBase;
-        itemBaseToNetworkedItem[Item] = this;
-
-        Item.Grabbed += OnGrabbed;
-        Item.Ungrabbed += OnUngrabbed;
-        Item.ItemInventoryStateChanged += OnItemInventoryStateChanged;
-
-        lastPosition = Item.transform.position - WorldMover.currentMove;
-        lastRotation = Item.transform.rotation;
-
-        return true;
+        catch (Exception ex)
+        {
+            Multiplayer.LogError($"Unable to find ItemBase for {name}\r\n{ex.Message}");
+            return false; 
+        }
     }
 
     private void OnUngrabbed(ControlImplBase obj)
@@ -188,7 +203,8 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         bool positionChanged = Vector3.Distance(currentPosition, lastPosition) > PositionThreshold;
         bool rotationChanged = Quaternion.Angle(currentRotation, lastRotation) > RotationThreshold;
 
-        if (positionChanged || rotationChanged)
+        //We don't care about position and rotation if the player is holding it, as it will move relative to the player
+        if ((positionChanged || rotationChanged) && !ItemGrabbed)
         {
             ItemPosition = new ItemPositionData
             {
@@ -201,13 +217,13 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         }
     }
 
-    private void Update()
+    public ItemUpdateData GetSnapshot()
     {
         ItemUpdateData snapshot;
         ItemUpdateData.ItemUpdateType updateType = ItemUpdateData.ItemUpdateType.None;
 
-        if (Item == null && Register() ==false)
-            return;
+        if (Item == null && Register() == false)
+            return null;
 
         CheckPositionChange();
 
@@ -230,8 +246,11 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
             updateType = ItemUpdateData.ItemUpdateType.Create;
         }
 
+        //no changes this snapshot
+        if (updateType == ItemUpdateData.ItemUpdateType.None)
+            return null;
+
         snapshot = CreateUpdateData(updateType);
-        NetworkedItemManager.Instance.AddDirtyItemSnapshot(snapshot);
 
         CreatedDirty = false;
         GrabbedDirty = false;
@@ -239,21 +258,22 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         PositionDirty = false;
 
         MarkValuesClean();
+
+        return snapshot;
     }
 
-    /*
-    private void SendStateUpdate()
+    public void ReceiveSnapshot(ItemUpdateData snapshot)
     {
-        var updateData = CreateUpdateData(ItemUpdateData.ItemUpdateType.State);
-        updateData.StateData = GetDirtyStateData();
-        SendItemUpdate(updateData);
-        MarkValuesClean();
+        if(snapshot == null || snapshot.UpdateType == ItemUpdateData.ItemUpdateType.None)
+            return;
+
+        if(snapshot.UpdateType == ItemUpdateData.ItemUpdateType.Create) return;
     }
-    */
     #endregion
 
     public ItemUpdateData CreateUpdateData(ItemUpdateData.ItemUpdateType updateType)
     {
+        Multiplayer.LogDebug(() => $"NetworkedItem.CreateUpdateData({updateType}) NetId: {NetId}, name: {name}");
    
         var updateData = new ItemUpdateData
         {
@@ -279,9 +299,13 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         {
             NetworkedItemManager.Instance.AddDirtyItemSnapshot(CreateUpdateData(ItemUpdateData.ItemUpdateType.Destroy));
         }
-        else
+        else if(!BlockSync)
         {
             Multiplayer.LogWarning($"NetworkedItem.OnDestroy({name}, {NetId})\r\n{new System.Diagnostics.StackTrace()}");
+        }
+        else
+        {
+            Multiplayer.LogDebug(()=>$"NetworkedItem.OnDestroy({name}, {NetId}) Sync blocked");
         }
 
         base.OnDestroy();

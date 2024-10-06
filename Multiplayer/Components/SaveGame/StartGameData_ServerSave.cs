@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using DV.UserManagement;
+using Multiplayer.Components.Networking.World;
 using Multiplayer.Networking.Packets.Clientbound;
 using Multiplayer.Patches.SaveGame;
 using Newtonsoft.Json.Linq;
@@ -51,6 +52,14 @@ public class StartGameData_ServerSave : AStartGameData
 
     public override IEnumerator DoLoad(Transform playerContainer)
     {
+        // clear spawned world items
+        foreach (var item in NetworkedItem.GetAll())
+        {
+            item.BlockSync = true;
+            Destroy(item);
+        }
+
+
         Transform playerTransform = playerContainer.transform;
         playerTransform.position = PlayerManager.IsPlayerPositionValid(packet.Position) ? packet.Position : LevelInfo.Instance.defaultSpawnPosition;
         playerTransform.eulerAngles = new Vector3(0, packet.Rotation, 0);

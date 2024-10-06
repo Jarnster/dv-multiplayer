@@ -578,7 +578,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         if (!hasSimFlow)
             return;
 
-        string log = $"CommonTrainPortsPacket({TrainCar.ID})";
+        //string log = $"CommonTrainPortsPacket({TrainCar.ID})";
         for (int i = 0; i < packet.PortIds.Length; i++)
         {
             Port port = simulationFlow.fullPortIdToPort[packet.PortIds[i]];
@@ -596,7 +596,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             */
         }
 
-        NetworkLifecycle.Instance.Client.LogDebug(() => log);
+        //NetworkLifecycle.Instance.Client.LogDebug(() => log);
     }
 
     public void Common_UpdateFuses(CommonTrainFusesPacket packet)

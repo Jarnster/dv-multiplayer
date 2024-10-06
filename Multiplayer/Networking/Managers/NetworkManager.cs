@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using LiteNetLib;
 using LiteNetLib.Utils;
 using Multiplayer.Networking.Data;
+using Multiplayer.Networking.Packets.Common;
 using Multiplayer.Networking.Serialization;
 
 namespace Multiplayer.Networking.Listeners;
@@ -84,6 +85,13 @@ public abstract class NetworkManager : INetEventListener, INatPunchListener
         return cachedWriter;
     }
 
+    protected NetDataWriter WriteNetSerializablePacket<T>(T packet) where T : INetSerializable, new()
+    {
+        cachedWriter.Reset();
+        netPacketProcessor.WriteNetSerializable<T>(cachedWriter, ref packet);
+        return cachedWriter;
+    }
+
     protected void SendPacket<T>(NetPeer peer, T packet, DeliveryMethod deliveryMethod) where T : class, new()
     {
         peer?.Send(WritePacket(packet), deliveryMethod);
@@ -94,7 +102,7 @@ public abstract class NetworkManager : INetEventListener, INatPunchListener
         netManager.SendUnconnectedMessage(WritePacket(packet), ipAddress, port);
     }
 
-    protected abstract void Subscribe();
+    protected abstract void Subscribe(); 
 
     #region Net Events
 

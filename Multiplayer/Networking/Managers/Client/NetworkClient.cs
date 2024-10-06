@@ -126,7 +126,7 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundJobsCreatePacket>(OnClientboundJobsCreatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundJobValidateResponsePacket>(OnClientboundJobValidateResponsePacket);
         netPacketProcessor.SubscribeReusable<CommonChatPacket>(OnCommonChatPacket);
-        netPacketProcessor.SubscribeReusable<CommonItemChangePacket, NetPeer>(OnCommonItemChangePacket);
+        netPacketProcessor.SubscribeNetSerializable<CommonItemChangePacket, NetPeer>(OnCommonItemChangePacket);
     }
 
     #region Net Events
@@ -212,7 +212,7 @@ public class NetworkClient : NetworkManager
     }
     #endregion
 
-    #region Listeners
+    #region Listeners 
 
     private void OnClientboundServerDenyPacket(ClientboundServerDenyPacket packet)
     {

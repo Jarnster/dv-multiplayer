@@ -133,7 +133,7 @@ public class NetworkServer : NetworkManager
         netPacketProcessor.SubscribeReusable<ServerboundJobValidateRequestPacket, NetPeer>(OnServerboundJobValidateRequestPacket);
         netPacketProcessor.SubscribeReusable<CommonChatPacket, NetPeer>(OnCommonChatPacket);
         netPacketProcessor.SubscribeReusable<UnconnectedPingPacket, IPEndPoint>(OnUnconnectedPingPacket);
-        netPacketProcessor.SubscribeReusable<CommonItemChangePacket, NetPeer>(OnCommonItemChangePacket);
+        netPacketProcessor.SubscribeNetSerializable<CommonItemChangePacket, NetPeer>(OnCommonItemChangePacket);
     }
 
     private void OnLoaded()
@@ -232,6 +232,16 @@ public class NetworkServer : NetworkManager
     private void SendPacketToAll<T>(T packet, DeliveryMethod deliveryMethod, NetPeer excludePeer) where T : class, new()
     {
         NetDataWriter writer = WritePacket(packet);
+        foreach (KeyValuePair<byte, NetPeer> kvp in netPeers)
+        {
+            if (kvp.Key == excludePeer.Id)
+                continue;
+            kvp.Value.Send(writer, deliveryMethod);
+        }
+    }
+    private void SendNetSerializablePacketToAll<T>(T packet, DeliveryMethod deliveryMethod, NetPeer excludePeer) where T : INetSerializable, new()
+    {
+        NetDataWriter writer = WriteNetSerializablePacket(packet);
         foreach (KeyValuePair<byte, NetPeer> kvp in netPeers)
         {
             if (kvp.Key == excludePeer.Id)
@@ -401,7 +411,7 @@ public class NetworkServer : NetworkManager
     public void SendItemsChangePacket(List<ItemUpdateData> items, NetPeer peer = null)
     {
         Multiplayer.Log($"Sending SendItemsChangePacket with {items.Count()} items");
-        SendPacketToAll(new CommonItemChangePacket { Items = items },
+        SendNetSerializablePacketToAll(new CommonItemChangePacket { Items = items },
             DeliveryMethod.ReliableUnordered, selfPeer);
     }
 
