@@ -126,7 +126,7 @@ public class NetworkClient : NetworkManager
         netPacketProcessor.SubscribeReusable<ClientboundJobsCreatePacket>(OnClientboundJobsCreatePacket);
         netPacketProcessor.SubscribeReusable<ClientboundJobValidateResponsePacket>(OnClientboundJobValidateResponsePacket);
         netPacketProcessor.SubscribeReusable<CommonChatPacket>(OnCommonChatPacket);
-        netPacketProcessor.SubscribeNetSerializable<CommonItemChangePacket, NetPeer>(OnCommonItemChangePacket);
+        netPacketProcessor.SubscribeNetSerializable<CommonItemChangePacket>(OnCommonItemChangePacket);
     }
 
     #region Net Events
@@ -324,6 +324,8 @@ public class NetworkClient : NetworkManager
         WorldStreamingInit.LoadingFinished += SendReadyPacket;
 
         TrainStress.globalIgnoreStressCalculation = true;
+
+        NetworkedItemManager.Instance.CheckInstance();
     }
 
     private void OnClientboundBeginWorldSyncPacket(ClientboundBeginWorldSyncPacket packet)
@@ -775,15 +777,15 @@ public class NetworkClient : NetworkManager
         GameObject.Destroy(networkedJob.gameObject);
     }
 
-    private void OnCommonItemChangePacket(CommonItemChangePacket packet, NetPeer peer)
+    private void OnCommonItemChangePacket(CommonItemChangePacket packet)
     {
-        LogDebug(() => $"OnCommonItemChangePacket({packet?.Items?.Count}, {peer.Id})");
+        LogDebug(() => $"OnCommonItemChangePacket({packet?.Items?.Count})");
 
         string debug = "";
 
         foreach (var item in packet?.Items)
         {
-            LogDebug(() => $"OnCommonItemChangePacket({packet?.Items?.Count}, {peer.Id}) in loop");
+            //LogDebug(() => $"OnCommonItemChangePacket({packet?.Items?.Count}, {peer.Id}) in loop");
             debug += "UpdateType: " + item?.UpdateType + "\r\n";
             debug += "itemNetId: " + item?.ItemNetId + "\r\n";
             debug += "PrefabName: " + item?.PrefabName + "\r\n";
@@ -792,7 +794,7 @@ public class NetworkClient : NetworkManager
             debug += "Position: " + item?.PositionData.Position + "\r\n";
             debug += "Rotation: " + item?.PositionData.Rotation + "\r\n";
 
-            LogDebug(() => $"OnCommonItemChangePacket({packet?.Items?.Count}, {peer.Id}) prep states");
+            //LogDebug(() => $"OnCommonItemChangePacket({packet?.Items?.Count}, {peer.Id}) prep states");
             debug += "States:";
 
             if (item.States != null)
@@ -1108,8 +1110,8 @@ public class NetworkClient : NetworkManager
     public void SendItemsChangePacket(List<ItemUpdateData> items, NetPeer peer = null)
     {
         Multiplayer.Log($"Sending SendItemsChangePacket with {items.Count()} items");
-        SendPacketToServer(new CommonItemChangePacket { Items = items },
-            DeliveryMethod.ReliableUnordered);
+        //SendPacketToServer(new CommonItemChangePacket { Items = items },
+        //    DeliveryMethod.ReliableUnordered);
     }
 
     #endregion

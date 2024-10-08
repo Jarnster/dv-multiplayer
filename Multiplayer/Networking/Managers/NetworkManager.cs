@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
 using LiteNetLib;
@@ -96,7 +97,12 @@ public abstract class NetworkManager : INetEventListener, INatPunchListener
     {
         peer?.Send(WritePacket(packet), deliveryMethod);
     }
-     
+
+    protected void SendNetSerializablePacket<T>(NetPeer peer, T packet, DeliveryMethod deliveryMethod) where T : INetSerializable, new()
+    {
+        peer?.Send(WriteNetSerializablePacket(packet), deliveryMethod);
+    }
+
     protected void SendUnconnectedPacket<T>(T packet, string ipAddress, int port) where T : class, new()
     {
         netManager.SendUnconnectedMessage(WritePacket(packet), ipAddress, port);

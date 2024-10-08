@@ -5,6 +5,7 @@ using UnityEngine;
 using JetBrains.Annotations;
 using Multiplayer.Networking.Data;
 using Multiplayer.Components.Networking.World;
+using System;
 
 namespace Multiplayer.Components.Networking.Train;
 
@@ -18,7 +19,10 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
         base.Awake();
         if (!NetworkLifecycle.Instance.IsHost())
             return;
+    }
 
+    protected void Start()
+    {
         NetworkLifecycle.Instance.OnTick += Common_OnTick;
     }
 
@@ -43,6 +47,7 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
             return;
 
         ReceivedSnapshots.AddRange(snapshots);
+        Multiplayer.LogDebug(() => $"ReceiveSnapshots: {ReceivedSnapshots.Count}");
     }
 
     #region Common
@@ -52,51 +57,62 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
         //Process received Snapshots
         ProcessReceived();
 
-        ProcessChanged();
+        if (NetworkLifecycle.Instance.IsHost())
+            ProcessChanged();
     }
 
     private void ProcessReceived()
     {
-        while(ReceivedSnapshots.Count > 0)
+        //Multiplayer.LogDebug(() => $"ProcessReceived: {ReceivedSnapshots.Count}");
+        while (ReceivedSnapshots.Count > 0)
         {
-            ItemUpdateData snapshot = ReceivedSnapshots.First();
-
-            //process
-            if (snapshot != null && snapshot.UpdateType != ItemUpdateData.ItemUpdateType.None)
+            
+                ItemUpdateData snapshot = ReceivedSnapshots.First();
+            try
             {
-                //try to find an existing item
-                NetworkedItem.Get(snapshot.ItemNetId, out NetworkedItem netItem);
+                Multiplayer.LogDebug(() => $"ProcessReceived: {snapshot.UpdateType}");
 
-                if (NetworkLifecycle.Instance.IsHost())
+                //process
+                if (snapshot != null && snapshot.UpdateType != ItemUpdateData.ItemUpdateType.None)
                 {
-                    if (snapshot.UpdateType == ItemUpdateData.ItemUpdateType.Create)
+                    //try to find an existing item
+                    NetworkedItem.Get(snapshot.ItemNetId, out NetworkedItem netItem);
+
+                    if (NetworkLifecycle.Instance.IsHost())
                     {
-                        Multiplayer.LogError($"NetworkedItemManager.ProcessReceived() Host received Create snapshot! ItemNetId: {snapshot.ItemNetId}, prefabName: {snapshot.PrefabName}");
+                        if (snapshot.UpdateType == ItemUpdateData.ItemUpdateType.Create)
+                        {
+                            Multiplayer.LogError($"NetworkedItemManager.ProcessReceived() Host received Create snapshot! ItemNetId: {snapshot.ItemNetId}, prefabName: {snapshot.PrefabName}");
+                        }
+                        else
+                        {
+                            //we should validate if the player can perform this action... TODO later
+                            if (netItem != null)
+                                netItem.ReceiveSnapshot(snapshot);
+                            else
+                                Multiplayer.LogError($"NetworkedItemManager.ProcessReceived() NetworkedItem not found! Update Type: {snapshot?.UpdateType}, ItemNetId: {snapshot?.ItemNetId}, prefabName: {snapshot?.PrefabName}");
+                        }
                     }
                     else
                     {
-                        //we should validate if the player can perform this action... TODO later
-                        if (netItem != null)
-                            netItem.ReceiveSnapshot(snapshot);
+                        if (snapshot.UpdateType == ItemUpdateData.ItemUpdateType.Create)
+                        {
+                            CreateItem(snapshot);
+                        }
                         else
-                            Multiplayer.LogError($"NetworkedItemManager.ProcessReceived() NetworkedItem not found! Update Type: {snapshot?.UpdateType}, ItemNetId: {snapshot?.ItemNetId}, prefabName: {snapshot?.PrefabName}");
+                        {
+                            netItem.ReceiveSnapshot(snapshot);
+                        }
                     }
                 }
                 else
                 {
-                    if (snapshot.UpdateType == ItemUpdateData.ItemUpdateType.Create)
-                    {
-                        CreateItem(snapshot);
-                    }
-                    else
-                    {
-                        netItem.ReceiveSnapshot(snapshot);
-                    }
+                    Multiplayer.LogError($"NetworkedItemManager.ProcessReceived() Invalid Update Type: {snapshot?.UpdateType}, ItemNetId: {snapshot?.ItemNetId}, prefabName: {snapshot?.PrefabName}");
                 }
             }
-            else
+            catch (Exception ex)
             {
-                Multiplayer.LogError($"NetworkedItemManager.ProcessReceived() Invalid Update Type: {snapshot?.UpdateType}, ItemNetId: {snapshot?.ItemNetId}, prefabName: {snapshot?.PrefabName}");
+                Multiplayer.LogError($"NetworkedItemManager.ProcessReceived() Error! {ex.Message}\r\n{ex.StackTrace}");
             }
 
             ReceivedSnapshots.Remove(snapshot);

@@ -1,6 +1,12 @@
 using System;
 using System.Collections;
+using System.ComponentModel;
+using System.Linq;
+using DV;
+using DV.CabControls;
 using DV.UserManagement;
+using DV.Utils;
+using Multiplayer.Components.Networking;
 using Multiplayer.Components.Networking.World;
 using Multiplayer.Networking.Packets.Clientbound;
 using Multiplayer.Patches.SaveGame;
@@ -52,13 +58,6 @@ public class StartGameData_ServerSave : AStartGameData
 
     public override IEnumerator DoLoad(Transform playerContainer)
     {
-        // clear spawned world items
-        foreach (var item in NetworkedItem.GetAll())
-        {
-            item.BlockSync = true;
-            Destroy(item);
-        }
-
 
         Transform playerTransform = playerContainer.transform;
         playerTransform.position = PlayerManager.IsPlayerPositionValid(packet.Position) ? packet.Position : LevelInfo.Instance.defaultSpawnPosition;
@@ -85,6 +84,34 @@ public class StartGameData_ServerSave : AStartGameData
         //     JobDebtController.Instance.LoadDeletedJoblessCarDebtsSaveData(JObject.Parse(packet.Debt_deleted_jobless_cars));
         // if (!string.IsNullOrEmpty(packet.Debt_insurance))
         //     CareerManagerDebtController.Instance.feeQuota.LoadSaveData(JObject.Parse(packet.Debt_insurance));
+
+        // clear spawned world items 
+        var items = NetworkedItem.GetAll().ToList();
+        foreach (var item in items)
+        {
+            try
+            {
+                if (item.Item != null && !item.Item.IsEssential() && !item.Item.IsGrabbed())
+                {
+                    NetworkLifecycle.Instance.Client.LogDebug(() => $"Clearing Spawned Item: {item?.TrackedItemType?.FullName}");
+                    item.BlockSync = true;
+
+                    RespawnOnDrop respawn = item.Item.GetComponent<RespawnOnDrop>();
+                    respawn.respawnOnDropThroughFloor = false;
+                    item.Item.itemDisabler.ToggleInDumpster(true);
+
+                    if (SingletonBehaviour<StorageController>.Instance.StorageWorld.ContainsItem(item.Item))
+                    {
+                        SingletonBehaviour<StorageController>.Instance.RemoveItemFromWorldStorage(item.Item);
+                    }
+                    //Destroy(item.gameObject);
+                }
+            }
+            catch (Exception ex)
+            {
+                NetworkLifecycle.Instance.Client.LogDebug(() => $"Error Clearing Spawned Item: {ex.Message}"); 
+            }
+        }
 
         carsAndJobsLoadingFinished = true;
         yield break;

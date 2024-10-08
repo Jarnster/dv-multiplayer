@@ -1,11 +1,7 @@
 using LiteNetLib.Utils;
 using Multiplayer.Networking.Data;
-using System.IO;
-using DV.Logic.Job;
 using System.Collections.Generic;
-using System.Linq;
 using System;
-
 
 namespace Multiplayer.Networking.Packets.Common;
 
@@ -17,8 +13,13 @@ public class CommonItemChangePacket : INetSerializable
 
     public void Deserialize(NetDataReader reader)
     {
+
+        Items.Clear();
+
         Multiplayer.Log("CommonItemChangePacket.Deserialize()");
+
         //Multiplayer.LogDebug(() => $"CommonItemChangePacket.Deserialize()\r\nBytes: {BitConverter.ToString(reader.RawData).Replace("-", " ")}");
+        Multiplayer.Log($"CommonItemChangePacket.Deserialize() Pre-itemCount {Items?.Count} ");
         try
         {
             bool compressed = reader.GetBool();
@@ -31,7 +32,7 @@ public class CommonItemChangePacket : INetSerializable
                 DeserializeRaw(reader);
             }
 
-            
+            Multiplayer.Log($"CommonItemChangePacket.Deserialize() post-itemCount {Items?.Count} ");
         }
         catch (Exception ex)
         {
@@ -43,7 +44,7 @@ public class CommonItemChangePacket : INetSerializable
     {
         int itemCount = reader.GetInt();
         byte[] compressedData = reader.GetBytesWithLength();
-        //Multiplayer.Log($"CommonItemChangePacket.DeserializeCompressed() itemCount {itemCount} length: {compressedData.Length}");
+        Multiplayer.Log($"CommonItemChangePacket.DeserializeCompressed() itemCount {itemCount} length: {compressedData.Length}");
 
         byte[] decompressedData = PacketCompression.Decompress(compressedData);
         //Multiplayer.Log($"CommonItemChangePacket.DeserializeCompressed() Compressed: {compressedData.Length} Decompressed: {decompressedData.Length}");

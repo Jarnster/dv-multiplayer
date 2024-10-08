@@ -31,6 +31,7 @@ using UnityModManagerNet;
 using System.Net;
 using Multiplayer.Networking.Packets.Serverbound.Train;
 using Multiplayer.Networking.Packets.Unconnected;
+using DV.CabControls.Spec;
 
 namespace Multiplayer.Networking.Listeners;
 
@@ -418,6 +419,7 @@ public class NetworkServer : NetworkManager
     public void SendItemsChangePacket(List<ItemUpdateData> items, NetPeer peer = null)
     {
         Multiplayer.Log($"Sending SendItemsChangePacket with {items.Count()} items");
+
         SendNetSerializablePacketToAll(new CommonItemChangePacket { Items = items },
             DeliveryMethod.ReliableUnordered, selfPeer);
 
@@ -646,6 +648,16 @@ public class NetworkServer : NetworkManager
             }
         }
 
+        //Send Item Sync
+        
+        List<ItemUpdateData> snapshots = new List<ItemUpdateData>();
+        foreach (var item in NetworkedItem.GetAll())
+        {
+            snapshots.Add(item.CreateUpdateData(ItemUpdateData.ItemUpdateType.Create));
+        }
+
+        LogDebug(() => $"Sending sync ItemUpdateData {snapshots.Count} items");
+        SendNetSerializablePacket(peer, new CommonItemChangePacket { Items = snapshots }, DeliveryMethod.ReliableOrdered);
 
         // Send existing players
         foreach (ServerPlayer player in ServerPlayers)

@@ -41,7 +41,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
     #endregion
 
     private const float PositionThreshold = 0.01f;
-    private const float RotationThreshold = 0.1f;
+    private const float RotationThreshold = 0.01f;
 
     public ItemBase Item { get; private set; }
     private Component trackedItem;
@@ -141,7 +141,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
     private void OnUngrabbed(ControlImplBase obj)
     {
         Multiplayer.LogDebug(() => $"OnUngrabbed() {name}");
-        GrabbedDirty = ItemGrabbed;
+        GrabbedDirty = ItemGrabbed == true;
         ItemGrabbed = false;
         
     }
@@ -149,7 +149,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
     private void OnGrabbed(ControlImplBase obj)
     {
         Multiplayer.LogDebug(() => $"OnGrabbed() {name}");
-        GrabbedDirty = !ItemGrabbed;
+        GrabbedDirty = ItemGrabbed == false;
         ItemGrabbed = true;
     }
 
@@ -158,7 +158,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         Multiplayer.LogDebug(() => $"OnItemInventoryStateChanged() {name}, InventoryActionType: {actionType}, InventoryItemState: {itemState}");
         if (actionType == InventoryActionType.Purge)
         {
-            DroppedDirty = !ItemDropped;
+            DroppedDirty = true;
             ItemDropped = true;
         }
     }
@@ -267,7 +267,58 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         if(snapshot == null || snapshot.UpdateType == ItemUpdateData.ItemUpdateType.None)
             return;
 
-        if(snapshot.UpdateType == ItemUpdateData.ItemUpdateType.Create) return;
+        if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.ItemEquipped))
+        {
+            //do something when a player equips/unequips an item
+            Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot.ItemNetId}, Equipped: {snapshot.Equipped}, Player ID: {snapshot.Player}");
+        }
+        else if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.ItemDropped))
+        {
+            //do something when a player drops/picks up an item
+            Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot.ItemNetId}, Dropped: {snapshot.Dropped}, Player ID: {snapshot.Player}");
+            Item.gameObject.SetActive(snapshot.Dropped);
+        }
+        else if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.Position))
+        { 
+            //update all values
+            transform.position = snapshot.PositionData.Position + WorldMover.currentMove;
+            transform.rotation = snapshot.PositionData.Rotation;
+        }
+        else if (snapshot.UpdateType == ItemUpdateData.ItemUpdateType.ObjectState)
+        {
+            Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot.ItemNetId}, States: {snapshot?.States?.Count}");
+            Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot.ItemNetId}, States: {snapshot?.States?.Count}");
+
+            foreach (var state in snapshot.States)
+            {
+                var trackedValue = trackedValues.Find(tv => ((dynamic)tv).Key == state.Key);
+                if (trackedValue != null)
+                {
+                    try
+                    {
+                        ((dynamic)trackedValue).SetValueFromObject(state.Value);
+                        Multiplayer.LogDebug(() => $"Updated tracked value: {state.Key}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Multiplayer.LogError($"Error updating tracked value {state.Key}: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    Multiplayer.LogWarning($"Tracked value not found: {state.Key}");
+                }
+            }
+        }
+
+        //mark values as clean
+        CreatedDirty = false;
+        GrabbedDirty = false;
+        DroppedDirty = false;
+        PositionDirty = false;
+
+        MarkValuesClean();
+        return;
     }
     #endregion
 
