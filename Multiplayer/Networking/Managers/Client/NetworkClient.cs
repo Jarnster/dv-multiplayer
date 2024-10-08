@@ -777,27 +777,32 @@ public class NetworkClient : NetworkManager
 
     private void OnCommonItemChangePacket(CommonItemChangePacket packet, NetPeer peer)
     {
-        Multiplayer.LogDebug(() => $"OnCommonItemChangePacket({packet.Items.Count}, {peer.Id})");
+        LogDebug(() => $"OnCommonItemChangePacket({packet?.Items?.Count}, {peer.Id})");
 
         string debug = "";
 
-        foreach (var item in packet.Items)
+        foreach (var item in packet?.Items)
         {
-            debug += "UpdateType: {" + item.UpdateType + "}";
-            debug += "itemNetId: " + item.ItemNetId;
-            debug += "PrefabName: " + item.PrefabName;
-            debug += "Equipped: " + item.Equipped;
-            debug += "Dropped: " + item.Dropped;
-            debug += "Position: " + item.PositionData.Position;
-            debug += "Rotation: " + item.PositionData.Rotation;
+            LogDebug(() => $"OnCommonItemChangePacket({packet?.Items?.Count}, {peer.Id}) in loop");
+            debug += "UpdateType: " + item?.UpdateType + "\r\n";
+            debug += "itemNetId: " + item?.ItemNetId + "\r\n";
+            debug += "PrefabName: " + item?.PrefabName + "\r\n";
+            debug += "Equipped: " + item?.Equipped + "\r\n";
+            debug += "Dropped: " + item?.Dropped + "\r\n";
+            debug += "Position: " + item?.PositionData.Position + "\r\n";
+            debug += "Rotation: " + item?.PositionData.Rotation + "\r\n";
 
+            LogDebug(() => $"OnCommonItemChangePacket({packet?.Items?.Count}, {peer.Id}) prep states");
             debug += "States:";
 
-            foreach (var state in item.States)
-                debug += "\r\n\t" + state.Key + ": " + state.Value;
+            if (item.States != null)
+                foreach (var state in item?.States)
+                    debug += "\r\n\t" + state.Key + ": " + state.Value;
         }
 
         Multiplayer.LogDebug(() => debug);
+
+        NetworkedItemManager.Instance.ReceiveSnapshots(packet.Items);
     }
 
     #endregion

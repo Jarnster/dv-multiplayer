@@ -18,6 +18,7 @@ public class CommonItemChangePacket : INetSerializable
     public void Deserialize(NetDataReader reader)
     {
         Multiplayer.Log("CommonItemChangePacket.Deserialize()");
+        //Multiplayer.LogDebug(() => $"CommonItemChangePacket.Deserialize()\r\nBytes: {BitConverter.ToString(reader.RawData).Replace("-", " ")}");
         try
         {
             bool compressed = reader.GetBool();
@@ -29,6 +30,8 @@ public class CommonItemChangePacket : INetSerializable
             {
                 DeserializeRaw(reader);
             }
+
+            
         }
         catch (Exception ex)
         {
@@ -40,14 +43,14 @@ public class CommonItemChangePacket : INetSerializable
     {
         int itemCount = reader.GetInt();
         byte[] compressedData = reader.GetBytesWithLength();
-        Multiplayer.Log($"CommonItemChangePacket.DeserializeCompressed() itemCount {itemCount} length: {compressedData.Length}");
+        //Multiplayer.Log($"CommonItemChangePacket.DeserializeCompressed() itemCount {itemCount} length: {compressedData.Length}");
 
         byte[] decompressedData = PacketCompression.Decompress(compressedData);
-        Multiplayer.Log($"CommonItemChangePacket.DeserializeCompressed() Compressed: {compressedData.Length} Decompressed: {decompressedData.Length}");
+        //Multiplayer.Log($"CommonItemChangePacket.DeserializeCompressed() Compressed: {compressedData.Length} Decompressed: {decompressedData.Length}");
 
         NetDataReader decompressedReader = new NetDataReader(decompressedData);
         
-        Items.Capacity = itemCount;
+        //Items.Capacity = itemCount;
 
         for (int i = 0; i < itemCount; i++)
         {
@@ -62,12 +65,16 @@ public class CommonItemChangePacket : INetSerializable
         int itemCount = reader.GetInt();
         Multiplayer.Log($"CommonItemChangePacket.DeserializeRaw() itemCount: {itemCount}");
 
-        Items.Capacity = itemCount;
+        //Items.Capacity = itemCount;
 
+        //Multiplayer.Log($"CommonItemChangePacket.DeserializeRaw() itemCount: {itemCount}, pre-loop");
         for (int i = 0; i < itemCount; i++)
         {
+            //Multiplayer.Log($"CommonItemChangePacket.DeserializeRaw() itemCount: {itemCount}, new ItemUpdateData()");
             var item = new ItemUpdateData();
+            //Multiplayer.Log($"CommonItemChangePacket.DeserializeRaw() itemCount: {itemCount}, item.Deserialize()");
             item.Deserialize(reader);
+            //Multiplayer.Log($"CommonItemChangePacket.DeserializeRaw() itemCount: {itemCount}, Items.Add()");
             Items.Add(item);
         }
     }
@@ -75,6 +82,8 @@ public class CommonItemChangePacket : INetSerializable
     public void Serialize(NetDataWriter writer)
     {
         Multiplayer.Log("CommonItemChangePacket.Serialize()");
+        //Multiplayer.LogDebug(() => $"CommonItemChangePacket.Serialize() Data Before\r\nBytes: {BitConverter.ToString(writer.CopyData()).Replace("-", " ")}");
+        
         try
         {
             if (Items.Count > COMPRESS_AFTER_COUNT)
@@ -85,6 +94,8 @@ public class CommonItemChangePacket : INetSerializable
             {
                 SerializeRaw(writer);
             }
+
+            //Multiplayer.LogDebug(() => $"CommonItemChangePacket.Serialize() Data After\r\nBytes: {BitConverter.ToString(writer.CopyData()).Replace("-", " ")}");
         }
         catch (Exception ex)
         {

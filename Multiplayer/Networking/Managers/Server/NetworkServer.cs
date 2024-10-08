@@ -239,6 +239,13 @@ public class NetworkServer : NetworkManager
             kvp.Value.Send(writer, deliveryMethod);
         }
     }
+    private void SendNetSerializablePacketToAll<T>(T packet, DeliveryMethod deliveryMethod) where T : INetSerializable, new()
+    {
+        NetDataWriter writer = WriteNetSerializablePacket(packet);
+        foreach (KeyValuePair<byte, NetPeer> kvp in netPeers)
+            kvp.Value.Send(writer, deliveryMethod);
+    }
+
     private void SendNetSerializablePacketToAll<T>(T packet, DeliveryMethod deliveryMethod, NetPeer excludePeer) where T : INetSerializable, new()
     {
         NetDataWriter writer = WriteNetSerializablePacket(packet);
@@ -413,6 +420,9 @@ public class NetworkServer : NetworkManager
         Multiplayer.Log($"Sending SendItemsChangePacket with {items.Count()} items");
         SendNetSerializablePacketToAll(new CommonItemChangePacket { Items = items },
             DeliveryMethod.ReliableUnordered, selfPeer);
+
+        //SendNetSerializablePacketToAll(new CommonItemChangePacket { Items = items },
+        //    DeliveryMethod.ReliableUnordered);
     }
 
     public void SendChat(string message, NetPeer exclude = null)
@@ -970,23 +980,23 @@ public class NetworkServer : NetworkManager
 
     private void OnCommonItemChangePacket(CommonItemChangePacket packet, NetPeer peer)
     {
-        Multiplayer.LogDebug(()=>$"OnCommonItemChangePacket({packet.Items.Count}, {peer.Id})");
+        LogDebug(()=>$"OnCommonItemChangePacket({packet?.Items?.Count}, {peer.Id})");
 
         string debug = "";
 
-        foreach(var item in packet.Items)
+        foreach(var item in packet?.Items)
         {
-            debug += "UpdateType: {" + item.UpdateType + "}";
-            debug += "itemNetId: " + item.ItemNetId;
-            debug += "PrefabName: " + item.PrefabName;
-            debug += "Equipped: " + item.Equipped;
-            debug += "Dropped: " + item.Dropped;
-            debug += "Position: " + item.PositionData.Position;
-            debug += "Rotation: " + item.PositionData.Rotation;
+            debug += "UpdateType: {" + item?.UpdateType + "}";
+            debug += "itemNetId: " + item?.ItemNetId;
+            debug += "PrefabName: " + item?.PrefabName;
+            debug += "Equipped: " + item?.Equipped;
+            debug += "Dropped: " + item?.Dropped;
+            debug += "Position: " + item?.PositionData.Position;
+            debug += "Rotation: " + item?.PositionData.Rotation;
 
             debug += "States:";
 
-            foreach(var state in item.States)
+            foreach(var state in item?.States)
                 debug += "\r\n\t" + state.Key + ": " + state.Value;
         }
 
