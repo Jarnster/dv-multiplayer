@@ -13,6 +13,7 @@ using UnityEngine.UI;
 using UnityEngine.Events;
 using Multiplayer.Networking.Data;
 using Multiplayer.Components.Networking;
+using Multiplayer.Components.Util;
 namespace Multiplayer.Components.MainMenu;
 
 public class HostGamePane : MonoBehaviour
@@ -148,12 +149,20 @@ public class HostGamePane : MonoBehaviour
         //update right hand info pane (this will be used later for more settings or information
         GameObject serverWindowGO = this.FindChildByName("Save Description");
         GameObject serverDetailsGO = serverWindowGO.FindChildByName("text list [noloc]");
+        HyperlinkHandler hyperLinks = serverDetailsGO.GetOrAddComponent<HyperlinkHandler>();
+
+        hyperLinks.linkColor = new Color(0.302f, 0.651f, 1f); // #4DA6FF
+        hyperLinks.linkHoverColor = new Color(0.498f, 0.749f, 1f); // #7FBFFF
+
         serverWindowGO.name = "Host Details";
         serverDetails = serverDetailsGO.GetComponent<TextMeshProUGUI>();
         serverDetails.textWrappingMode = TextWrappingModes.Normal;
-        serverDetails.text = "Please note:<br>Use of other mods is currently not supported and may cause unexpected behaviour.<br><br>" +
+        serverDetails.text = "First time hosts, please see the <link=\"https://github.com/AMacro/dv-multiplayer/wiki/Hosting\">Hosting</link> section of our Wiki.<br><br><br>" +
+
+                             "Using other mods may cause unexpected behaviour including de-syncs. See <link=\"https://github.com/AMacro/dv-multiplayer/wiki/Mod-Compatibility\">Mod Compatibility</link> for more info.<br><br>" +
                              "It is recommended that other mods are disabled and Derail Valley restarted prior to playing in multiplayer.<br><br>" +
-                             "We hope to make your favourite mods work with multiplayer in the future.";
+
+                             "We hope to have your favourite mods compatible with multiplayer in the future.";
 
 
         //Find scrolling viewport
