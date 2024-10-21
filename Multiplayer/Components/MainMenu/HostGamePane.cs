@@ -329,7 +329,7 @@ private void SetupListeners(bool on)
         bool valid = true;
         int portNum=0;
 
-        if (serverName.text.Trim() == "" || serverName.text.Length >= MAX_SERVER_NAME_LEN)
+        if (serverName.text.Trim() == "" || serverName.text.Length > MAX_SERVER_NAME_LEN)
             valid = false;
 
         if (port.text != "")
