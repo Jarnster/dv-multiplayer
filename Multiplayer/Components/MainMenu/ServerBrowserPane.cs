@@ -97,7 +97,7 @@ namespace Multiplayer.Components.MainMenu
         //LAN tracking
         private List<IServerBrowserGameDetails> localServers = new List<IServerBrowserGameDetails>();
         private const int LAN_TIMEOUT = 60;         //How long to hold a LAN server without a response
-        private const int DISCOVERY_TIMEOUT = 2;    //how long to wait for servers to respond
+        private const int DISCOVERY_TIMEOUT = 1;    //how long to wait for servers to respond
         private bool localRefreshComplete;
         private float discoveryTimer = 0f;
 
@@ -142,9 +142,6 @@ namespace Multiplayer.Components.MainMenu
 
             SetupServerBrowser();
             RefreshGridView();
-
-            buttonRefresh.ToggleInteractable(true);
-            RefreshAction();
         }
 
         private void OnEnable()
@@ -167,6 +164,8 @@ namespace Multiplayer.Components.MainMenu
             serverBrowserClient.OnPing += this.OnPing;
             serverBrowserClient.OnDiscovery += this.OnDiscovery;
             serverBrowserClient.Start();
+
+            RefreshAction();
         }
 
         // Disable listeners
