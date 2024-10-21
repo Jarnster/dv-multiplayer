@@ -16,10 +16,9 @@ public class CommonItemChangePacket : INetSerializable
 
         Items.Clear();
 
-        Multiplayer.Log("CommonItemChangePacket.Deserialize()");
-
+        //Multiplayer.LogDebug(()=>"CommonItemChangePacket.Deserialize()");
         //Multiplayer.LogDebug(() => $"CommonItemChangePacket.Deserialize()\r\nBytes: {BitConverter.ToString(reader.RawData).Replace("-", " ")}");
-        Multiplayer.Log($"CommonItemChangePacket.Deserialize() Pre-itemCount {Items?.Count} ");
+
         try
         {
             bool compressed = reader.GetBool();
@@ -32,7 +31,7 @@ public class CommonItemChangePacket : INetSerializable
                 DeserializeRaw(reader);
             }
 
-            Multiplayer.Log($"CommonItemChangePacket.Deserialize() post-itemCount {Items?.Count} ");
+            //Multiplayer.LogDebug(() => $"CommonItemChangePacket.Deserialize() post-itemCount {Items?.Count} ");
         }
         catch (Exception ex)
         {
@@ -44,7 +43,7 @@ public class CommonItemChangePacket : INetSerializable
     {
         int itemCount = reader.GetInt();
         byte[] compressedData = reader.GetBytesWithLength();
-        Multiplayer.Log($"CommonItemChangePacket.DeserializeCompressed() itemCount {itemCount} length: {compressedData.Length}");
+        //Multiplayer.LogDebug(() => $"CommonItemChangePacket.DeserializeCompressed() itemCount {itemCount} length: {compressedData.Length}");
 
         byte[] decompressedData = PacketCompression.Decompress(compressedData);
         //Multiplayer.Log($"CommonItemChangePacket.DeserializeCompressed() Compressed: {compressedData.Length} Decompressed: {decompressedData.Length}");
@@ -64,25 +63,19 @@ public class CommonItemChangePacket : INetSerializable
     private void DeserializeRaw(NetDataReader reader)
     {
         int itemCount = reader.GetInt();
-        Multiplayer.Log($"CommonItemChangePacket.DeserializeRaw() itemCount: {itemCount}");
+        //Multiplayer.LogDebug(() => $"CommonItemChangePacket.DeserializeRaw() itemCount: {itemCount}");
 
-        //Items.Capacity = itemCount;
-
-        //Multiplayer.Log($"CommonItemChangePacket.DeserializeRaw() itemCount: {itemCount}, pre-loop");
         for (int i = 0; i < itemCount; i++)
         {
-            //Multiplayer.Log($"CommonItemChangePacket.DeserializeRaw() itemCount: {itemCount}, new ItemUpdateData()");
             var item = new ItemUpdateData();
-            //Multiplayer.Log($"CommonItemChangePacket.DeserializeRaw() itemCount: {itemCount}, item.Deserialize()");
             item.Deserialize(reader);
-            //Multiplayer.Log($"CommonItemChangePacket.DeserializeRaw() itemCount: {itemCount}, Items.Add()");
             Items.Add(item);
         }
     }
 
     public void Serialize(NetDataWriter writer)
     {
-        Multiplayer.Log("CommonItemChangePacket.Serialize()");
+        //Multiplayer.LogDebug(() => "CommonItemChangePacket.Serialize()");
         //Multiplayer.LogDebug(() => $"CommonItemChangePacket.Serialize() Data Before\r\nBytes: {BitConverter.ToString(writer.CopyData()).Replace("-", " ")}");
         
         try
@@ -106,7 +99,7 @@ public class CommonItemChangePacket : INetSerializable
 
     private void SerializeCompressed(NetDataWriter writer)
     {
-        Multiplayer.Log($"CommonItemChangePacket.Serialize() Compressing. Item Count: {Items.Count}");
+        //Multiplayer.LogDebug(() => $"CommonItemChangePacket.Serialize() Compressing. Item Count: {Items.Count}");
         writer.Put(true); // compressed data stream
         writer.Put(Items.Count);
 
@@ -118,13 +111,13 @@ public class CommonItemChangePacket : INetSerializable
         }
 
         byte[] compressedData = PacketCompression.Compress(dataWriter.Data);
-        Multiplayer.Log($"Uncompressed: {dataWriter.Length} Compressed: {compressedData.Length}");
+        //Multiplayer.LogDebug(() => $"Uncompressed: {dataWriter.Length} Compressed: {compressedData.Length}");
         writer.PutBytesWithLength(compressedData);
     }
 
     private void SerializeRaw(NetDataWriter writer)
     {
-        Multiplayer.Log($"CommonItemChangePacket.Serialize() Raw. Item Count: {Items.Count}");
+        //Multiplayer.LogDebug(() => $"CommonItemChangePacket.Serialize() Raw. Item Count: {Items.Count}");
         writer.Put(false); // uncompressed data stream
         writer.Put(Items.Count);
         foreach (var item in Items)

@@ -653,7 +653,11 @@ public class NetworkServer : NetworkManager
         List<ItemUpdateData> snapshots = new List<ItemUpdateData>();
         foreach (var item in NetworkedItem.GetAll())
         {
-            snapshots.Add(item.CreateUpdateData(ItemUpdateData.ItemUpdateType.Create));
+            //only send items that are close to the player
+            float sqDist = (serverPlayer.WorldPosition - item.transform.position).sqrMagnitude;
+
+            if (sqDist < 1000f )
+                snapshots.Add(item.CreateUpdateData(ItemUpdateData.ItemUpdateType.Create));
         }
 
         LogDebug(() => $"Sending sync ItemUpdateData {snapshots.Count} items");

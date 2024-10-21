@@ -1,5 +1,6 @@
 using HarmonyLib;
 using Multiplayer.Components.Networking.World;
+using Multiplayer.Utils;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -13,7 +14,7 @@ public static class LighterAwakePatch
 {
     static void Postfix(Lighter __instance)
     {
-        var networkedItem = __instance.gameObject.AddComponent<NetworkedItem>();
+        var networkedItem = __instance.gameObject.GetOrAddComponent<NetworkedItem>();
         networkedItem.Initialize(__instance);
 
         // Register the values you want to track with both getters and setters

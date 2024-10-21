@@ -267,27 +267,32 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         if(snapshot == null || snapshot.UpdateType == ItemUpdateData.ItemUpdateType.None)
             return;
 
+        //Multiplayer.LogDebug(()=>$"NetworkedItem.ReceiveSnapshot() netID: {snapshot.ItemNetId}, {snapshot.UpdateType}");
+
         if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.ItemEquipped))
         {
             //do something when a player equips/unequips an item
             Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot.ItemNetId}, Equipped: {snapshot.Equipped}, Player ID: {snapshot.Player}");
+            
         }
-        else if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.ItemDropped))
+
+        if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.ItemDropped))
         {
             //do something when a player drops/picks up an item
             Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot.ItemNetId}, Dropped: {snapshot.Dropped}, Player ID: {snapshot.Player}");
             Item.gameObject.SetActive(snapshot.Dropped);
         }
-        else if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.Position))
+
+        if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.Position) || snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.Create))
         { 
             //update all values
             transform.position = snapshot.PositionData.Position + WorldMover.currentMove;
             transform.rotation = snapshot.PositionData.Rotation;
         }
-        else if (snapshot.UpdateType == ItemUpdateData.ItemUpdateType.ObjectState)
+
+        if (snapshot.UpdateType == ItemUpdateData.ItemUpdateType.ObjectState || snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.Create))
         {
-            Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot.ItemNetId}, States: {snapshot?.States?.Count}");
-            Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot.ItemNetId}, States: {snapshot?.States?.Count}");
+            //Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot.ItemNetId}, States: {snapshot?.States?.Count}");
 
             foreach (var state in snapshot.States)
             {
@@ -350,16 +355,16 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         {
             NetworkedItemManager.Instance.AddDirtyItemSnapshot(CreateUpdateData(ItemUpdateData.ItemUpdateType.Destroy));
         }
+        /*
         else if(!BlockSync)
         {
-            Multiplayer.LogWarning($"NetworkedItem.OnDestroy({name}, {NetId})\r\n{new System.Diagnostics.StackTrace()}");
+            Multiplayer.LogWarning($"NetworkedItem.OnDestroy({name}, {NetId})");/*\r\n{new System.Diagnostics.StackTrace()}
         }
         else
         {
-            Multiplayer.LogDebug(()=>$"NetworkedItem.OnDestroy({name}, {NetId}) Sync blocked");
-        }
+            Multiplayer.LogDebug(()=>$"NetworkedItem.OnDestroy({name}, {NetId})");/*\r\n{new System.Diagnostics.StackTrace()}
+        }*/
 
-        base.OnDestroy();
         if (Item != null)
         {
             Item.Grabbed -= OnGrabbed;
@@ -367,6 +372,12 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
             Item.ItemInventoryStateChanged -= OnItemInventoryStateChanged;
             itemBaseToNetworkedItem.Remove(Item);
         }
+        else
+        {
+            Multiplayer.LogWarning($"NetworkedItem.OnDestroy({name}, {NetId}) Item is null!");
+        }
+
+        base.OnDestroy();
 
     }
 

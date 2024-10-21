@@ -321,11 +321,19 @@ public class NetworkClient : NetworkManager
         Object.DontDestroyOnLoad(go);
 
         SceneSwitcher.SwitchToScene(DVScenes.Game);
-        WorldStreamingInit.LoadingFinished += SendReadyPacket;
+        WorldStreamingInit.LoadingFinished += () =>
+        {
+            LogDebug(() => $"WorldStreamingInit.LoadingFinished()");
+            NetworkedItemManager.Instance.CheckInstance();
+            LogDebug(() => $"WorldStreamingInit.LoadingFinished() CacheWorldItems()");
+            NetworkedItemManager.Instance.CacheWorldItems();
+            LogDebug(() => $"WorldStreamingInit.LoadingFinished() SendReadyPacket()");
+            SendReadyPacket();
+        };
+        
 
         TrainStress.globalIgnoreStressCalculation = true;
 
-        NetworkedItemManager.Instance.CheckInstance();
     }
 
     private void OnClientboundBeginWorldSyncPacket(ClientboundBeginWorldSyncPacket packet)
@@ -781,28 +789,34 @@ public class NetworkClient : NetworkManager
     {
         LogDebug(() => $"OnCommonItemChangePacket({packet?.Items?.Count})");
 
-        string debug = "";
+        /*
+        Multiplayer.LogDebug(() =>
+            {
+                string debug = "";
 
-        foreach (var item in packet?.Items)
-        {
-            //LogDebug(() => $"OnCommonItemChangePacket({packet?.Items?.Count}, {peer.Id}) in loop");
-            debug += "UpdateType: " + item?.UpdateType + "\r\n";
-            debug += "itemNetId: " + item?.ItemNetId + "\r\n";
-            debug += "PrefabName: " + item?.PrefabName + "\r\n";
-            debug += "Equipped: " + item?.Equipped + "\r\n";
-            debug += "Dropped: " + item?.Dropped + "\r\n";
-            debug += "Position: " + item?.PositionData.Position + "\r\n";
-            debug += "Rotation: " + item?.PositionData.Rotation + "\r\n";
+                foreach (var item in packet?.Items)
+                {
+                    //LogDebug(() => $"OnCommonItemChangePacket({packet?.Items?.Count}, {peer.Id}) in loop");
+                    debug += "UpdateType: " + item?.UpdateType + "\r\n";
+                    debug += "itemNetId: " + item?.ItemNetId + "\r\n";
+                    debug += "PrefabName: " + item?.PrefabName + "\r\n";
+                    debug += "Equipped: " + item?.Equipped + "\r\n";
+                    debug += "Dropped: " + item?.Dropped + "\r\n";
+                    debug += "Position: " + item?.PositionData.Position + "\r\n";
+                    debug += "Rotation: " + item?.PositionData.Rotation + "\r\n";
 
-            //LogDebug(() => $"OnCommonItemChangePacket({packet?.Items?.Count}, {peer.Id}) prep states");
-            debug += "States:";
+                    //LogDebug(() => $"OnCommonItemChangePacket({packet?.Items?.Count}, {peer.Id}) prep states");
+                    debug += "States:";
 
-            if (item.States != null)
-                foreach (var state in item?.States)
-                    debug += "\r\n\t" + state.Key + ": " + state.Value;
-        }
+                    if (item.States != null)
+                        foreach (var state in item?.States)
+                            debug += "\r\n\t" + state.Key + ": " + state.Value;
+                }
 
-        Multiplayer.LogDebug(() => debug);
+                return debug;
+            }
+        );
+        */
 
         NetworkedItemManager.Instance.ReceiveSnapshots(packet.Items);
     }

@@ -85,34 +85,6 @@ public class StartGameData_ServerSave : AStartGameData
         // if (!string.IsNullOrEmpty(packet.Debt_insurance))
         //     CareerManagerDebtController.Instance.feeQuota.LoadSaveData(JObject.Parse(packet.Debt_insurance));
 
-        // clear spawned world items 
-        var items = NetworkedItem.GetAll().ToList();
-        foreach (var item in items)
-        {
-            try
-            {
-                if (item.Item != null && !item.Item.IsEssential() && !item.Item.IsGrabbed())
-                {
-                    NetworkLifecycle.Instance.Client.LogDebug(() => $"Clearing Spawned Item: {item?.TrackedItemType?.FullName}");
-                    item.BlockSync = true;
-
-                    RespawnOnDrop respawn = item.Item.GetComponent<RespawnOnDrop>();
-                    respawn.respawnOnDropThroughFloor = false;
-                    item.Item.itemDisabler.ToggleInDumpster(true);
-
-                    if (SingletonBehaviour<StorageController>.Instance.StorageWorld.ContainsItem(item.Item))
-                    {
-                        SingletonBehaviour<StorageController>.Instance.RemoveItemFromWorldStorage(item.Item);
-                    }
-                    //Destroy(item.gameObject);
-                }
-            }
-            catch (Exception ex)
-            {
-                NetworkLifecycle.Instance.Client.LogDebug(() => $"Error Clearing Spawned Item: {ex.Message}"); 
-            }
-        }
-
         carsAndJobsLoadingFinished = true;
         yield break;
     }
