@@ -37,6 +37,7 @@ namespace Multiplayer.Networking.Listeners;
 
 public class NetworkServer : NetworkManager
 {
+    public Action<uint> PlayerDisconnect;
     protected override string LogPrefix => "[Server]";
 
     private readonly Queue<NetPeer> joinQueue = new();
@@ -185,6 +186,8 @@ public class NetworkServer : NetworkManager
         {
             Id = id
         }), DeliveryMethod.ReliableUnordered);
+
+        PlayerDisconnect?.Invoke(id);
     }
 
     public override void OnNetworkLatencyUpdate(NetPeer peer, int latency)
@@ -416,15 +419,15 @@ public class NetworkServer : NetworkManager
         SendPacketToAll(ClientboundJobsUpdatePacket.FromNetworkedJobs(stationNetId, jobs), DeliveryMethod.ReliableUnordered,selfPeer);
     }
 
-    public void SendItemsChangePacket(List<ItemUpdateData> items, NetPeer peer = null)
+    public void SendItemsChangePacket(List<ItemUpdateData> items, ServerPlayer player)
     {
-        Multiplayer.Log($"Sending SendItemsChangePacket with {items.Count()} items");
+        Multiplayer.Log($"Sending SendItemsChangePacket with {items.Count()} items to {player.Username}");
 
-        SendNetSerializablePacketToAll(new CommonItemChangePacket { Items = items },
-            DeliveryMethod.ReliableUnordered, selfPeer);
-
-        //SendNetSerializablePacketToAll(new CommonItemChangePacket { Items = items },
-        //    DeliveryMethod.ReliableUnordered);
+        if(TryGetNetPeer(player.Id, out NetPeer peer) && peer != selfPeer)
+        {
+            SendNetSerializablePacket(peer, new CommonItemChangePacket { Items = items },
+                DeliveryMethod.ReliableUnordered);
+        }
     }
 
     public void SendChat(string message, NetPeer exclude = null)
@@ -650,18 +653,18 @@ public class NetworkServer : NetworkManager
 
         //Send Item Sync
         
-        List<ItemUpdateData> snapshots = new List<ItemUpdateData>();
-        foreach (var item in NetworkedItem.GetAll())
-        {
-            //only send items that are close to the player
-            float sqDist = (serverPlayer.WorldPosition - item.transform.position).sqrMagnitude;
+        //List<ItemUpdateData> snapshots = new List<ItemUpdateData>();
+        //foreach (var item in NetworkedItem.GetAll())
+        //{
+        //    //only send items that are close to the player
+        //    float sqDist = (serverPlayer.WorldPosition - item.transform.position).sqrMagnitude;
 
-            if (sqDist < 1000f )
-                snapshots.Add(item.CreateUpdateData(ItemUpdateData.ItemUpdateType.Create));
-        }
+        //    if (sqDist < 1000f )
+        //        snapshots.Add(item.CreateUpdateData(ItemUpdateData.ItemUpdateType.Create));
+        //}
 
-        LogDebug(() => $"Sending sync ItemUpdateData {snapshots.Count} items");
-        SendNetSerializablePacket(peer, new CommonItemChangePacket { Items = snapshots }, DeliveryMethod.ReliableOrdered);
+        //LogDebug(() => $"Sending sync ItemUpdateData {snapshots.Count} items");
+        //SendNetSerializablePacket(peer, new CommonItemChangePacket { Items = snapshots }, DeliveryMethod.ReliableOrdered);
 
         // Send existing players
         foreach (ServerPlayer player in ServerPlayers)

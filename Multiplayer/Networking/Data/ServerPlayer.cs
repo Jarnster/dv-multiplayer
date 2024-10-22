@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using Multiplayer.Components.Networking.Train;
+using Multiplayer.Components.Networking.World;
 using UnityEngine;
 
 namespace Multiplayer.Networking.Data;
@@ -14,6 +16,10 @@ public class ServerPlayer
     public Vector3 RawPosition { get; set; }
     public float RawRotationY { get; set; }
     public ushort CarId { get; set; }
+
+    public Dictionary<NetworkedItem, uint> KnownItems { get; private set; } = new Dictionary<NetworkedItem, uint>(); //NetworkedItem, last updated tick
+    public Dictionary<NetworkedItem, float> NearbyItems { get; private set; } = new Dictionary<NetworkedItem, float>(); //NetworkedItem, time since near the item
+    public StorageBase Storage { get; set; } = new StorageBase();
 
     private Vector3 _lastWorldPos = Vector3.zero;
     private Vector3 _lastAbsoluteWorldPosition = Vector3.zero;

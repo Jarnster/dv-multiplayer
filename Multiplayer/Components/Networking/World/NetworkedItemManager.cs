@@ -7,27 +7,45 @@ using Multiplayer.Networking.Data;
 using Multiplayer.Components.Networking.World;
 using System;
 using Multiplayer.Utils;
+using DV;
 using DV.CabControls.Spec;
 
 namespace Multiplayer.Components.Networking.Train;
 
 public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
 {
-    private List<ItemUpdateData> DirtyItems = new List<ItemUpdateData>();
+    public const float MAX_DISTANCE_TO_ITEM = 100f;
+    public const float MAX_DISTANCE_TO_ITEM_SQR = MAX_DISTANCE_TO_ITEM * MAX_DISTANCE_TO_ITEM;
+    public const float NEARBY_REMOVAL_DELAY = 3f; // 3 seconds delay
+
+    private List<ItemUpdateData> DestroyedItems = new List<ItemUpdateData>();
     private Queue<ItemUpdateData> ReceivedSnapshots = new Queue<ItemUpdateData>();
     private Dictionary<string, List<NetworkedItem>> CachedItems = new Dictionary<string, List<NetworkedItem>>();
+    private Dictionary<string, InventoryItemSpec> ItemPrefabs = new Dictionary<string, InventoryItemSpec>();
 
-protected override void Awake()
+    //private Dictionary<ushort, PlayerInventory> playerInventories = new Dictionary<ushort, PlayerInventory>();
+    //private Dictionary<NetworkedItem, ushort> itemToPlayerMap = new Dictionary<NetworkedItem, ushort>();
+
+
+    protected override void Awake()
     {
         base.Awake();
         if (!NetworkLifecycle.Instance.IsHost())
             return;
 
+        NetworkLifecycle.Instance.Server.PlayerDisconnect += PlayerDisconnected;
+    }
+
+    private void PlayerDisconnected(uint netID)
+    {
+        throw new NotImplementedException();
     }
 
     protected void Start()
     {
         NetworkLifecycle.Instance.OnTick += Common_OnTick;
+
+        BuildPrefabLookup();
     }
 
     protected override void OnDestroy()
@@ -39,10 +57,18 @@ protected override void Awake()
         NetworkLifecycle.Instance.OnTick -= Common_OnTick;
     }
 
-    public void AddDirtyItemSnapshot(ItemUpdateData item)
+    public void AddDirtyItemSnapshot(NetworkedItem netItem, ItemUpdateData snapshot)
     {
-        if(! DirtyItems.Contains(item))
-            DirtyItems.Add(item);
+        DestroyedItems.Add(snapshot);
+
+        foreach(var player in NetworkLifecycle.Instance.Server.ServerPlayers)
+        {
+            if(player.KnownItems.ContainsKey(netItem))
+                player.KnownItems.Remove(netItem);
+
+            if(player.NearbyItems.ContainsKey(netItem))
+                player.NearbyItems.Remove(netItem);
+        }
     }
 
     public void ReceiveSnapshots(List<ItemUpdateData> snapshots)
@@ -62,11 +88,17 @@ protected override void Awake()
 
     private void Common_OnTick(uint tick)
     {
-        //Process received Snapshots
         ProcessReceived();
 
         if (NetworkLifecycle.Instance.IsHost())
-            ProcessChanged();
+        {
+            UpdatePlayerItemLists();
+            ProcessChanged(tick);
+        }
+        else
+        {
+            ProcessClientChanges(tick);
+        }
     }
 
     private void ProcessReceived()
@@ -100,41 +132,118 @@ protected override void Awake()
         }
     }
 
-    private void ProcessChanged()
-    {
-        //Process all items for updates
-        foreach (var item in NetworkedItem.GetAll())
-        {
-            ItemUpdateData snapshot = item.GetSnapshot();
-
-            if (snapshot != null)
-                DirtyItems.Add(snapshot);
-        }
-
-        if (DirtyItems.Count == 0)
-            return;
-
-        if (NetworkLifecycle.Instance.IsHost())
-        {
-            NetworkLifecycle.Instance.Server.SendItemsChangePacket(DirtyItems);
-        }
-        else
-        {
-            NetworkLifecycle.Instance.Client.SendItemsChangePacket(DirtyItems);
-        }
-
-        DirtyItems.Clear();
-    }
-
     #endregion
 
     #region Server
+
+    private void UpdatePlayerItemLists()
+    {
+        float currentTime = Time.time;
+
+        List<NetworkedItem> allItems = NetworkedItem.GetAll();
+
+        foreach (var player in NetworkLifecycle.Instance.Server.ServerPlayers)
+        {
+            if (!player.IsLoaded)
+                continue;
+            foreach (var item in allItems)
+            {
+                float sqrDistance = (player.WorldPosition - item.transform.position).sqrMagnitude;
+
+                if (sqrDistance <= MAX_DISTANCE_TO_ITEM_SQR)
+                {
+                    //NetworkLifecycle.Instance.Server.LogDebug(() => $"UpdatePlayerItemLists() Adding for player: {player.Username}, Nearby Item: {item.NetId}, {item.name}");
+                    player.NearbyItems[item] = currentTime;
+                }
+            }
+
+            // Remove items that are no longer nearby
+            foreach (var kvp in player.NearbyItems)
+            {
+                if (currentTime - kvp.Value > NEARBY_REMOVAL_DELAY)
+                {
+                    //NetworkLifecycle.Instance.Server.LogDebug(() => $"UpdatePlayerItemLists() Removing for player: {player.Username}, Nearby Item: {kvp.Key.NetId}, {kvp.Key.name}");
+                    player.NearbyItems.Remove(kvp.Key);
+                }
+            }
+        }
+    }
+
+    private void ProcessChanged(uint tick)
+    {
+        List<ItemUpdateData> dirtyItems = new List<ItemUpdateData>();
+        float timeStamp = Time.time;
+
+        foreach (var item in NetworkedItem.GetAll())
+        {
+            ItemUpdateData snapshot = item.GetSnapshot();
+            if (snapshot != null)
+                dirtyItems.Add(snapshot);
+        }
+
+        //NetworkLifecycle.Instance.Server.LogDebug(() => $"ProcessChanged({tick}) DirtyItems: {dirtyItems.Count}");
+
+        foreach (var player in NetworkLifecycle.Instance.Server.ServerPlayers)
+        {
+            if (!player.IsLoaded)
+                continue;
+
+            List<ItemUpdateData> playerUpdates = new List<ItemUpdateData>();
+
+            // Process nearby items
+            foreach (var nearbyItem in player.NearbyItems.Keys)
+            {
+                if (!player.KnownItems.ContainsKey(nearbyItem))
+                {
+                    // This is a new item for the player
+                    //NetworkLifecycle.Instance.Server.LogDebug(() => $"ProcessChanged({tick}) New item for: {player.Username}, itemNetID{nearbyItem.NetId}");
+                    ItemUpdateData snapshot = nearbyItem.CreateUpdateData(ItemUpdateData.ItemUpdateType.Create);
+                    playerUpdates.Add(snapshot);
+                    player.KnownItems[nearbyItem] = tick;
+                }
+                else
+                {
+                    // Check if this item is in the dirty items list
+                    var dirtyUpdate = dirtyItems.FirstOrDefault(di => di.ItemNetId == nearbyItem.NetId);
+
+                    //NetworkLifecycle.Instance.Server.LogDebug(() => $"ProcessChanged({tick}) Item exists for: {player.Username}, {dirtyUpdate != null}");
+
+                    if (dirtyUpdate == null)
+                    {
+                        //NetworkLifecycle.Instance.Server.LogDebug(() => $"ProcessChanged({tick}) Item exists for: {player.Username}, LastDirtyTick: {player.KnownItems[nearbyItem] < nearbyItem.LastDirtyTick}");
+                        if (player.KnownItems[nearbyItem] < nearbyItem.LastDirtyTick)
+                        {
+                            dirtyUpdate = nearbyItem.CreateUpdateData(ItemUpdateData.ItemUpdateType.FullSync);
+                        }
+                    }
+
+                    if (dirtyUpdate != null)
+                    {
+                        playerUpdates.Add(dirtyUpdate);
+                        player.KnownItems[nearbyItem] = tick;
+                    }
+                }
+            }
+
+            //NetworkLifecycle.Instance.Server.LogDebug(() => $"ProcessChanged({tick}) Adding {DestroyedItems.Count()} DestroyedItems for: {player.Username}");
+
+            playerUpdates.AddRange(DestroyedItems);
+
+            if (playerUpdates.Count > 0)
+            {
+                //NetworkLifecycle.Instance.Server.LogDebug(() => $"ProcessChanged({tick}) Sending {playerUpdates.Count()} to player: {player.Username}");
+                NetworkLifecycle.Instance.Server.SendItemsChangePacket(playerUpdates, player);
+            }
+        }
+
+        DestroyedItems.Clear();
+    }
 
     private void ProcessReceivedAsHost(ItemUpdateData snapshot)
     {
         if (snapshot.UpdateType == ItemUpdateData.ItemUpdateType.Create)
         {
-            Multiplayer.LogError($"NetworkedItemManager.ProcessReceived() Host received Create snapshot! ItemNetId: {snapshot.ItemNetId}, prefabName: {snapshot.PrefabName}");
+            NetworkLifecycle.Instance.Server.LogError($"NetworkedItemManager.ProcessReceivedAsHost() Host received Create snapshot! ItemNetId: {snapshot.ItemNetId}, prefabName: {snapshot.PrefabName}");
             return;
         }
 
@@ -142,16 +251,17 @@ protected override void Awake()
         {
             if (ValidatePlayerAction(snapshot)) //Ensure the player can do this
             {
+                NetworkLifecycle.Instance.Server.LogWarning($"NetworkedItemManager.ProcessReceivedAsHost() ItemNetId: {snapshot.ItemNetId}, snapshot type: {snapshot.UpdateType}");
                 netItem.ReceiveSnapshot(snapshot);
             }
             else
             {
-                Multiplayer.LogWarning($"NetworkedItemManager.ProcessReceived() Player action validation failed for ItemNetId: {snapshot.ItemNetId}");
+                NetworkLifecycle.Instance.Server.LogWarning($"NetworkedItemManager.ProcessReceivedAsHost() Player action validation failed for ItemNetId: {snapshot.ItemNetId}");
             }
         }
         else
         {
-            Multiplayer.LogError($"NetworkedItemManager.ProcessReceived() NetworkedItem not found! Update Type: {snapshot.UpdateType}, ItemNetId: {snapshot.ItemNetId}, prefabName: {snapshot.PrefabName}");
+            NetworkLifecycle.Instance.Server.LogError($"NetworkedItemManager.ProcessReceivedAsHost() NetworkedItem not found! Update Type: {snapshot.UpdateType}, ItemNetId: {snapshot.ItemNetId}, prefabName: {snapshot.PrefabName}");
         }
     }
 
@@ -163,8 +273,29 @@ protected override void Awake()
     #endregion
 
     #region Client
+
+    private void ProcessClientChanges(uint tick)
+    {
+        List<ItemUpdateData> changedItems = new List<ItemUpdateData>();
+
+        foreach (var item in NetworkedItem.GetAll())
+        {
+            ItemUpdateData snapshot = item.GetSnapshot();
+            if (snapshot != null)
+            {
+                changedItems.Add(snapshot);
+            }
+        }
+
+        if (changedItems.Count > 0)
+        {
+            NetworkLifecycle.Instance.Client.SendItemsChangePacket(changedItems);
+        }
+    }
+
     private void ProcessReceivedAsClient(ItemUpdateData snapshot)
     {
+        NetworkLifecycle.Instance.Client.LogDebug(() => $"NetworkedItemManager.ProcessReceivedAsClient() Update Type: {snapshot?.UpdateType}, ItemNetId: {snapshot?.ItemNetId}, prefabName: {snapshot?.PrefabName}");
         if (snapshot.UpdateType == ItemUpdateData.ItemUpdateType.Create)
         {
             CreateItem(snapshot);
@@ -175,7 +306,7 @@ protected override void Awake()
         }
         else
         {
-            Multiplayer.LogError($"NetworkedItemManager.ProcessReceived() NetworkedItem not found on client! Update Type: {snapshot.UpdateType}, ItemNetId: {snapshot.ItemNetId}, prefabName: {snapshot.PrefabName}");
+            NetworkLifecycle.Instance.Client.LogError($"NetworkedItemManager.ProcessReceivedAsClient() NetworkedItem not found on client! Update Type: {snapshot.UpdateType}, ItemNetId: {snapshot.ItemNetId}, prefabName: {snapshot.PrefabName}");
         }
     }
     #endregion
@@ -193,16 +324,16 @@ protected override void Awake()
 
         if(newItem == null)
         {
-            GameObject prefabObj = Resources.Load(snapshot.PrefabName) as GameObject;
-
-            if (prefabObj == null)
+            //GameObject prefabObj = Resources.Load(snapshot.PrefabName) as GameObject;
+            
+            if (!ItemPrefabs.TryGetValue(snapshot.PrefabName, out InventoryItemSpec spec))
             {
                 Multiplayer.LogError($"NetworkedItemManager.CreateItem() Unable to load prefab for ItemNetId: {snapshot.ItemNetId}, prefabName: {snapshot.PrefabName}");
                 return;
             }
 
             //create a new item
-            GameObject gameObject = Instantiate(prefabObj, snapshot.PositionData.Position, snapshot.PositionData.Rotation);
+            GameObject gameObject = Instantiate(spec.gameObject, snapshot.PositionData.Position + WorldMover.currentMove, snapshot.PositionData.Rotation);
 
             //Make sure we have a NetworkedItem
             newItem = gameObject.GetOrAddComponent<NetworkedItem>();
@@ -210,22 +341,26 @@ protected override void Awake()
 
         newItem.gameObject.SetActive(true);
 
-        //InventoryItemSpec component = newItem.GetComponent<InventoryItemSpec>();
-        //if (newItem.Item.InventorySpecs != null)
-        //    newItem.Item.InventorySpecs.BelongsToPlayer = false;
-
-        //SingletonBehaviour<StorageController>.Instance.AddItemToWorldStorage(newItem.Item);
-
         newItem.NetId = snapshot.ItemNetId;
         newItem.ReceiveSnapshot(snapshot);
     }
 
+    private void BuildPrefabLookup()
+    {
+        NetworkLifecycle.Instance.Client.LogDebug(() => $"BuildPrefabLookup()");
+
+        foreach (var item in Globals.G.Items.items)
+        {
+            if (!ItemPrefabs.ContainsKey(item.ItemPrefabName))
+            {
+                ItemPrefabs[item.itemPrefabName] = item;
+            }
+        }
+    }
     public void CacheWorldItems()
     {
         if (NetworkLifecycle.Instance.IsHost())
             return;
-
-        NetworkLifecycle.Instance.Client.LogDebug(() => $"CacheWorldItems()");
 
         // Remove all spawned world items and place them into a cache for later use
         var items = NetworkedItem.GetAll().ToList();
@@ -253,13 +388,12 @@ protected override void Awake()
     {
         if (CachedItems.TryGetValue(prefabName, out var items) && items.Count > 0)
         {
-            //NetworkLifecycle.Instance.Client.LogDebug(() => $"GetFromCache({prefabName}) Cache Hit");
+
             var cachedItem = items[items.Count - 1];
             items.RemoveAt(items.Count - 1);
             return cachedItem;
         }
 
-        //NetworkLifecycle.Instance.Client.LogDebug(() => $"GetFromCache({prefabName}) Cache Miss!");
         return null;
     }
 
@@ -275,15 +409,12 @@ protected override void Awake()
         RespawnOnDrop respawn = netItem.Item.GetComponent<RespawnOnDrop>();
 
         Destroy(respawn);
-        
 
-        NetworkLifecycle.Instance.Client.LogDebug(() => $"Caching Spawned Item: {prefabName ?? ""}: checkWhileDisabled {respawn.checkWhileDisabled}, ignoreDistanceFromSpawnPosition {respawn.ignoreDistanceFromSpawnPosition}, respawnOnDropThroughFloor {respawn.respawnOnDropThroughFloor}");
-
+        //NetworkLifecycle.Instance.Client.LogDebug(() => $"Caching Spawned Item: {prefabName ?? ""}: checkWhileDisabled {respawn.checkWhileDisabled}, ignoreDistanceFromSpawnPosition {respawn.ignoreDistanceFromSpawnPosition}, respawnOnDropThroughFloor {respawn.respawnOnDropThroughFloor}");
 
         //respawn.checkWhileDisabled = false;
         //respawn.ignoreDistanceFromSpawnPosition = true;
         //respawn.respawnOnDropThroughFloor = false;
-        //netItem.Item.itemDisabler.ToggleInDumpster(false);
 
         if (SingletonBehaviour<StorageController>.Instance.StorageWorld.ContainsItem(netItem.Item))
         {
@@ -303,8 +434,6 @@ protected override void Awake()
     }
 
     #endregion
-
-
 
 
     [UsedImplicitly]

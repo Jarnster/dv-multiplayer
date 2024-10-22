@@ -37,6 +37,7 @@ using UnityModManagerNet;
 using Object = UnityEngine.Object;
 using Multiplayer.Networking.Packets.Serverbound.Train;
 using System.Linq;
+using LiteNetLib.Utils;
 
 namespace Multiplayer.Networking.Listeners;
 
@@ -830,6 +831,11 @@ public class NetworkClient : NetworkManager
         SendPacket(serverPeer, packet, deliveryMethod);
     }
 
+    private void SendNetSerializablePacketToServer<T>(T packet, DeliveryMethod deliveryMethod) where T : INetSerializable, new()
+    {
+        SendNetSerializablePacket(serverPeer, packet, deliveryMethod);
+    }
+
     public void SendSaveGameDataRequest()
     {
         SendPacketToServer(new ServerboundSaveGameDataRequestPacket(), DeliveryMethod.ReliableOrdered);
@@ -1121,11 +1127,14 @@ public class NetworkClient : NetworkManager
         }, DeliveryMethod.ReliableUnordered);
     }
 
-    public void SendItemsChangePacket(List<ItemUpdateData> items, NetPeer peer = null)
+    public void SendItemsChangePacket(List<ItemUpdateData> items)
     {
         Multiplayer.Log($"Sending SendItemsChangePacket with {items.Count()} items");
         //SendPacketToServer(new CommonItemChangePacket { Items = items },
         //    DeliveryMethod.ReliableUnordered);
+
+        SendNetSerializablePacketToServer(new CommonItemChangePacket { Items = items },
+                DeliveryMethod.ReliableOrdered);
     }
 
     #endregion

@@ -49,6 +49,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
     public bool UsefulItem { get; private set; } = false;
     public Type TrackedItemType { get; private set; }
     public bool BlockSync { get; set; } = false;
+    public uint LastDirtyTick { get; private set; }
 
     //Track dirty states
     private bool CreatedDirty = true;   //if set, we created this item dirty and have not sent an update
@@ -64,6 +65,24 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
     private ItemPositionData ItemPosition;
     private bool PositionDirty = false;
 
+    //Handle ownership
+    public ushort OwnerId { get; private set; } = 0; // 0 means no owner
+
+    //public void SetOwner(ushort playerId)
+    //{
+    //    if (OwnerId != playerId)
+    //    {
+    //        if (OwnerId != 0)
+    //        {
+    //            NetworkedItemManager.Instance.RemoveItemFromPlayerInventory(this);
+    //        }
+    //        OwnerId = playerId;
+    //        if (playerId != 0)
+    //        {
+    //            NetworkedItemManager.Instance.AddItemToPlayerInventory(playerId, this);
+    //        }
+    //    }
+    //}
 
     protected override bool IsIdServerAuthoritative => true;
 
@@ -80,11 +99,15 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
     {
         if (!CreatedDirty)
             return;
-    
-        if (StorageController.Instance.IsInStorageWorld(Item))
-        {
-            ItemDropped = true;
-        }
+
+
+        ItemGrabbed = Item.IsGrabbed();
+        ItemDropped = Item.transform.parent == WorldMover.OriginShiftParent;
+
+        //if (StorageController.Instance.IsInStorageWorld(Item) )
+        //{
+        //    ItemDropped = true;
+        //}
     }
 
     public T GetTrackedItem<T>() where T : Component
@@ -161,6 +184,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
             DroppedDirty = true;
             ItemDropped = true;
         }
+
     }
 
     #region Item Value Tracking
@@ -250,6 +274,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         if (updateType == ItemUpdateData.ItemUpdateType.None)
             return null;
 
+        LastDirtyTick = NetworkLifecycle.Instance.Tick;
         snapshot = CreateUpdateData(updateType);
 
         CreatedDirty = false;
@@ -269,18 +294,19 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
         //Multiplayer.LogDebug(()=>$"NetworkedItem.ReceiveSnapshot() netID: {snapshot.ItemNetId}, {snapshot.UpdateType}");
 
-        if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.ItemEquipped))
+        if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.ItemEquipped) || snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.Create))
         {
             //do something when a player equips/unequips an item
             Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot.ItemNetId}, Equipped: {snapshot.Equipped}, Player ID: {snapshot.Player}");
-            
+            //OwnerId = snapshot.Player;
+            //if(OwnerId != NetworkLifecycle.Instance.Client.selfPeer.RemoteId)
         }
 
-        if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.ItemDropped))
+        if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.ItemDropped) || snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.Create))
         {
             //do something when a player drops/picks up an item
             Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot.ItemNetId}, Dropped: {snapshot.Dropped}, Player ID: {snapshot.Player}");
-            Item.gameObject.SetActive(snapshot.Dropped);
+            //Item.gameObject.SetActive(snapshot.Dropped);
         }
 
         if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.Position) || snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.Create))
@@ -353,7 +379,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
         if (NetworkLifecycle.Instance.IsHost())
         {
-            NetworkedItemManager.Instance.AddDirtyItemSnapshot(CreateUpdateData(ItemUpdateData.ItemUpdateType.Destroy));
+            NetworkedItemManager.Instance.AddDirtyItemSnapshot(this, CreateUpdateData(ItemUpdateData.ItemUpdateType.Destroy));
         }
         /*
         else if(!BlockSync)

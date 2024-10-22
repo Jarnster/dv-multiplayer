@@ -17,6 +17,7 @@ public class ItemUpdateData
         ItemDropped = 8,
         ItemEquipped = 16,
         ObjectState = 32,
+        FullSync = Position | ItemDropped | ItemEquipped | ObjectState,
     }
 
     public ItemUpdateType UpdateType { get; set; }
