@@ -1,6 +1,7 @@
 using DV.CabControls;
-using DV.CabControls.Spec;
+using DV.Interaction;
 using DV.InventorySystem;
+using DV.Items;
 using Multiplayer.Components.Networking.Train;
 using Multiplayer.Networking.Data;
 using System;
@@ -10,6 +11,15 @@ using System.Text;
 using UnityEngine;
 
 namespace Multiplayer.Components.Networking.World;
+
+public enum ItemState : byte
+{
+    Dropped,        //belongs to the world
+    Thrown,         //was thrown by player
+    InHand,         //held by player
+    InInventory,    //in player's inventory
+    Attached        //attached to another object (e.g. EOT Lanterns)
+}
 
 public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 {
@@ -44,26 +54,26 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
     private const float RotationThreshold = 0.1f;
 
     public ItemBase Item { get; private set; }
+    private GrabHandlerItem GrabHandler;
+    private SnappableItem SnappableItem;
     private Component trackedItem;
     private List<object> trackedValues = new List<object>();
     public bool UsefulItem { get; private set; } = false;
     public Type TrackedItemType { get; private set; }
     public bool BlockSync { get; set; } = false;
     public uint LastDirtyTick { get; private set; }
+    private bool Initialised;
 
     //Track dirty states
     private bool CreatedDirty = true;   //if set, we created this item dirty and have not sent an update
 
-    private bool ItemGrabbed = false;   //Current state of item grabbed
-    private bool GrabbedDirty = false;  //Current state is dirty
+    private ItemState lastState;
+    private bool stateDirty;
+    private bool wasThrown;
 
-    private bool ItemDropped = false;   //Current state of item dropped
-    private bool DroppedDirty = false;  //Current state is dirty
-
-    private Vector3 lastPosition;
-    private Quaternion lastRotation;
-    private ItemPositionData ItemPosition;
-    private bool PositionDirty = false;
+    private Vector3 thrownPosition;
+    private Quaternion thrownRotation;
+    private Vector3 throwDirection;
 
     //Handle ownership
     public ushort OwnerId { get; private set; } = 0; // 0 means no owner
@@ -99,10 +109,6 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
     {
         if (!CreatedDirty)
             return;
-
-
-        ItemGrabbed = Item.IsGrabbed();
-        ItemDropped = Item.transform.parent == WorldMover.OriginShiftParent;
     }
 
     public T GetTrackedItem<T>() where T : Component
@@ -128,6 +134,9 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
     private bool Register()
     {
+        if (Initialised)
+            return false;
+
         try
         {
 
@@ -142,11 +151,17 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
             Item.Grabbed += OnGrabbed;
             Item.Ungrabbed += OnUngrabbed;
-            Item.ItemInventoryStateChanged += OnItemInventoryStateChanged;
 
-            lastPosition = Item.transform.position - WorldMover.currentMove;
-            lastRotation = Item.transform.rotation;
+            TryGetComponent<GrabHandlerItem>(out GrabHandler);
+            TryGetComponent<SnappableItem>(out SnappableItem);
 
+
+            //Item.ItemInventoryStateChanged += OnItemInventoryStateChanged;
+
+            lastState = GetItemState();
+            stateDirty = false;
+
+            Initialised = true;
             return true;
         }
         catch (Exception ex)
@@ -158,29 +173,27 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
     private void OnUngrabbed(ControlImplBase obj)
     {
-        Multiplayer.LogDebug(() => $"OnUngrabbed() {name}");
-        GrabbedDirty = ItemGrabbed == true;
-        ItemGrabbed = false;
-        
+        Multiplayer.LogDebug(() => $"OnUngrabbed() NetID: {NetId}, {name}");
+        stateDirty = true;
     }
 
     private void OnGrabbed(ControlImplBase obj)
     {
-        Multiplayer.LogDebug(() => $"OnGrabbed() {name}");
-        GrabbedDirty = ItemGrabbed == false;
-        ItemGrabbed = true;
+        Multiplayer.LogDebug(() => $"OnGrabbed() NetID: {NetId}, {name}");
+        stateDirty = true;
     }
 
-    private void OnItemInventoryStateChanged(ItemBase itemBase, InventoryActionType actionType, InventoryItemState itemState)
+    public void OnThrow(Vector3 direction)
     {
-        Multiplayer.LogDebug(() => $"OnItemInventoryStateChanged() {name}, InventoryActionType: {actionType}, InventoryItemState: {itemState}");
-        if (actionType == InventoryActionType.Purge)
-        {
-            DroppedDirty = true;
-            ItemDropped = true;
-        }
+        Multiplayer.LogDebug(() => $"OnThrow() netId: {NetId}, Name: {name}, Direction: {direction}");
+        throwDirection = direction;
+        thrownPosition = Item.transform.position - WorldMover.currentMove;
+        thrownRotation = Item.transform.rotation;
 
+        wasThrown = true;
+        stateDirty = true;
     }
+
 
     #region Item Value Tracking
     public void RegisterTrackedValue<T>(string key, Func<T> valueGetter, Action<T> valueSetter)
@@ -214,27 +227,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         }
     }
 
-    private void CheckPositionChange()
-    {
-        Vector3 currentPosition = transform.position - WorldMover.currentMove;
-        Quaternion currentRotation = transform.rotation;
-
-        bool positionChanged = Vector3.Distance(currentPosition, lastPosition) > PositionThreshold;
-        bool rotationChanged = Quaternion.Angle(currentRotation, lastRotation) > RotationThreshold;
-
-        //We don't care about position and rotation if the player is holding it, as it will move relative to the player
-        if ((positionChanged || rotationChanged) && !ItemGrabbed)
-        {
-            ItemPosition = new ItemPositionData
-            {
-                Position = currentPosition,
-                Rotation = currentRotation
-            };
-            lastPosition = currentPosition;
-            lastRotation = currentRotation;
-            PositionDirty = true;
-        }
-    }
+    #endregion
 
     public ItemUpdateData GetSnapshot()
     {
@@ -244,16 +237,16 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         if (Item == null && Register() == false)
             return null;
 
-        CheckPositionChange();
+        if (!stateDirty)
+            return null;
+
+        ItemState currentState = GetItemState();
 
         if (!CreatedDirty)
         {
-            if(PositionDirty)
-                updateType |= ItemUpdateData.ItemUpdateType.Position;
-            if(DroppedDirty)
-                updateType |= ItemUpdateData.ItemUpdateType.ItemDropped;
-            if(GrabbedDirty)
-                updateType |= ItemUpdateData.ItemUpdateType.ItemEquipped;
+            if(lastState != currentState)
+                updateType |= ItemUpdateData.ItemUpdateType.ItemState;
+
             if (HasDirtyValues())
             {
                 Multiplayer.LogDebug(GetDirtyValuesDebugString);
@@ -269,13 +262,13 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         if (updateType == ItemUpdateData.ItemUpdateType.None)
             return null;
 
+        lastState = currentState;
         LastDirtyTick = NetworkLifecycle.Instance.Tick;
         snapshot = CreateUpdateData(updateType);
 
         CreatedDirty = false;
-        GrabbedDirty = false;
-        DroppedDirty = false;
-        PositionDirty = false;
+        stateDirty = false;
+        wasThrown = false;
 
         MarkValuesClean();
 
@@ -287,85 +280,149 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         if(snapshot == null || snapshot.UpdateType == ItemUpdateData.ItemUpdateType.None)
             return;
 
-        //Multiplayer.LogDebug(()=>$"NetworkedItem.ReceiveSnapshot() netID: {snapshot.ItemNetId}, {snapshot.UpdateType}");
-
-        if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.ItemEquipped) || snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.Create))
+        if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.ItemState) || snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.FullSync) || snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.Create))
         {
-            //do something when a player equips/unequips an item
-            Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot.ItemNetId}, Equipped: {snapshot.Equipped}, Player ID: {snapshot.Player}");
-            //OwnerId = snapshot.Player;
-            //if(OwnerId != NetworkLifecycle.Instance.Client.selfPeer.RemoteId)
+            Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot?.ItemNetId}, ItemUpdateType {snapshot?.UpdateType}, ItemState {snapshot?.ItemState}");
+
+            switch (snapshot.ItemState)
+            {
+                case ItemState.Dropped:
+                    this.gameObject.SetActive(true);
+                    transform.position = snapshot.ItemPosition + WorldMover.currentMove;
+                    transform.rotation = snapshot.ItemRotation;
+                    OwnerId = 0;
+                    break;
+
+                case ItemState.Thrown:
+                    this.gameObject.SetActive(true);
+                    transform.position = snapshot.ItemPosition + WorldMover.currentMove;
+                    transform.rotation = snapshot.ItemRotation;
+                    OwnerId = 0;
+
+                    GrabHandler?.Throw(throwDirection);
+                    break;
+
+                case ItemState.InHand:
+                    this.gameObject.SetActive(false);
+                    break;
+
+                case ItemState.InInventory:
+                    this.gameObject.SetActive(false);
+                    break;
+
+                case ItemState.Attached:
+                    this.gameObject.SetActive(true);
+                    break;
+
+                default:
+                    throw new Exception($"Item state not implemented: {snapshot.ItemState}");
+
+            }
+
         }
 
-        if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.ItemDropped) || snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.Create))
-        {
-            //do something when a player drops/picks up an item
-            Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot.ItemNetId}, Dropped: {snapshot.Dropped}, Player ID: {snapshot.Player}");
-            //Item.gameObject.SetActive(snapshot.Dropped);
-        }
+        Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot?.ItemNetId}, ItemUpdateType {snapshot?.UpdateType} About to process states");
 
-        if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.Position) || snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.Create))
-        { 
-            //update all values
-            transform.position = snapshot.PositionData.Position + WorldMover.currentMove;
-            transform.rotation = snapshot.PositionData.Rotation;
-        }
-
-        if (snapshot.UpdateType == ItemUpdateData.ItemUpdateType.ObjectState || snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.Create))
+        if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.ObjectState) || snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.FullSync) || snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.Create))
         {
             //Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot.ItemNetId}, States: {snapshot?.States?.Count}");
 
-            foreach (var state in snapshot.States)
+            if (snapshot.States != null)
             {
-                var trackedValue = trackedValues.Find(tv => ((dynamic)tv).Key == state.Key);
-                if (trackedValue != null)
+                foreach (var state in snapshot.States)
                 {
-                    try
+                    var trackedValue = trackedValues.Find(tv => ((dynamic)tv).Key == state.Key);
+                    if (trackedValue != null)
                     {
-                        ((dynamic)trackedValue).SetValueFromObject(state.Value);
-                        Multiplayer.LogDebug(() => $"Updated tracked value: {state.Key}");
+                        try
+                        {
+                            ((dynamic)trackedValue).SetValueFromObject(state.Value);
+                            Multiplayer.LogDebug(() => $"Updated tracked value: {state.Key}");
+                        }
+                        catch (Exception ex)
+                        {
+                            Multiplayer.LogError($"Error updating tracked value {state.Key}: {ex.Message}");
+                        }
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        Multiplayer.LogError($"Error updating tracked value {state.Key}: {ex.Message}");
+                        Multiplayer.LogWarning($"Tracked value not found: {state.Key}");
                     }
-                }
-                else
-                {
-                    Multiplayer.LogWarning($"Tracked value not found: {state.Key}");
                 }
             }
         }
 
+        Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot?.ItemNetId}, ItemUpdateType {snapshot?.UpdateType} states processed");
+
         //mark values as clean
         CreatedDirty = false;
-        GrabbedDirty = false;
-        DroppedDirty = false;
-        PositionDirty = false;
+        stateDirty = false;
 
         MarkValuesClean();
         return;
     }
-    #endregion
 
     public ItemUpdateData CreateUpdateData(ItemUpdateData.ItemUpdateType updateType)
     {
         Multiplayer.LogDebug(() => $"NetworkedItem.CreateUpdateData({updateType}) NetId: {NetId}, name: {name}");
-   
+
+        Vector3 position;
+        Quaternion rotation;
+
+        if (wasThrown)
+        {
+            position = thrownPosition;
+            rotation = thrownRotation;
+        }
+        else
+        {
+            position = transform.position - WorldMover.currentMove;
+            rotation = transform.rotation;
+        }
+
         var updateData = new ItemUpdateData
         {
             UpdateType = updateType,
             ItemNetId = NetId,
-            PrefabName = Item.name,
-            PositionData = ItemPosition,
-            Equipped = ItemGrabbed,
-            Dropped = ItemDropped,
+            PrefabName = Item.InventorySpecs.ItemPrefabName,
+            ItemState = lastState,
+            ItemPosition = position,
+            ItemRotation = rotation,
+            ThrowDirection = throwDirection,
             States = GetDirtyStateData(),
         };
 
         return updateData;
     }
 
+    private ItemState GetItemState()
+    {
+        Multiplayer.LogDebug(() => $"GetItemState() NetId: {NetId}, {name}, Parent: {Item.transform.parent} WorldMover: {WorldMover.OriginShiftParent}, wasThrown: {wasThrown}, isGrabbed: {Item.IsGrabbed()} Inventory.Contains(): {Inventory.Instance.Contains(this.gameObject, false)} Storage.Contains: {StorageController.Instance.StorageInventory.ContainsItem(Item)}");
+
+
+        if (Item.transform.parent == WorldMover.OriginShiftParent)
+            return ItemState.Dropped;
+
+        if (wasThrown)
+            return ItemState.Thrown;
+
+        if (Item.IsGrabbed())
+            return ItemState.InHand;
+
+        if (Inventory.Instance.Contains(this.gameObject, false))
+            return ItemState.InInventory;
+
+        if(SnappableItem != null && SnappableItem.IsSnapped)
+        {
+
+            Multiplayer.LogDebug(() => $"GetItemState() NetId: {NetId}, {name}, snapped! {this.transform.parent}");
+            return ItemState.Attached;
+        }
+
+        //we need a condition to check if it's attached to something else
+        return ItemState.Dropped;
+            
+    }
 
     protected override void OnDestroy()
     {
@@ -390,7 +447,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         {
             Item.Grabbed -= OnGrabbed;
             Item.Ungrabbed -= OnUngrabbed;
-            Item.ItemInventoryStateChanged -= OnItemInventoryStateChanged;
+            //Item.ItemInventoryStateChanged -= OnItemInventoryStateChanged;
             itemBaseToNetworkedItem.Remove(Item);
         }
         else

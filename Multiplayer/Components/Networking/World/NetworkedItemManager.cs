@@ -8,7 +8,6 @@ using Multiplayer.Components.Networking.World;
 using System;
 using Multiplayer.Utils;
 using DV;
-using DV.CabControls.Spec;
 
 namespace Multiplayer.Components.Networking.Train;
 
@@ -155,7 +154,7 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
 
                 if (sqrDistance <= MAX_DISTANCE_TO_ITEM_SQR)
                 {
-                    NetworkLifecycle.Instance.Server.LogDebug(() => $"UpdatePlayerItemLists() Adding for player: {player?.Username}, Nearby Item: {item?.NetId}, {item?.name}");
+                    //NetworkLifecycle.Instance.Server.LogDebug(() => $"UpdatePlayerItemLists() Adding for player: {player?.Username}, Nearby Item: {item?.NetId}, {item?.name}");
                     player.NearbyItems[item] = currentTime;
                 }
             }
@@ -167,7 +166,7 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
 
                 if (currentTime - kvp.Value > NEARBY_REMOVAL_DELAY)
                 {
-                    NetworkLifecycle.Instance.Server.LogDebug(() => $"UpdatePlayerItemLists() Removing for player: {player?.Username}, Nearby Item: {kvp.Key?.NetId}, {kvp.Key?.name}");
+                    //NetworkLifecycle.Instance.Server.LogDebug(() => $"UpdatePlayerItemLists() Removing for player: {player?.Username}, Nearby Item: {kvp.Key?.NetId}, {kvp.Key?.name}");
                     player.NearbyItems.Remove(kvp.Key);
                 }
             }
@@ -341,7 +340,7 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
             }
 
             //create a new item
-            GameObject gameObject = Instantiate(spec.gameObject, snapshot.PositionData.Position + WorldMover.currentMove, snapshot.PositionData.Rotation);
+            GameObject gameObject = Instantiate(spec.gameObject, snapshot.ItemPosition + WorldMover.currentMove, snapshot.ItemRotation);
 
             //Make sure we have a NetworkedItem
             newItem = gameObject.GetOrAddComponent<NetworkedItem>();

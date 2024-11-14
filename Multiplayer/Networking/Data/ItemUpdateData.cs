@@ -1,7 +1,9 @@
 using LiteNetLib.Utils;
 using Multiplayer.Components.Networking.World;
+using Multiplayer.Networking.Serialization;
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
 namespace Multiplayer.Networking.Data;
 
@@ -13,21 +15,21 @@ public class ItemUpdateData
         None = 0,
         Create = 1,
         Destroy = 2,
-        Position = 4,
-        ItemDropped = 8,
-        ItemEquipped = 16,
-        ObjectState = 32,
-        FullSync = Position | ItemDropped | ItemEquipped | ObjectState,
+        ItemState = 4,
+        ObjectState = 8,
+        FullSync = 16,
     }
 
     public ItemUpdateType UpdateType { get; set; }
     public ushort ItemNetId { get; set; }
     public string PrefabName { get; set; }
-    public ItemPositionData PositionData { get; set; }
-    
-    public bool Dropped { get; set; }
-    public bool Equipped { get; set; }
+    public ItemState ItemState { get; set; }
+    public Vector3 ItemPosition { get; set; }
+    public Quaternion ItemRotation { get; set; }
+    public Vector3 ThrowDirection { get; set; }
     public ushort Player { get; set; }
+    public ushort CarNetId { get; set; }
+    public bool AttachedFront  { get; set; }
     public Dictionary<string, object> States { get; set; }
 
     public void Serialize(NetDataWriter writer)
@@ -38,20 +40,32 @@ public class ItemUpdateData
         if(UpdateType == ItemUpdateType.Destroy)
             return;
 
+        if(UpdateType.HasFlag(ItemUpdateType.ItemState) || UpdateType.HasFlag(ItemUpdateType.Create) || UpdateType.HasFlag(ItemUpdateType.FullSync))
+            writer.Put((byte)ItemState);
+
         if (UpdateType.HasFlag(ItemUpdateType.Create))
             writer.Put(PrefabName);
 
-        if (UpdateType.HasFlag(ItemUpdateType.Position) || UpdateType.HasFlag(ItemUpdateType.ItemDropped) || UpdateType.HasFlag(ItemUpdateType.Create))
-            ItemPositionData.Serialize(writer, PositionData);
+        if (UpdateType.HasFlag(ItemUpdateType.Create) || UpdateType.HasFlag(ItemUpdateType.FullSync) || (UpdateType.HasFlag(ItemUpdateType.ItemState) && ItemState == ItemState.Dropped))
+        {
+            Vector3Serializer.Serialize(writer, ItemPosition);
+            QuaternionSerializer.Serialize(writer, ItemRotation);
 
-        if (UpdateType.HasFlag(ItemUpdateType.ItemDropped) || UpdateType.HasFlag(ItemUpdateType.Create))
-            writer.Put(Dropped);
+            if(ItemState == ItemState.InInventory || ItemState == ItemState.InHand)
+            {
+                writer.Put(Player);
+            }
+            else if(ItemState == ItemState.Attached)
+            {
+                writer.Put(CarNetId);
+                writer.Put(AttachedFront);
+            }
+        }
 
-        if (UpdateType.HasFlag(ItemUpdateType.ItemEquipped) || UpdateType.HasFlag(ItemUpdateType.Create))
-            writer.Put(Equipped);
-
-        if (UpdateType.HasFlag(ItemUpdateType.ItemDropped) || UpdateType.HasFlag(ItemUpdateType.ItemEquipped) || UpdateType.HasFlag(ItemUpdateType.Create))
-            writer.Put(Player);
+        if (UpdateType.HasFlag(ItemUpdateType.ItemState) && ItemState == ItemState.Thrown)
+        {
+            Vector3Serializer.Serialize(writer, ThrowDirection);
+        }
 
         if (UpdateType.HasFlag(ItemUpdateType.ObjectState) || UpdateType.HasFlag(ItemUpdateType.Create))
         {
@@ -60,7 +74,7 @@ public class ItemUpdateData
             else
             {
                 writer.Put(States.Count);
-                foreach(var state in States)
+                foreach (var state in States)
                 {
                     writer.Put(state.Key);
                     SerializeTrackedValue(writer, state.Value);
@@ -77,33 +91,46 @@ public class ItemUpdateData
         if (UpdateType == ItemUpdateType.Destroy)
             return;
 
-        if (UpdateType == ItemUpdateType.Create)
+        if (UpdateType.HasFlag(ItemUpdateType.ItemState) || UpdateType.HasFlag(ItemUpdateType.Create) || UpdateType.HasFlag(ItemUpdateType.FullSync))
+            ItemState = (ItemState)reader.GetByte();
+
+        if (UpdateType.HasFlag(ItemUpdateType.Create))
             PrefabName = reader.GetString();
 
-        if (UpdateType.HasFlag(ItemUpdateType.Position) || UpdateType.HasFlag(ItemUpdateType.ItemDropped) || UpdateType.HasFlag(ItemUpdateType.Create))
+        if (UpdateType.HasFlag(ItemUpdateType.Create) || UpdateType.HasFlag(ItemUpdateType.FullSync) ||
+           (UpdateType.HasFlag(ItemUpdateType.ItemState) && ItemState == ItemState.Dropped))
         {
-            PositionData = ItemPositionData.Deserialize(reader);
+            ItemPosition = Vector3Serializer.Deserialize(reader);
+            ItemRotation = QuaternionSerializer.Deserialize(reader);
+
+            if (ItemState == ItemState.InInventory || ItemState == ItemState.InHand)
+            {
+                Player = reader.GetUShort();
+            }
+            else if (ItemState == ItemState.Attached)
+            {
+                CarNetId = reader.GetUShort();
+                AttachedFront = reader.GetBool();
+            }
         }
 
-        if (UpdateType.HasFlag(ItemUpdateType.ItemDropped) || UpdateType.HasFlag(ItemUpdateType.Create))
-            Dropped = reader.GetBool();
-
-        if (UpdateType.HasFlag(ItemUpdateType.ItemEquipped) || UpdateType.HasFlag(ItemUpdateType.Create))
-            Equipped = reader.GetBool();
-
-        if (UpdateType.HasFlag(ItemUpdateType.ItemDropped) || UpdateType.HasFlag(ItemUpdateType.ItemEquipped) || UpdateType.HasFlag(ItemUpdateType.Create))
-            Player = reader.GetUShort();
+        if (UpdateType.HasFlag(ItemUpdateType.ItemState) && ItemState == ItemState.Thrown)
+        {
+            ThrowDirection = Vector3Serializer.Deserialize(reader);
+        }
 
         if (UpdateType.HasFlag(ItemUpdateType.ObjectState) || UpdateType.HasFlag(ItemUpdateType.Create))
         {
-            States = new Dictionary<string, object>();
-
             int stateCount = reader.GetInt();
-            for (int i = 0; i < stateCount; i++)
+            if (stateCount > 0)
             {
-                string key = reader.GetString();
-                object value = DeserializeTrackedValue(reader);
-                States[key] = value;
+                States = new Dictionary<string, object>();
+                for (int i = 0; i < stateCount; i++)
+                {
+                    string key = reader.GetString();
+                    object value = DeserializeTrackedValue(reader);
+                    States[key] = value;
+                }
             }
         }
     }
