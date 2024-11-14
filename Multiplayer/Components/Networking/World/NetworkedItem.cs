@@ -40,8 +40,8 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
     }
     #endregion
 
-    private const float PositionThreshold = 0.01f;
-    private const float RotationThreshold = 0.01f;
+    private const float PositionThreshold = 0.1f;
+    private const float RotationThreshold = 0.1f;
 
     public ItemBase Item { get; private set; }
     private Component trackedItem;
@@ -103,11 +103,6 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
         ItemGrabbed = Item.IsGrabbed();
         ItemDropped = Item.transform.parent == WorldMover.OriginShiftParent;
-
-        //if (StorageController.Instance.IsInStorageWorld(Item) )
-        //{
-        //    ItemDropped = true;
-        //}
     }
 
     public T GetTrackedItem<T>() where T : Component

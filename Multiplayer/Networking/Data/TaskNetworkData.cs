@@ -6,7 +6,6 @@ using DV.ThingTypes;
 using LiteNetLib.Utils;
 using Multiplayer.Components.Networking.Train;
 
-
 namespace Multiplayer.Networking.Data;
 
 #region TaskData Base Class
@@ -29,22 +28,16 @@ public abstract class TaskNetworkData<T> : TaskNetworkData where T : TaskNetwork
 
     protected void SerializeCommon(NetDataWriter writer)
     {
-        Multiplayer.Log($"TaskNetworkData.SerializeCommon() State {(byte)State}, {State}");
         //Multiplayer.Log($"TaskNetworkData.SerializeCommon() State {(byte)State}, {State}");
         writer.Put((byte)State);
-        Multiplayer.Log($"TaskNetworkData.SerializeCommon() TaskStartTime {TaskStartTime}");
         //Multiplayer.Log($"TaskNetworkData.SerializeCommon() TaskStartTime {TaskStartTime}");
         writer.Put(TaskStartTime);
-        Multiplayer.Log($"TaskNetworkData.SerializeCommon() TaskFinishTime {TaskFinishTime}");
         //Multiplayer.Log($"TaskNetworkData.SerializeCommon() TaskFinishTime {TaskFinishTime}");
         writer.Put(TaskFinishTime);
-        Multiplayer.Log($"TaskNetworkData.SerializeCommon() IsLastTask {IsLastTask}");
         //Multiplayer.Log($"TaskNetworkData.SerializeCommon() IsLastTask {IsLastTask}");
         writer.Put(IsLastTask);
-        Multiplayer.Log($"TaskNetworkData.SerializeCommon() TimeLimit {TimeLimit}");
         //Multiplayer.Log($"TaskNetworkData.SerializeCommon() TimeLimit {TimeLimit}");
         writer.Put(TimeLimit);
-        Multiplayer.Log($"TaskNetworkData.SerializeCommon() TaskType {(byte)TaskType}, {TaskType}");
         //Multiplayer.Log($"TaskNetworkData.SerializeCommon() TaskType {(byte)TaskType}, {TaskType}");
         writer.Put((byte)TaskType);
     }

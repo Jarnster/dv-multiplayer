@@ -32,7 +32,7 @@ public static class LanternAwakePatch
             value =>
                     {
                         if (value)
-                            __instance.OnFlameIgnited();
+                            __instance.Ignite(1);
                         else
                             __instance.OnFlameExtinguished();
                     }

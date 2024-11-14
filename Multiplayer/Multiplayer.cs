@@ -72,6 +72,7 @@ public static class Multiplayer
                 RemoteDispatchPatch.Patch(harmony, remoteDispatch.Assembly);
             }
 
+            //UnityModManager.ModEntry passengerJobs = UnityModManager.FindMod("PassengerJobs");
             //if (passengerJobs?.Enabled == true)
             //{
             //    Log("Found PassengerJobs, initialising...");

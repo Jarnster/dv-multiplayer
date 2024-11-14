@@ -23,6 +23,8 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
     private Dictionary<string, List<NetworkedItem>> CachedItems = new Dictionary<string, List<NetworkedItem>>();
     private Dictionary<string, InventoryItemSpec> ItemPrefabs = new Dictionary<string, InventoryItemSpec>();
 
+    private bool ClientInitialised = false;
+
     //private Dictionary<ushort, PlayerInventory> playerInventories = new Dictionary<ushort, PlayerInventory>();
     //private Dictionary<NetworkedItem, ushort> itemToPlayerMap = new Dictionary<NetworkedItem, ushort>();
 
@@ -146,23 +148,26 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
         {
             if (!player.IsLoaded)
                 continue;
+
             foreach (var item in allItems)
             {
                 float sqrDistance = (player.WorldPosition - item.transform.position).sqrMagnitude;
 
                 if (sqrDistance <= MAX_DISTANCE_TO_ITEM_SQR)
                 {
-                    //NetworkLifecycle.Instance.Server.LogDebug(() => $"UpdatePlayerItemLists() Adding for player: {player.Username}, Nearby Item: {item.NetId}, {item.name}");
+                    NetworkLifecycle.Instance.Server.LogDebug(() => $"UpdatePlayerItemLists() Adding for player: {player?.Username}, Nearby Item: {item?.NetId}, {item?.name}");
                     player.NearbyItems[item] = currentTime;
                 }
             }
 
             // Remove items that are no longer nearby
-            foreach (var kvp in player.NearbyItems)
+            for (int i = 0; i < player.NearbyItems.Count; i++)
             {
+                var kvp = player.NearbyItems.ElementAt(i);
+
                 if (currentTime - kvp.Value > NEARBY_REMOVAL_DELAY)
                 {
-                    //NetworkLifecycle.Instance.Server.LogDebug(() => $"UpdatePlayerItemLists() Removing for player: {player.Username}, Nearby Item: {kvp.Key.NetId}, {kvp.Key.name}");
+                    NetworkLifecycle.Instance.Server.LogDebug(() => $"UpdatePlayerItemLists() Removing for player: {player?.Username}, Nearby Item: {kvp.Key?.NetId}, {kvp.Key?.name}");
                     player.NearbyItems.Remove(kvp.Key);
                 }
             }
@@ -278,6 +283,9 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
     {
         List<ItemUpdateData> changedItems = new List<ItemUpdateData>();
 
+        if(!ClientInitialised)
+            return;
+
         foreach (var item in NetworkedItem.GetAll())
         {
             ItemUpdateData snapshot = item.GetSnapshot();
@@ -382,6 +390,8 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
                 NetworkLifecycle.Instance.Client.LogDebug(() => $"Error Caching Spawned Item: {ex.Message}");
             }
         }
+
+        ClientInitialised = true;
     }
 
     private NetworkedItem GetFromCache(string prefabName)

@@ -324,11 +324,11 @@ public class NetworkClient : NetworkManager
         SceneSwitcher.SwitchToScene(DVScenes.Game);
         WorldStreamingInit.LoadingFinished += () =>
         {
-            LogDebug(() => $"WorldStreamingInit.LoadingFinished()");
+            Log($"WorldStreamingInit.LoadingFinished()");
             NetworkedItemManager.Instance.CheckInstance();
-            LogDebug(() => $"WorldStreamingInit.LoadingFinished() CacheWorldItems()");
+            Log($"WorldStreamingInit.LoadingFinished() CacheWorldItems()");
             NetworkedItemManager.Instance.CacheWorldItems();
-            LogDebug(() => $"WorldStreamingInit.LoadingFinished() SendReadyPacket()");
+            Log($"WorldStreamingInit.LoadingFinished() SendReadyPacket()");
             SendReadyPacket();
         };
         
