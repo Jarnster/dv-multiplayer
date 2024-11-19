@@ -36,6 +36,15 @@ public abstract class IdMonoBehaviour<T, I> : MonoBehaviour where T : struct whe
         return false;
     }
 
+    protected static bool TryGet(T netId, out IdMonoBehaviour<T, I> obj)
+    {
+        if (indexToObject.TryGetValue(netId, out obj))
+            return true;
+
+        obj = null;
+        return false;
+    }
+
     protected virtual void Awake()
     {
         if (IsIdServerAuthoritative && !NetworkLifecycle.Instance.IsHost())

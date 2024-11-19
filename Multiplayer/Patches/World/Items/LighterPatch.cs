@@ -4,28 +4,21 @@ using Multiplayer.Utils;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using UnityEngine;
 
 namespace Multiplayer.Patches.World.Items;
 
-[HarmonyPatch(typeof(Lighter), "Start")]
+[HarmonyPatch(typeof(Lighter))]
 public static class LighterPatch
 {
-    static void Postfix(Lighter __instance)
+    [HarmonyPatch(nameof(Lighter.Start))]
+    [HarmonyPostfix]
+    static void Start(Lighter __instance)
     {
-        var networkedItem = __instance.gameObject.GetOrAddComponent<NetworkedItem>();
+        var netItem = __instance.gameObject.GetOrAddComponent<NetworkedItem>();
+        netItem.Initialize(__instance);
 
-        __instance.StartCoroutine(Init(networkedItem, __instance));
-    }
-
-    private static IEnumerator Init(NetworkedItem netItem, Lighter lighter)
-    {
-        while (!lighter.initialized)
-            yield return null;
-
-        netItem.Initialize(lighter);
+        Lighter lighter = __instance;
 
         // Register the values you want to track with both getters and setters
         netItem.RegisterTrackedValue(
@@ -33,23 +26,49 @@ public static class LighterPatch
             () => lighter.isOpen,
             value =>
             {
-                if (value)
-                    lighter.OpenLid();
+                bool active = lighter.gameObject.activeInHierarchy;
+                if (active)
+                {
+                    if (value)
+                        lighter.OpenLid(active);
+                    else
+                        lighter.CloseLid(!active);
+                }
                 else
-                    lighter.CloseLid();
+                {
+                    lighter.isOpen = value;
+                }
             }
             );
 
         netItem.RegisterTrackedValue(
             "Ignited",
-            () => lighter.igniter.enabled,
+            () => lighter.IsFireOn(),
             value =>
             {
-                if (value)
-                    lighter.LightFire(true, true);
+                bool active = lighter.gameObject.activeInHierarchy;
+                if (active)
+                    if (value)
+                        lighter.LightFire(true, true);
+                    else
+                        lighter.flame.UpdateFlameIntensity(0f, true);
                 else
-                    lighter.OnFlameExtinguished();
+                    if (value && lighter.isOpen)
+                    lighter.flame.UpdateFlameIntensity(1f, true);
             }
             );
+
+        netItem.FinaliseTrackedValues();
+    }
+
+    [HarmonyPatch(nameof(Lighter.OnEnable))]
+    [HarmonyPostfix]
+
+    static void OnEnable(Lighter __instance)
+    {
+        if (__instance.isOpen)
+        {
+            __instance.lighterAnimator.Play("lighter_case_top_open", 0);
+        }
     }
 }

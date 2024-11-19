@@ -8,6 +8,9 @@ using Multiplayer.Components.Networking.World;
 using System;
 using Multiplayer.Utils;
 using DV;
+using DV.CabControls.Spec;
+using System.ComponentModel;
+using Cysharp.Threading.Tasks.Triggers;
 
 namespace Multiplayer.Components.Networking.Train;
 
@@ -201,9 +204,13 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
                 {
                     // This is a new item for the player
                     //NetworkLifecycle.Instance.Server.LogDebug(() => $"ProcessChanged({tick}) New item for: {player.Username}, itemNetID{nearbyItem.NetId}");
+
                     ItemUpdateData snapshot = nearbyItem.CreateUpdateData(ItemUpdateData.ItemUpdateType.Create);
-                    playerUpdates.Add(snapshot);
                     player.KnownItems[nearbyItem] = tick;
+
+                    //prevent propagation of creates for special items
+                    if(!DoNotCreateItem(nearbyItem.GetType()))
+                        playerUpdates.Add(snapshot);
                 }
                 else
                 {
@@ -223,6 +230,7 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
 
                     if (dirtyUpdate != null)
                     {
+                        Multiplayer.LogDebug(() => $"ProcessChanged({tick}) Update Type: {dirtyUpdate.UpdateType}, Item State: {dirtyUpdate.ItemState}");
                         playerUpdates.Add(dirtyUpdate);
                         player.KnownItems[nearbyItem] = tick;
                     }
@@ -251,7 +259,7 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
             return;
         }
 
-        if (NetworkedItem.Get(snapshot.ItemNetId, out NetworkedItem netItem))
+        if (NetworkedItem.TryGet(snapshot.ItemNetId, out NetworkedItem netItem))
         {
             if (ValidatePlayerAction(snapshot)) //Ensure the player can do this
             {
@@ -302,12 +310,22 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
 
     private void ProcessReceivedAsClient(ItemUpdateData snapshot)
     {
+        NetworkedItem.TryGet(snapshot.ItemNetId, out NetworkedItem netItem);
+
         NetworkLifecycle.Instance.Client.LogDebug(() => $"NetworkedItemManager.ProcessReceivedAsClient() Update Type: {snapshot?.UpdateType}, ItemNetId: {snapshot?.ItemNetId}, prefabName: {snapshot?.PrefabName}");
         if (snapshot.UpdateType == ItemUpdateData.ItemUpdateType.Create)
         {
+            //if the item already exists we need to remove it
+            if (netItem != null)
+                SendToCache(netItem);
+
             CreateItem(snapshot);
         }
-        else if (NetworkedItem.Get(snapshot.ItemNetId, out NetworkedItem netItem))
+        else if (snapshot.UpdateType == ItemUpdateData.ItemUpdateType.Destroy)
+        {
+            SendToCache(netItem);
+        }
+        else if (netItem != null)
         {
             netItem.ReceiveSnapshot(snapshot);
         }
@@ -347,8 +365,8 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
         }
 
         newItem.gameObject.SetActive(true);
-
         newItem.NetId = snapshot.ItemNetId;
+
         newItem.ReceiveSnapshot(snapshot);
     }
 
@@ -430,10 +448,18 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
             SingletonBehaviour<StorageController>.Instance.RemoveItemFromWorldStorage(netItem.Item);
         }
 
+        if (SingletonBehaviour<StorageController>.Instance.StorageInventory.ContainsItem(netItem.Item))
+        {
+            SingletonBehaviour<StorageController>.Instance.RemoveItemFromStorageItemList(netItem.Item);
+        }
+
+        if (SingletonBehaviour<StorageController>.Instance.StorageLostAndFound.ContainsItem(netItem.Item))
+        {
+            SingletonBehaviour<StorageController>.Instance.RemoveItemFromStorageItemList(netItem.Item);
+        }
+
         netItem.Item.InventorySpecs.BelongsToPlayer = false;
         netItem.NetId = 0;
-        
-
         
         if (!CachedItems.ContainsKey(prefabName))
         {
@@ -444,6 +470,21 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
 
     #endregion
 
+    public bool DoNotCreateItem(Type itemType)
+    {
+        if (
+            itemType == typeof(JobOverview) ||
+            itemType == typeof(JobBooklet) ||
+            itemType == typeof(JobReport) ||
+            itemType == typeof(JobExpiredReport) ||
+            itemType == typeof(JobMissingLicenseReport)
+           )
+        {
+            return true;
+        }
+
+            return false;
+    }
 
     [UsedImplicitly]
     public new static string AllowAutoCreate()

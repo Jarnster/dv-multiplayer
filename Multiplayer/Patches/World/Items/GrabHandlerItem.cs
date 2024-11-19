@@ -5,12 +5,12 @@ using UnityEngine;
 
 namespace Multiplayer.Patches.World.Items;
 
-[HarmonyPatch(typeof(AGrabHandler))]
-public static class AGrabHandler_Patch
+[HarmonyPatch(typeof(GrabHandlerItem))]
+public static class GrabHandlerItem_Patch
 {
-    [HarmonyPatch(nameof(AGrabHandler.Throw))]
+    [HarmonyPatch(nameof(GrabHandlerItem.Throw))]
     [HarmonyPrefix]
-    private static void Throw(AGrabHandler __instance, Vector3 direction)
+    private static void Throw(GrabHandlerItem __instance, Vector3 direction)
     {
         __instance.TryGetComponent<NetworkedItem>(out NetworkedItem netItem);
 

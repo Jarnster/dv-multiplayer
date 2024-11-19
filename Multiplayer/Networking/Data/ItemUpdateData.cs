@@ -16,8 +16,9 @@ public class ItemUpdateData
         Create = 1,
         Destroy = 2,
         ItemState = 4,
-        ObjectState = 8,
-        FullSync = 16,
+        ItemPosition = 8,
+        ObjectState = 16,
+        FullSync = ItemState | ItemPosition | ObjectState,
     }
 
     public ItemUpdateType UpdateType { get; set; }
@@ -37,37 +38,36 @@ public class ItemUpdateData
         writer.Put((byte)UpdateType);
         writer.Put(ItemNetId);
 
-        if(UpdateType == ItemUpdateType.Destroy)
+        if (UpdateType == ItemUpdateType.Destroy)
             return;
 
-        if(UpdateType.HasFlag(ItemUpdateType.ItemState) || UpdateType.HasFlag(ItemUpdateType.Create) || UpdateType.HasFlag(ItemUpdateType.FullSync))
-            writer.Put((byte)ItemState);
+        writer.Put((byte)ItemState);
 
         if (UpdateType.HasFlag(ItemUpdateType.Create))
             writer.Put(PrefabName);
 
-        if (UpdateType.HasFlag(ItemUpdateType.Create) || UpdateType.HasFlag(ItemUpdateType.FullSync) || (UpdateType.HasFlag(ItemUpdateType.ItemState) && ItemState == ItemState.Dropped))
+        if (UpdateType.HasFlag(ItemUpdateType.Create) || UpdateType.HasFlag(ItemUpdateType.ItemState))
         {
-            Vector3Serializer.Serialize(writer, ItemPosition);
-            QuaternionSerializer.Serialize(writer, ItemRotation);
+            if (ItemState == ItemState.Dropped || ItemState == ItemState.Thrown) // || UpdateType.HasFlag(ItemUpdateType.ItemPosition)
+            {
+                Vector3Serializer.Serialize(writer, ItemPosition);
+                QuaternionSerializer.Serialize(writer, ItemRotation);
 
-            if(ItemState == ItemState.InInventory || ItemState == ItemState.InHand)
+                if (ItemState == ItemState.Thrown)
+                    Vector3Serializer.Serialize(writer, ThrowDirection);
+            }
+            else if (ItemState == ItemState.InInventory || ItemState == ItemState.InHand)
             {
                 writer.Put(Player);
             }
-            else if(ItemState == ItemState.Attached)
+            else if (ItemState == ItemState.Attached)
             {
                 writer.Put(CarNetId);
                 writer.Put(AttachedFront);
             }
         }
 
-        if (UpdateType.HasFlag(ItemUpdateType.ItemState) && ItemState == ItemState.Thrown)
-        {
-            Vector3Serializer.Serialize(writer, ThrowDirection);
-        }
-
-        if (UpdateType.HasFlag(ItemUpdateType.ObjectState) || UpdateType.HasFlag(ItemUpdateType.Create))
+        if (UpdateType.HasFlag(ItemUpdateType.Create) || UpdateType.HasFlag(ItemUpdateType.ObjectState))
         {
             if (States == null)
                 writer.Put(0);
@@ -91,19 +91,26 @@ public class ItemUpdateData
         if (UpdateType == ItemUpdateType.Destroy)
             return;
 
-        if (UpdateType.HasFlag(ItemUpdateType.ItemState) || UpdateType.HasFlag(ItemUpdateType.Create) || UpdateType.HasFlag(ItemUpdateType.FullSync))
-            ItemState = (ItemState)reader.GetByte();
+        ItemState = (ItemState)reader.GetByte();
 
         if (UpdateType.HasFlag(ItemUpdateType.Create))
             PrefabName = reader.GetString();
 
-        if (UpdateType.HasFlag(ItemUpdateType.Create) || UpdateType.HasFlag(ItemUpdateType.FullSync) ||
-           (UpdateType.HasFlag(ItemUpdateType.ItemState) && ItemState == ItemState.Dropped))
+        if (UpdateType.HasFlag(ItemUpdateType.Create) || UpdateType.HasFlag(ItemUpdateType.ItemState))
         {
-            ItemPosition = Vector3Serializer.Deserialize(reader);
-            ItemRotation = QuaternionSerializer.Deserialize(reader);
+            if (ItemState == ItemState.Dropped || ItemState == ItemState.Thrown) // || UpdateType.HasFlag(ItemUpdateType.ItemPosition)
+            {
+                ItemPosition = Vector3Serializer.Deserialize(reader);
+                ItemRotation = QuaternionSerializer.Deserialize(reader);
 
-            if (ItemState == ItemState.InInventory || ItemState == ItemState.InHand)
+                if (ItemState == ItemState.Thrown)
+                {
+                    Multiplayer.LogDebug(() => $"ItemUpdateData.Deserialize() Item Thrown before: {ThrowDirection}");
+                    ThrowDirection = Vector3Serializer.Deserialize(reader);
+                    Multiplayer.LogDebug(() => $"ItemUpdateData.Deserialize() Item Thrown after: {ThrowDirection}");
+                }
+            }
+            else if (ItemState == ItemState.InInventory || ItemState == ItemState.InHand)
             {
                 Player = reader.GetUShort();
             }
@@ -114,12 +121,7 @@ public class ItemUpdateData
             }
         }
 
-        if (UpdateType.HasFlag(ItemUpdateType.ItemState) && ItemState == ItemState.Thrown)
-        {
-            ThrowDirection = Vector3Serializer.Deserialize(reader);
-        }
-
-        if (UpdateType.HasFlag(ItemUpdateType.ObjectState) || UpdateType.HasFlag(ItemUpdateType.Create))
+        if (UpdateType.HasFlag(ItemUpdateType.Create) || UpdateType.HasFlag(ItemUpdateType.ObjectState))
         {
             int stateCount = reader.GetInt();
             if (stateCount > 0)
@@ -147,14 +149,19 @@ public class ItemUpdateData
             writer.Put((byte)1);
             writer.Put(intValue);
         }
-        else if (value is float floatValue)
+        else if (value is uint uintValue)
         {
             writer.Put((byte)2);
+            writer.Put(uintValue);
+        }
+        else if (value is float floatValue)
+        {
+            writer.Put((byte)3);
             writer.Put(floatValue);
         }
         else if (value is string stringValue)
         {
-            writer.Put((byte)3);
+            writer.Put((byte)4);
             writer.Put(stringValue);
         }
         else
@@ -170,8 +177,9 @@ public class ItemUpdateData
         {
             case 0: return reader.GetBool();
             case 1: return reader.GetInt();
-            case 2: return reader.GetFloat();
-            case 3: return reader.GetString();
+            case 2: return reader.GetUInt();
+            case 3: return reader.GetFloat();
+            case 4: return reader.GetString();
 
             default:
                 throw new NotSupportedException($"ItemUpdateData.DeserializeTrackedValue({ItemNetId}, {PrefabName ?? ""}) Unsupported type code for deserialization: {typeCode}");

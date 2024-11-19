@@ -4,7 +4,9 @@ using DV.InventorySystem;
 using DV.Items;
 using Multiplayer.Components.Networking.Train;
 using Multiplayer.Networking.Data;
+using Multiplayer.Utils;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -37,6 +39,13 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         return b;
     }
 
+    public static bool TryGet(ushort netId, out NetworkedItem obj)
+    {
+        bool b = TryGet(netId, out IdMonoBehaviour<ushort, NetworkedItem> rawObj);
+        obj = (NetworkedItem)rawObj;
+        return b;
+    }
+
     public static bool GetItem(ushort netId, out ItemBase obj)
     {
         bool b = Get(netId, out NetworkedItem networkedItem);
@@ -54,19 +63,20 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
     private const float RotationThreshold = 0.1f;
 
     public ItemBase Item { get; private set; }
-    private GrabHandlerItem GrabHandler;
-    private SnappableItem SnappableItem;
+    private GrabHandlerItem grabHandler;
+    private SnappableOnCoupler snappableOnCoupler;
     private Component trackedItem;
     private List<object> trackedValues = new List<object>();
     public bool UsefulItem { get; private set; } = false;
     public Type TrackedItemType { get; private set; }
     public bool BlockSync { get; set; } = false;
     public uint LastDirtyTick { get; private set; }
-    private bool Initialised;
+    private bool initialised;
+    private bool registrationComplete = false;
+    private Queue<ItemUpdateData> pendingSnapshots = new Queue<ItemUpdateData>();
 
     //Track dirty states
-    private bool CreatedDirty = true;   //if set, we created this item dirty and have not sent an update
-
+    private bool createdDirty = true;   //if set, we created this item dirty and have not sent an update
     private ItemState lastState;
     private bool stateDirty;
     private bool wasThrown;
@@ -107,7 +117,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
     protected void Start()
     {
-        if (!CreatedDirty)
+        if (!createdDirty)
             return;
     }
 
@@ -125,7 +135,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         TrackedItemType = typeof(T);
         UsefulItem = true;
 
-        CreatedDirty = createDirty;
+        createdDirty = createDirty;
 
         if(Item == null)
             Register();
@@ -134,7 +144,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
     private bool Register()
     {
-        if (Initialised)
+        if (initialised)
             return false;
 
         try
@@ -152,16 +162,17 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
             Item.Grabbed += OnGrabbed;
             Item.Ungrabbed += OnUngrabbed;
 
-            TryGetComponent<GrabHandlerItem>(out GrabHandler);
-            TryGetComponent<SnappableItem>(out SnappableItem);
-
+            //Find special interaction components
+            TryGetComponent<GrabHandlerItem>(out grabHandler);
+            TryGetComponent<SnappableOnCoupler>(out snappableOnCoupler);
+ 
 
             //Item.ItemInventoryStateChanged += OnItemInventoryStateChanged;
 
             lastState = GetItemState();
             stateDirty = false;
 
-            Initialised = true;
+            initialised = true;
             return true;
         }
         catch (Exception ex)
@@ -185,11 +196,19 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
     public void OnThrow(Vector3 direction)
     {
-        Multiplayer.LogDebug(() => $"OnThrow() netId: {NetId}, Name: {name}, Direction: {direction}");
+        //block a received throw from 
+        if(wasThrown)
+        {
+            wasThrown = false;
+            return;
+        }
+
         throwDirection = direction;
         thrownPosition = Item.transform.position - WorldMover.currentMove;
         thrownRotation = Item.transform.rotation;
 
+        Multiplayer.LogDebug(() => $"OnThrow() netId: {NetId}, Name: {name}, Raw Position: {Item.transform.position}, Position: {thrownPosition}, Rotation: {thrownRotation}, Direction: {throwDirection}");
+         
         wasThrown = true;
         stateDirty = true;
     }
@@ -198,7 +217,22 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
     #region Item Value Tracking
     public void RegisterTrackedValue<T>(string key, Func<T> valueGetter, Action<T> valueSetter)
     {
+        Multiplayer.LogDebug(() => $"NetworkedItem.RegisterTrackedValue(\"{key}\", {valueGetter != null}, {valueSetter != null}) itemNetId {NetId}, item name: {name}");
         trackedValues.Add(new TrackedValue<T>(key, valueGetter, valueSetter));
+    }
+
+    public void FinaliseTrackedValues()
+    {
+        Multiplayer.LogDebug(() => $"NetworkedItem.FinaliseTrackedValues() itemNetId: {NetId}, item name: {name}");
+
+        while (pendingSnapshots.Count > 0)
+        {
+            Multiplayer.LogDebug(() => $"NetworkedItem.FinaliseTrackedValues() itemNetId: {NetId}, item name: {name}. Dequeuing");
+            ApplySnapshot(pendingSnapshots.Dequeue());
+        }
+
+        registrationComplete = true;
+
     }
 
     private bool HasDirtyValues()
@@ -218,6 +252,15 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         }
         return dirtyData;
     }
+    private Dictionary<string, object> GetAllStateData()
+    {
+        var data = new Dictionary<string, object>();
+        foreach (var trackedValue in trackedValues)
+        {
+            data[((dynamic)trackedValue).Key] = ((dynamic)trackedValue).GetValueAsObject();
+        }
+        return data;
+    }
 
     private void MarkValuesClean()
     {
@@ -234,20 +277,22 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         ItemUpdateData snapshot;
         ItemUpdateData.ItemUpdateType updateType = ItemUpdateData.ItemUpdateType.None;
 
+        bool hasDirtyVals = HasDirtyValues();
+
         if (Item == null && Register() == false)
             return null;
 
-        if (!stateDirty)
+        if (!stateDirty && !hasDirtyVals)
             return null;
 
         ItemState currentState = GetItemState();
 
-        if (!CreatedDirty)
+        if (!createdDirty)
         {
             if(lastState != currentState)
                 updateType |= ItemUpdateData.ItemUpdateType.ItemState;
 
-            if (HasDirtyValues())
+            if (hasDirtyVals)
             {
                 Multiplayer.LogDebug(GetDirtyValuesDebugString);
                 updateType |= ItemUpdateData.ItemUpdateType.ObjectState;
@@ -266,7 +311,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         LastDirtyTick = NetworkLifecycle.Instance.Tick;
         snapshot = CreateUpdateData(updateType);
 
-        CreatedDirty = false;
+        createdDirty = false;
         stateDirty = false;
         wasThrown = false;
 
@@ -280,82 +325,60 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         if(snapshot == null || snapshot.UpdateType == ItemUpdateData.ItemUpdateType.None)
             return;
 
+        if (!registrationComplete)
+        {
+            Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netId: {snapshot?.ItemNetId}, ItemUpdateType: {snapshot?.UpdateType}. Queuing");
+            pendingSnapshots.Enqueue(snapshot);
+            return;
+        }
+
+        ApplySnapshot(snapshot);
+    }
+
+    private void ApplySnapshot(ItemUpdateData snapshot)
+    {
         if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.ItemState) || snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.FullSync) || snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.Create))
         {
-            Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot?.ItemNetId}, ItemUpdateType {snapshot?.UpdateType}, ItemState {snapshot?.ItemState}");
+            Multiplayer.Log($"NetworkedItem.ApplySnapshot() netId: {snapshot?.ItemNetId}, ItemUpdateType: {snapshot?.UpdateType}, ItemState: {snapshot?.ItemState}, Active state: {gameObject.activeInHierarchy}");
 
             switch (snapshot.ItemState)
             {
                 case ItemState.Dropped:
-                    this.gameObject.SetActive(true);
-                    transform.position = snapshot.ItemPosition + WorldMover.currentMove;
-                    transform.rotation = snapshot.ItemRotation;
-                    OwnerId = 0;
-                    break;
-
                 case ItemState.Thrown:
-                    this.gameObject.SetActive(true);
-                    transform.position = snapshot.ItemPosition + WorldMover.currentMove;
-                    transform.rotation = snapshot.ItemRotation;
-                    OwnerId = 0;
-
-                    GrabHandler?.Throw(throwDirection);
+                    HandleDroppedOrThrownState(snapshot);
                     break;
 
                 case ItemState.InHand:
-                    this.gameObject.SetActive(false);
-                    break;
-
                 case ItemState.InInventory:
-                    this.gameObject.SetActive(false);
+                    HandleInventoryorHandState(snapshot);
                     break;
 
                 case ItemState.Attached:
-                    this.gameObject.SetActive(true);
+                    HandleAttachedState(snapshot);
                     break;
 
                 default:
-                    throw new Exception($"Item state not implemented: {snapshot.ItemState}");
+                    throw new Exception($"NetworkedItem.ApplySnapshot() Item state not implemented: {snapshot?.ItemState}");
 
             }
-
         }
 
-        Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot?.ItemNetId}, ItemUpdateType {snapshot?.UpdateType} About to process states");
+        Multiplayer.Log($"NetworkedItem.ApplySnapshot() netID: {snapshot?.ItemNetId}, ItemUpdateType {snapshot?.UpdateType} About to process states");
 
-        if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.ObjectState) || snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.FullSync) || snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.Create))
+        if (snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.Create) || snapshot.UpdateType.HasFlag(ItemUpdateData.ItemUpdateType.ObjectState))
         {
-            //Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot.ItemNetId}, States: {snapshot?.States?.Count}");
+            Multiplayer.Log($"NetworkedItem.ApplySnapshot() netID: {snapshot?.ItemNetId}, States: {snapshot?.States?.Count}");
 
-            if (snapshot.States != null)
+            if (trackedItem != null && snapshot.States != null)
             {
-                foreach (var state in snapshot.States)
-                {
-                    var trackedValue = trackedValues.Find(tv => ((dynamic)tv).Key == state.Key);
-                    if (trackedValue != null)
-                    {
-                        try
-                        {
-                            ((dynamic)trackedValue).SetValueFromObject(state.Value);
-                            Multiplayer.LogDebug(() => $"Updated tracked value: {state.Key}");
-                        }
-                        catch (Exception ex)
-                        {
-                            Multiplayer.LogError($"Error updating tracked value {state.Key}: {ex.Message}");
-                        }
-                    }
-                    else
-                    {
-                        Multiplayer.LogWarning($"Tracked value not found: {state.Key}");
-                    }
-                }
+                ApplyTrackedValues(snapshot.States);
             }
         }
 
-        Multiplayer.Log($"NetworkedItem.ReceiveSnapshot() netID: {snapshot?.ItemNetId}, ItemUpdateType {snapshot?.UpdateType} states processed");
+        Multiplayer.Log($"NetworkedItem.ApplySnapshot() netID: {snapshot?.ItemNetId}, ItemUpdateType {snapshot?.UpdateType} states processed");
 
         //mark values as clean
-        CreatedDirty = false;
+        createdDirty = false;
         stateDirty = false;
 
         MarkValuesClean();
@@ -368,6 +391,9 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
         Vector3 position;
         Quaternion rotation;
+        Dictionary<string, object> states;
+        ushort carId =0;
+        bool frontCoupler = true;
 
         if (wasThrown)
         {
@@ -380,6 +406,26 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
             rotation = transform.rotation;
         }
 
+        if (updateType.HasFlag(ItemUpdateData.ItemUpdateType.Create) || updateType.HasFlag(ItemUpdateData.ItemUpdateType.FullSync))
+        {
+            states = GetAllStateData();
+        }
+        else
+        {
+            states = GetDirtyStateData();
+        }
+
+        if(lastState == ItemState.Attached)
+        {
+            ItemSnapPointCoupler itemSnapPointCoupler = snappableOnCoupler.SnappedTo as ItemSnapPointCoupler;
+
+            if (itemSnapPointCoupler != null)
+            {
+                carId = itemSnapPointCoupler.Car.GetNetId();
+                frontCoupler = itemSnapPointCoupler.IsFront;
+            }
+        }
+
         var updateData = new ItemUpdateData
         {
             UpdateType = updateType,
@@ -389,7 +435,9 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
             ItemPosition = position,
             ItemRotation = rotation,
             ThrowDirection = throwDirection,
-            States = GetDirtyStateData(),
+            CarNetId = carId,
+            AttachedFront = frontCoupler,
+            States = states,
         };
 
         return updateData;
@@ -400,11 +448,17 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         Multiplayer.LogDebug(() => $"GetItemState() NetId: {NetId}, {name}, Parent: {Item.transform.parent} WorldMover: {WorldMover.OriginShiftParent}, wasThrown: {wasThrown}, isGrabbed: {Item.IsGrabbed()} Inventory.Contains(): {Inventory.Instance.Contains(this.gameObject, false)} Storage.Contains: {StorageController.Instance.StorageInventory.ContainsItem(Item)}");
 
 
-        if (Item.transform.parent == WorldMover.OriginShiftParent)
+        if (Item.transform.parent == WorldMover.OriginShiftParent && !wasThrown)
+        {
+            Multiplayer.LogDebug(() => $"GetItemState() NetId: {NetId}, {name}, Parent: {Item.transform.parent} WorldMover: {WorldMover.OriginShiftParent}, wasThrown: {wasThrown}");
             return ItemState.Dropped;
+        }
 
         if (wasThrown)
+        {
+            Multiplayer.LogDebug(() => $"GetItemState() NetId: {NetId}, {name}, Parent: {Item.transform.parent} WorldMover: {WorldMover.OriginShiftParent}, wasThrown: {wasThrown}");
             return ItemState.Thrown;
+        }
 
         if (Item.IsGrabbed())
             return ItemState.InHand;
@@ -412,9 +466,8 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         if (Inventory.Instance.Contains(this.gameObject, false))
             return ItemState.InInventory;
 
-        if(SnappableItem != null && SnappableItem.IsSnapped)
+        if(snappableOnCoupler != null && snappableOnCoupler.IsSnapped)
         {
-
             Multiplayer.LogDebug(() => $"GetItemState() NetId: {NetId}, {name}, snapped! {this.transform.parent}");
             return ItemState.Attached;
         }
@@ -423,6 +476,103 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         return ItemState.Dropped;
             
     }
+
+    private void ApplyTrackedValues(Dictionary<string, object> newValues)
+    {
+        Multiplayer.LogDebug(() => $"NetworkedItem.ApplyTrackedValues()  itemNetId: {NetId}, item name: {name}. Null checks");
+
+        if (newValues == null || newValues.Count == 0)
+            return; //yield break;
+
+        //int i = 0;
+        //while (!registrationComplete)
+        //{
+        //    Multiplayer.LogDebug(() => $"NetworkedItem.ApplyTrackedValues()  itemNetId: {NetId}, item name: {name}. Registration checks: {i}");
+        //    i++;
+        //    //yield return null;
+        //}
+
+        Multiplayer.LogDebug(() => $"NetworkedItem.ApplyTrackedValues()  itemNetId: {NetId}, item name: {name}. Registration complete: {registrationComplete}");
+
+        foreach (var newValue in newValues)
+        {
+            var trackedValue = trackedValues.Find(tv => ((dynamic)tv).Key == newValue.Key);
+            if (trackedValue != null)
+            {
+                try
+                {
+                    ((dynamic)trackedValue).SetValueFromObject(newValue.Value);
+                    Multiplayer.LogDebug(() => $"Updated tracked value: {newValue.Key}, value: {newValue.Value} ");
+                }
+                catch (Exception ex)
+                {
+                    Multiplayer.LogError($"Error updating tracked value {newValue.Key}: {ex.Message}");
+                }
+            }
+            else
+            {
+                Multiplayer.LogWarning($"Tracked value not found: {newValue.Key}\r\n {String.Join(", ", trackedValues.Select(val => ((dynamic)val).Key))}");
+            }
+        }
+    }
+
+    #region Item State Update Handlers
+
+    private void HandleDroppedOrThrownState(ItemUpdateData snapshot)
+    {
+        gameObject.SetActive(true);
+        transform.position = snapshot.ItemPosition + WorldMover.currentMove;
+        transform.rotation = snapshot.ItemRotation;
+        OwnerId = 0;
+
+        if (snapshot.ItemState == ItemState.Thrown)
+        {
+            Multiplayer.LogDebug(()=>$"NetworkedItem.HandleDroppedOrThrownState() ItemNetId: {snapshot?.ItemNetId} Thrown. Position: {transform.position}, Direction: {snapshot?.ThrowDirection}");
+
+            wasThrown = true;
+            grabHandler?.Throw(snapshot.ThrowDirection);
+        }
+        else
+        {
+            Multiplayer.LogDebug(() => $"NetworkedItem.HandleDroppedOrThrownState() ItemNetId: {snapshot?.ItemNetId} Dropped. Position: {transform.position}");
+        }
+    }
+
+    private void HandleAttachedState(ItemUpdateData snapshot)
+    {
+        gameObject.SetActive(true);
+        Multiplayer.LogDebug(() => $"NetworkedItem.HandleAttachedState() ItemNetId: {snapshot?.ItemNetId} attempting attachment to car {snapshot.CarNetId}, at the front {snapshot.AttachedFront}");
+
+        if (!NetworkedTrainCar.GetTrainCar(snapshot.CarNetId, out TrainCar trainCar))
+        {
+            Multiplayer.LogWarning($"NetworkedItem.HandleAttachedState() CarNetId: {snapshot?.CarNetId} not found for ItemNetId: {snapshot?.ItemNetId}");
+            return;
+        }
+
+        //Try to find the coupler snap point for the car and correct end
+        var snapPoint = trainCar?.physicsLod?.GetCouplerSnapPoints()
+            .FirstOrDefault(sp => sp.IsFront == snapshot.AttachedFront);
+
+        if (snapPoint == null)
+        {
+            Multiplayer.LogWarning($"No valid snap point found for car {snapshot.CarNetId}");
+            return;
+        }
+
+        //Attempt attachment to car
+        Item.ItemRigidbody.isKinematic = false;
+        if (!snapPoint.SnapItem(Item, false))
+        {
+            Multiplayer.LogWarning($"Attachment failed for item {snapshot?.ItemNetId} to car {snapshot.CarNetId}");
+        }
+    }
+
+    private void HandleInventoryorHandState(ItemUpdateData snapshot)
+    {
+        //todo add to player model's hand
+        this.gameObject.SetActive(false);
+    }
+    #endregion
 
     protected override void OnDestroy()
     {
@@ -433,15 +583,6 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         {
             NetworkedItemManager.Instance.AddDirtyItemSnapshot(this, CreateUpdateData(ItemUpdateData.ItemUpdateType.Destroy));
         }
-        /*
-        else if(!BlockSync)
-        {
-            Multiplayer.LogWarning($"NetworkedItem.OnDestroy({name}, {NetId})");/*\r\n{new System.Diagnostics.StackTrace()}
-        }
-        else
-        {
-            Multiplayer.LogDebug(()=>$"NetworkedItem.OnDestroy({name}, {NetId})");/*\r\n{new System.Diagnostics.StackTrace()}
-        }*/
 
         if (Item != null)
         {
@@ -468,7 +609,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.AppendLine($"Dirty values for NetworkedItem {name}, NetId {NetId}:");
+        sb.AppendLine($"Dirty values for NetworkedItem: {name}, NetId: {NetId}:");
         foreach (var value in dirtyValues)
         {
             sb.AppendLine(((dynamic)value).GetDebugString());

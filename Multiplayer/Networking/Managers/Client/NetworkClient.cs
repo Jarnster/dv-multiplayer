@@ -790,34 +790,37 @@ public class NetworkClient : NetworkManager
     {
         LogDebug(() => $"OnCommonItemChangePacket({packet?.Items?.Count})");
 
-        /*
+
         Multiplayer.LogDebug(() =>
+        {
+            string debug = "";
+
+            foreach (var item in packet?.Items)
             {
-                string debug = "";
+                debug += "UpdateType: " + item?.UpdateType + "\r\n";
+                debug += "itemNetId: " + item?.ItemNetId + "\r\n";
+                debug += "PrefabName: " + item?.PrefabName + "\r\n";
+                debug += "Equipped: " + item?.ItemState + "\r\n";
+                debug += "Position: " + item?.ItemPosition + "\r\n";
+                debug += "Rotation: " + item?.ItemRotation + "\r\n";
+                debug += "ThrowDirection: " + item?.ThrowDirection + "\r\n";
+                debug += "Player: " + item?.Player + "\r\n";
+                debug += "CarNetId: " + item?.CarNetId + "\r\n";
+                debug += "AttachedFront: " + item?.AttachedFront + "\r\n";
 
-                foreach (var item in packet?.Items)
-                {
-                    //LogDebug(() => $"OnCommonItemChangePacket({packet?.Items?.Count}, {peer.Id}) in loop");
-                    debug += "UpdateType: " + item?.UpdateType + "\r\n";
-                    debug += "itemNetId: " + item?.ItemNetId + "\r\n";
-                    debug += "PrefabName: " + item?.PrefabName + "\r\n";
-                    debug += "Equipped: " + item?.Equipped + "\r\n";
-                    debug += "Dropped: " + item?.Dropped + "\r\n";
-                    debug += "Position: " + item?.PositionData.Position + "\r\n";
-                    debug += "Rotation: " + item?.PositionData.Rotation + "\r\n";
+                debug += $"States: {item?.States?.Count}\r\n";
 
-                    //LogDebug(() => $"OnCommonItemChangePacket({packet?.Items?.Count}, {peer.Id}) prep states");
-                    debug += "States:";
-
-                    if (item.States != null)
-                        foreach (var state in item?.States)
-                            debug += "\r\n\t" + state.Key + ": " + state.Value;
-                }
-
-                return debug;
+                if (item.States != null)
+                    foreach (var state in item?.States)
+                        debug += "\t" + state.Key + ": " + state.Value + "\r\n";
+                else
+                    debug += "\r\n";
             }
-        );
-        */
+
+            return debug;
+        });
+
+
 
         NetworkedItemManager.Instance.ReceiveSnapshots(packet.Items);
     }

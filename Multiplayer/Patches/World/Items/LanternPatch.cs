@@ -1,11 +1,6 @@
 using HarmonyLib;
 using Multiplayer.Components.Networking.World;
 using Multiplayer.Utils;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Multiplayer.Patches.World.Items;
 
@@ -37,5 +32,7 @@ public static class LanternAwakePatch
                             __instance.OnFlameExtinguished();
                     }
             );
+
+        networkedItem.FinaliseTrackedValues();
     }
 }
