@@ -77,6 +77,7 @@ public static class TaskNetworkDataFactory
     public static TaskNetworkData ConvertTask(Task task)
     {
         Multiplayer.LogDebug(()=>$"TaskNetworkDataFactory.ConvertTask: Processing task of type {task.GetType()}");
+        //Multiplayer.LogDebug(()=>$"TaskNetworkDataFactory.ConvertTask: Processing task of type {task.GetType()}");
         if (TypeToTaskNetworkData.TryGetValue(task.GetType(), out var converter))
         {
             return converter(task);

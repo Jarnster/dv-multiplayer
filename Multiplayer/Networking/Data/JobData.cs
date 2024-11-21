@@ -33,7 +33,7 @@ public class JobData
         ushort itemNetId = 0;
         ItemPositionData itemPos = new ItemPositionData();
 
-        Multiplayer.Log($"JobData.FromJob({netStation.name}, {job.ID}, {networkedJob.Job.State})");
+        //Multiplayer.Log($"JobData.FromJob({netStation.name}, {job.ID}, {networkedJob.Job.State})");
 
         if (networkedJob.Job.State == JobState.Available)
         {
@@ -80,7 +80,7 @@ public class JobData
 
     public static void Serialize(NetDataWriter writer, JobData data)
     {
-        NetworkLifecycle.Instance.Server.Log($"JobData.Serialize({data.ID}) NetID {data.NetID}");
+        //NetworkLifecycle.Instance.Server.Log($"JobData.Serialize({data.ID}) NetID {data.NetID}");
 
         writer.Put(data.NetID);
         writer.Put((byte)data.JobType);
@@ -104,7 +104,7 @@ public class JobData
 
             byte[] compressedData = PacketCompression.Compress(ms.ToArray());
 
-            Multiplayer.Log($"JobData.Serialize() Uncompressed: {ms.Length} Compressed: {compressedData.Length}");
+           // Multiplayer.Log($"JobData.Serialize() Uncompressed: {ms.Length} Compressed: {compressedData.Length}");
             writer.PutBytesWithLength(compressedData);
         }
 
@@ -133,7 +133,7 @@ public class JobData
             byte[] compressedData = reader.GetBytesWithLength();
             byte[] decompressedData = PacketCompression.Decompress(compressedData);
 
-            Multiplayer.Log($"JobData.Deserialize() Compressed: {compressedData.Length} Decompressed: {decompressedData.Length}");
+            //Multiplayer.Log($"JobData.Deserialize() Compressed: {compressedData.Length} Decompressed: {decompressedData.Length}");
 
             TaskNetworkData[] tasks;
 

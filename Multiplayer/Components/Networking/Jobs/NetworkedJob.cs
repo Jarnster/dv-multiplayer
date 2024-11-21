@@ -165,7 +165,7 @@ public class NetworkedJob : IdMonoBehaviour<ushort, NetworkedJob>
         jobToNetworkedJob[Job] = this;
         jobIdToNetworkedJob[Job.ID] = this;
         jobIdToJob[Job.ID] = Job;
-        Multiplayer.Log($"NetworkedJob added to cache: {Job.ID}");
+        //Multiplayer.Log($"NetworkedJob added to cache: {Job.ID}");
     }
 
     private void OnJobTaken(Job job, bool viaLoadGame)
