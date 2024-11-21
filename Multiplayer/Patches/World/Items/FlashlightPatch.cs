@@ -1,6 +1,7 @@
 using HarmonyLib;
 using Multiplayer.Components.Networking.World;
 using Multiplayer.Utils;
+using System;
 using UnityEngine;
 
 namespace Multiplayer.Patches.World.Items;
@@ -16,27 +17,25 @@ public static class FlashlightItemPatch
 
         // Register the values you want to track with both getters and setters
         networkedItem.RegisterTrackedValue(
-            "originalLightIntensity ",
+            "originalLightIntensity",
             () => __instance.originalLightIntensity,
-            value => __instance.originalLightIntensity = value
+            value => __instance.originalLightIntensity = value,
+            serverAuthoritative: true                           //This parameter is driven by the server: true
             );
 
-        networkedItem.RegisterTrackedValue(
-            "originalLightIntensity ",
-            () => __instance.originalLightIntensity,
-            value => __instance.originalLightIntensity = value
-            );
-
-        networkedItem.RegisterTrackedValue(
-            "intensity",
-            () => __instance.originalLightIntensity,
-            value =>  __instance.spotlight.intensity = value
-            );
+        //probably not needed as flicker can be handled locally
+        //networkedItem.RegisterTrackedValue(
+        //    "intensity",
+        //    () => __instance.spotlight.intensity,
+        //    value =>  __instance.spotlight.intensity = value,
+        //    serverAuthoritative: true                           //This parameter is driven by the server: true
+        //    );
 
         networkedItem.RegisterTrackedValue(
             "originalBeamColour",
             () => __instance.originalBeamColor.ColorToUInt32(),
-            value =>__instance.originalBeamColor = value.UInt32ToColor()
+            value =>__instance.originalBeamColor = value.UInt32ToColor(),
+            serverAuthoritative: true                           //This parameter is driven by the server: true
             );
 
         networkedItem.RegisterTrackedValue(
@@ -47,17 +46,20 @@ public static class FlashlightItemPatch
                 Color colour = value.UInt32ToColor();
                 __instance.beamController.SetBeamColor(colour);
                 __instance.spotlight.color = colour;
-            }
+            },
+            serverAuthoritative: true                            //This parameter is driven by the server: true
             );
 
         networkedItem.RegisterTrackedValue(
-            "batteryCurrentPower",
+            "batteryPower",
             () => __instance.battery.currentPower,
             value =>
                 {
-                    __instance.battery.currentPower = value; //set the value
-                    __instance.battery.UpdatePower(0f);      //process a delta of 0 to force an update
-                }
+                    __instance.battery.currentPower = value;     //set the value
+                    __instance.battery.UpdatePower(0f);          //process a delta of 0 to force an update
+                },
+            (current, last) => Math.Abs(current - last) >= 1.0f, //Don't communicate updates for changes less than 1f
+            true                                                 //This parameter is driven by the server: true
             );
 
         networkedItem.RegisterTrackedValue(
@@ -73,15 +75,6 @@ public static class FlashlightItemPatch
                     __instance.ToggleFlashlight(value);
                 }
             );
-
-        //This may not be required testing needed
-        /*
-        networkedItem.RegisterTrackedValue(
-            "batteryDepleted",
-            () => __instance.battery.Depleted,
-            value =>__instance.battery.Depleted = value
-            );
-        */
 
         networkedItem.FinaliseTrackedValues();
     }

@@ -160,6 +160,10 @@ public class NetworkServer : NetworkManager
     {
         return serverPlayers.TryGetValue((byte)peer.Id, out player);
     }
+    public bool TryGetServerPlayer(byte id, out ServerPlayer player)
+    {
+        return serverPlayers.TryGetValue(id, out player);
+    }
 
     public bool TryGetNetPeer(byte id, out NetPeer peer)
     {
@@ -1000,6 +1004,10 @@ public class NetworkServer : NetworkManager
     private void OnCommonItemChangePacket(CommonItemChangePacket packet, NetPeer peer)
     {
         LogDebug(()=>$"OnCommonItemChangePacket({packet?.Items?.Count}, {peer.Id})");
+        if(!TryGetServerPlayer(peer, out var player))
+            return;
+
+        LogDebug(()=>$"OnCommonItemChangePacket({packet?.Items?.Count}, {peer.Id} (\"{player.Username}\"))");
 
         Multiplayer.LogDebug(() =>
         {
@@ -1029,6 +1037,9 @@ public class NetworkServer : NetworkManager
         }
 
 );
+        );
+        
+        NetworkedItemManager.Instance.ReceiveSnapshots(packet.Items, player);
     }
     #endregion
 }

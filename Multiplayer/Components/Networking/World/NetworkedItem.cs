@@ -117,8 +117,12 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
     protected void Start()
     {
-        if (!createdDirty)
-            return;
+        if (!initialised)
+            Register();
+
+        // Mark registration as complete for items that don't need tracked values
+        if (!registrationComplete && !UsefulItem)
+            registrationComplete = true;
     }
 
     public T GetTrackedItem<T>() where T : Component
@@ -128,7 +132,9 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
     public void Initialize<T>(T item, ushort netId = 0, bool createDirty = true) where T : Component
     {
-        if(netId != 0)
+        Multiplayer.LogDebug(() => $"NetworkedItem.Initialize<{typeof(T)}>(netId: {netId}, name: {name}, createDirty: {createdDirty})");
+
+        if (netId != 0)
             NetId = netId;
 
         trackedItem = item;
@@ -152,7 +158,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
             if (!TryGetComponent(out ItemBase itemBase))
             {
-                Multiplayer.LogError($"Unable to find ItemBase for {name}");
+                Multiplayer.LogError($"NetworkedItem.Register() Unable to find ItemBase for {name}");
                 return false;
             }
 
@@ -165,9 +171,6 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
             //Find special interaction components
             TryGetComponent<GrabHandlerItem>(out grabHandler);
             TryGetComponent<SnappableOnCoupler>(out snappableOnCoupler);
- 
-
-            //Item.ItemInventoryStateChanged += OnItemInventoryStateChanged;
 
             lastState = GetItemState();
             stateDirty = false;
@@ -177,20 +180,20 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         }
         catch (Exception ex)
         {
-            Multiplayer.LogError($"Unable to find ItemBase for {name}\r\n{ex.Message}");
+            Multiplayer.LogError($"NetworkedItem.Register() Unable to find ItemBase for {name}\r\n{ex.Message}");
             return false; 
         }
     }
 
     private void OnUngrabbed(ControlImplBase obj)
     {
-        Multiplayer.LogDebug(() => $"OnUngrabbed() NetID: {NetId}, {name}");
+        Multiplayer.LogDebug(() => $"NetworkedItem.OnUngrabbed() NetID: {NetId}, {name}");
         stateDirty = true;
     }
 
     private void OnGrabbed(ControlImplBase obj)
     {
-        Multiplayer.LogDebug(() => $"OnGrabbed() NetID: {NetId}, {name}");
+        Multiplayer.LogDebug(() => $"NetworkedItem.OnGrabbed() NetID: {NetId}, {name}");
         stateDirty = true;
     }
 
@@ -207,7 +210,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         thrownPosition = Item.transform.position - WorldMover.currentMove;
         thrownRotation = Item.transform.rotation;
 
-        Multiplayer.LogDebug(() => $"OnThrow() netId: {NetId}, Name: {name}, Raw Position: {Item.transform.position}, Position: {thrownPosition}, Rotation: {thrownRotation}, Direction: {throwDirection}");
+        Multiplayer.LogDebug(() => $"NetworkedItem.OnThrow() netId: {NetId}, Name: {name}, Raw Position: {Item.transform.position}, Position: {thrownPosition}, Rotation: {thrownRotation}, Direction: {throwDirection}");
          
         wasThrown = true;
         stateDirty = true;
@@ -215,10 +218,10 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
 
     #region Item Value Tracking
-    public void RegisterTrackedValue<T>(string key, Func<T> valueGetter, Action<T> valueSetter)
+    public void RegisterTrackedValue<T>(string key, Func<T> valueGetter, Action<T> valueSetter, Func<T, T, bool> thresholdComparer = null, bool serverAuthoritative = false)
     {
-        Multiplayer.LogDebug(() => $"NetworkedItem.RegisterTrackedValue(\"{key}\", {valueGetter != null}, {valueSetter != null}) itemNetId {NetId}, item name: {name}");
-        trackedValues.Add(new TrackedValue<T>(key, valueGetter, valueSetter));
+        Multiplayer.LogDebug(() => $"NetworkedItem.RegisterTrackedValue(\"{key}\", {valueGetter != null}, {valueSetter != null}, {thresholdComparer != null}, {serverAuthoritative}) itemNetId {NetId}, item name: {name}");
+        trackedValues.Add(new TrackedValue<T>(key, valueGetter, valueSetter, thresholdComparer, serverAuthoritative));
     }
 
     public void FinaliseTrackedValues()
@@ -237,7 +240,11 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
     private bool HasDirtyValues()
     {
-        return trackedValues.Any(tv => ((dynamic)tv).IsDirty);
+        //clients should only send values that are not server authoritative
+        if(!NetworkLifecycle.Instance.IsHost())
+            return trackedValues.Any(tv => ((dynamic)tv).IsDirty && !((dynamic)tv).ServerAuthoritative);
+        else
+            return trackedValues.Any(tv => ((dynamic)tv).IsDirty);
     }
 
     private Dictionary<string, object> GetDirtyStateData()
@@ -350,7 +357,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
                 case ItemState.InHand:
                 case ItemState.InInventory:
-                    HandleInventoryorHandState(snapshot);
+                    HandleInventoryOrHandState(snapshot);
                     break;
 
                 case ItemState.Attached:
@@ -479,34 +486,34 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
     private void ApplyTrackedValues(Dictionary<string, object> newValues)
     {
-        Multiplayer.LogDebug(() => $"NetworkedItem.ApplyTrackedValues()  itemNetId: {NetId}, item name: {name}. Null checks");
+        Multiplayer.LogDebug(() => $"NetworkedItem.ApplyTrackedValues() itemNetId: {NetId}, item name: {name}. Null checks");
 
         if (newValues == null || newValues.Count == 0)
-            return; //yield break;
+            return;
 
-        //int i = 0;
-        //while (!registrationComplete)
-        //{
-        //    Multiplayer.LogDebug(() => $"NetworkedItem.ApplyTrackedValues()  itemNetId: {NetId}, item name: {name}. Registration checks: {i}");
-        //    i++;
-        //    //yield return null;
-        //}
 
-        Multiplayer.LogDebug(() => $"NetworkedItem.ApplyTrackedValues()  itemNetId: {NetId}, item name: {name}. Registration complete: {registrationComplete}");
+        Multiplayer.LogDebug(() => $"NetworkedItem.ApplyTrackedValues() itemNetId: {NetId}, item name: {name}. Registration complete: {registrationComplete}");
 
         foreach (var newValue in newValues)
         {
             var trackedValue = trackedValues.Find(tv => ((dynamic)tv).Key == newValue.Key);
             if (trackedValue != null)
             {
-                try
+                if (!NetworkLifecycle.Instance.IsHost() || !((dynamic)trackedValue).ServerAuthoritative)
                 {
-                    ((dynamic)trackedValue).SetValueFromObject(newValue.Value);
-                    Multiplayer.LogDebug(() => $"Updated tracked value: {newValue.Key}, value: {newValue.Value} ");
+                    try
+                    {
+                        ((dynamic)trackedValue).SetValueFromObject(newValue.Value);
+                        Multiplayer.LogDebug(() => $"NetworkedItem.ApplyTrackedValues() itemNetId: {NetId}, item name: {name}, Updated tracked value: {newValue.Key}, value: {newValue.Value} ");
+                    }
+                    catch (Exception ex)
+                    {
+                        Multiplayer.LogError($"NetworkedItem.ApplyTrackedValues() itemNetId: {NetId}, item name: {name}. Error updating tracked value {newValue.Key}: {ex.Message}");
+                    }
                 }
-                catch (Exception ex)
+                else
                 {
-                    Multiplayer.LogError($"Error updating tracked value {newValue.Key}: {ex.Message}");
+                    Multiplayer.LogWarning(() => $"NetworkedItem.ApplyTrackedValues() itemNetId: {NetId}, item name: {name}. Skipped server-authoritative value update from client: {newValue.Key}");
                 }
             }
             else
@@ -520,11 +527,19 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
     private void HandleDroppedOrThrownState(ItemUpdateData snapshot)
     {
+        //resolve attachment
+        if (Item.IsSnapped)
+        {
+            Item.SnappableItem.SnappedTo.UnsnapItem(false);
+        }
+
+        //activate and relocate item
         gameObject.SetActive(true);
         transform.position = snapshot.ItemPosition + WorldMover.currentMove;
         transform.rotation = snapshot.ItemRotation;
         OwnerId = 0;
 
+        //handle throwing of the item
         if (snapshot.ItemState == ItemState.Thrown)
         {
             Multiplayer.LogDebug(()=>$"NetworkedItem.HandleDroppedOrThrownState() ItemNetId: {snapshot?.ItemNetId} Thrown. Position: {transform.position}, Direction: {snapshot?.ThrowDirection}");
@@ -540,6 +555,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
     private void HandleAttachedState(ItemUpdateData snapshot)
     {
+        //handle attaching the item
         gameObject.SetActive(true);
         Multiplayer.LogDebug(() => $"NetworkedItem.HandleAttachedState() ItemNetId: {snapshot?.ItemNetId} attempting attachment to car {snapshot.CarNetId}, at the front {snapshot.AttachedFront}");
 
@@ -549,13 +565,13 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
             return;
         }
 
-        //Try to find the coupler snap point for the car and correct end
+        //Try to find the coupler snap point for the car and correct end to snap to
         var snapPoint = trainCar?.physicsLod?.GetCouplerSnapPoints()
             .FirstOrDefault(sp => sp.IsFront == snapshot.AttachedFront);
 
         if (snapPoint == null)
         {
-            Multiplayer.LogWarning($"No valid snap point found for car {snapshot.CarNetId}");
+            Multiplayer.LogWarning($"NetworkedItem.HandleAttachedState() ItemNetId: {snapshot?.ItemNetId}. No valid snap point found for car {snapshot.CarNetId}");
             return;
         }
 
@@ -563,12 +579,17 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         Item.ItemRigidbody.isKinematic = false;
         if (!snapPoint.SnapItem(Item, false))
         {
-            Multiplayer.LogWarning($"Attachment failed for item {snapshot?.ItemNetId} to car {snapshot.CarNetId}");
+            Multiplayer.LogWarning($"NetworkedItem.HandleAttachedState() Attachment failed for item {snapshot?.ItemNetId} to car {snapshot.CarNetId}");
         }
     }
 
-    private void HandleInventoryorHandState(ItemUpdateData snapshot)
+    private void HandleInventoryOrHandState(ItemUpdateData snapshot)
     {
+        if (Item.IsSnapped)
+        {
+            Item.SnappableItem.SnappedTo.UnsnapItem(false);
+        }
+
         //todo add to player model's hand
         this.gameObject.SetActive(false);
     }
@@ -588,7 +609,6 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         {
             Item.Grabbed -= OnGrabbed;
             Item.Ungrabbed -= OnUngrabbed;
-            //Item.ItemInventoryStateChanged -= OnItemInventoryStateChanged;
             itemBaseToNetworkedItem.Remove(Item);
         }
         else

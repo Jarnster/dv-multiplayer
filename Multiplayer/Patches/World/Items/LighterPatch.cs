@@ -30,13 +30,15 @@ public static class LighterPatch
                 if (active)
                 {
                     if (value)
-                        lighter.OpenLid(active);
+                        lighter.OpenLid();
                     else
-                        lighter.CloseLid(!active);
+                        lighter.CloseLid();
                 }
                 else
                 {
                     lighter.isOpen = value;
+                    if (!value)
+                        lighter.CloseLid(true);
                 }
             }
             );
@@ -48,13 +50,26 @@ public static class LighterPatch
             {
                 bool active = lighter.gameObject.activeInHierarchy;
                 if (active)
+                {
                     if (value)
                         lighter.LightFire(true, true);
                     else
                         lighter.flame.UpdateFlameIntensity(0f, true);
+                }
                 else
+                {
                     if (value && lighter.isOpen)
-                    lighter.flame.UpdateFlameIntensity(1f, true);
+                    {
+                        lighter.flame.UpdateFlameIntensity(1f, true);
+                        lighter.OnFlameIgnited();
+
+                    }
+                    else
+                    {
+                        lighter.flame.UpdateFlameIntensity(0f, true);
+                        lighter.OnFlameExtinguished();
+                    }
+                }
             }
             );
 

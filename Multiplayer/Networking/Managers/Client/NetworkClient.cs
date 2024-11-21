@@ -820,9 +820,7 @@ public class NetworkClient : NetworkManager
             return debug;
         });
 
-
-
-        NetworkedItemManager.Instance.ReceiveSnapshots(packet.Items);
+        NetworkedItemManager.Instance.ReceiveSnapshots(packet.Items, null);
     }
 
     #endregion

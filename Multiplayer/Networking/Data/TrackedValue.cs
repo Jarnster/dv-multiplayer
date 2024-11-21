@@ -1,3 +1,4 @@
+using Multiplayer.Components.Networking;
 using System;
 using System.Collections.Generic;
 
@@ -8,17 +9,25 @@ public class TrackedValue<T>
     private T lastSentValue;
     private Func<T> valueGetter;
     private Action<T> valueSetter;
+    private Func<T, T, bool> thresholdComparer;
+    private bool serverAuthoritative;
     public string Key { get; }
 
-    public TrackedValue(string key, Func<T> valueGetter, Action<T> valueSetter)
+    public TrackedValue(string key, Func<T> valueGetter, Action<T> valueSetter, Func<T, T, bool> thresholdComparer = null, bool serverAuthoritative = false)
     {
         Key = key;
         this.valueGetter = valueGetter;
         this.valueSetter = valueSetter;
+
+        this.thresholdComparer = thresholdComparer ?? DefaultComparer;
+        this.serverAuthoritative = serverAuthoritative;
+
         lastSentValue = valueGetter();
     }
 
-    public bool IsDirty => !EqualityComparer<T>.Default.Equals(CurrentValue, lastSentValue);
+    public bool IsDirty => thresholdComparer(CurrentValue, lastSentValue);
+
+    public bool ServerAuthoritative => serverAuthoritative;
 
     public T CurrentValue
     {
@@ -47,6 +56,11 @@ public class TrackedValue<T>
         {
             throw new ArgumentException($"Value type mismatch. Expected {typeof(T)}, got {value.GetType()}");
         }
+    }
+
+    private bool DefaultComparer(T current, T last)
+    {
+        return !current.Equals(last);
     }
 
     public string GetDebugString()
