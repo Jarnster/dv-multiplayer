@@ -31,7 +31,6 @@ using UnityModManagerNet;
 using System.Net;
 using Multiplayer.Networking.Packets.Serverbound.Train;
 using Multiplayer.Networking.Packets.Unconnected;
-using DV.CabControls.Spec;
 
 namespace Multiplayer.Networking.Listeners;
 
@@ -655,21 +654,6 @@ public class NetworkServer : NetworkManager
             }
         }
 
-        //Send Item Sync
-        
-        //List<ItemUpdateData> snapshots = new List<ItemUpdateData>();
-        //foreach (var item in NetworkedItem.GetAll())
-        //{
-        //    //only send items that are close to the player
-        //    float sqDist = (serverPlayer.WorldPosition - item.transform.position).sqrMagnitude;
-
-        //    if (sqDist < 1000f )
-        //        snapshots.Add(item.CreateUpdateData(ItemUpdateData.ItemUpdateType.Create));
-        //}
-
-        //LogDebug(() => $"Sending sync ItemUpdateData {snapshots.Count} items");
-        //SendNetSerializablePacket(peer, new CommonItemChangePacket { Items = snapshots }, DeliveryMethod.ReliableOrdered);
-
         // Send existing players
         foreach (ServerPlayer player in ServerPlayers)
         {
@@ -1003,7 +987,6 @@ public class NetworkServer : NetworkManager
 
     private void OnCommonItemChangePacket(CommonItemChangePacket packet, NetPeer peer)
     {
-        LogDebug(()=>$"OnCommonItemChangePacket({packet?.Items?.Count}, {peer.Id})");
         if(!TryGetServerPlayer(peer, out var player))
             return;
 
@@ -1036,7 +1019,6 @@ public class NetworkServer : NetworkManager
             return debug;
         }
 
-);
         );
         
         NetworkedItemManager.Instance.ReceiveSnapshots(packet.Items, player);

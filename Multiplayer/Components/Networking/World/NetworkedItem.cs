@@ -69,7 +69,6 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
     private List<object> trackedValues = new List<object>();
     public bool UsefulItem { get; private set; } = false;
     public Type TrackedItemType { get; private set; }
-    public bool BlockSync { get; set; } = false;
     public uint LastDirtyTick { get; private set; }
     private bool initialised;
     private bool registrationComplete = false;
@@ -86,7 +85,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
     private Vector3 throwDirection;
 
     //Handle ownership
-    public ushort OwnerId { get; private set; } = 0; // 0 means no owner
+    public sbyte OwnerId { get; private set; } = -1; // 0 means no owner
 
     //public void SetOwner(ushort playerId)
     //{
@@ -479,7 +478,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
             return ItemState.Attached;
         }
 
-        //we need a condition to check if it's attached to something else
+        //do we need a condition to check if it's attached to something else (last attach vs current attach)?
         return ItemState.Dropped;
             
     }
@@ -533,6 +532,11 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
             Item.SnappableItem.SnappedTo.UnsnapItem(false);
         }
 
+        //resolve ownership
+        if (NetworkLifecycle.Instance.IsHost())
+            if (NetworkLifecycle.Instance.Server.TryGetServerPlayer(snapshot.Player, out ServerPlayer player) && player.OwnsItem(NetId))
+                player.RemoveOwnedItem(NetId);
+
         //activate and relocate item
         gameObject.SetActive(true);
         transform.position = snapshot.ItemPosition + WorldMover.currentMove;
@@ -555,6 +559,11 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
     private void HandleAttachedState(ItemUpdateData snapshot)
     {
+        //resovle ownership
+        if (NetworkLifecycle.Instance.IsHost())
+            if (NetworkLifecycle.Instance.Server.TryGetServerPlayer(snapshot.Player, out ServerPlayer player) && player.OwnsItem(NetId))
+                player.RemoveOwnedItem(NetId);
+
         //handle attaching the item
         gameObject.SetActive(true);
         Multiplayer.LogDebug(() => $"NetworkedItem.HandleAttachedState() ItemNetId: {snapshot?.ItemNetId} attempting attachment to car {snapshot.CarNetId}, at the front {snapshot.AttachedFront}");
@@ -589,6 +598,10 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         {
             Item.SnappableItem.SnappedTo.UnsnapItem(false);
         }
+
+        if (NetworkLifecycle.Instance.IsHost())
+            if(NetworkLifecycle.Instance.Server.TryGetServerPlayer(snapshot.Player, out ServerPlayer player) && !player.OwnsItem(NetId))
+                player.AddOwnedItem(NetId);
 
         //todo add to player model's hand
         this.gameObject.SetActive(false);

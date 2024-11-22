@@ -28,7 +28,7 @@ public class ItemUpdateData
     public Vector3 ItemPosition { get; set; }
     public Quaternion ItemRotation { get; set; }
     public Vector3 ThrowDirection { get; set; }
-    public ushort Player { get; set; }
+    public byte Player { get; set; }
     public ushort CarNetId { get; set; }
     public bool AttachedFront  { get; set; }
     public Dictionary<string, object> States { get; set; }
@@ -112,7 +112,7 @@ public class ItemUpdateData
             }
             else if (ItemState == ItemState.InInventory || ItemState == ItemState.InHand)
             {
-                Player = reader.GetUShort();
+                Player = reader.GetByte();
             }
             else if (ItemState == ItemState.Attached)
             {

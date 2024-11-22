@@ -8,28 +8,46 @@ using Multiplayer.Components.Networking.World;
 using System;
 using Multiplayer.Utils;
 using DV;
-using DV.CabControls.Spec;
-using System.ComponentModel;
-using Cysharp.Threading.Tasks.Triggers;
+using DV.Interaction;
 
 namespace Multiplayer.Components.Networking.Train;
 
 public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
 {
+    /*
+     * Server 
+     */
+
+    //Culling distance for items
     public const float MAX_DISTANCE_TO_ITEM = 100f;
     public const float MAX_DISTANCE_TO_ITEM_SQR = MAX_DISTANCE_TO_ITEM * MAX_DISTANCE_TO_ITEM;
     public const float NEARBY_REMOVAL_DELAY = 3f; // 3 seconds delay
+    public const float REACH_DISTANCE_BUFFER = 0.5f;
+    public float MAX_REACH_DISTANCE = 4f + REACH_DISTANCE_BUFFER;         //from the game, but we should try to look up the value
 
+    //caches for item snapshots
     private List<ItemUpdateData> DestroyedItems = new List<ItemUpdateData>();
-    private Queue<ItemUpdateData> ReceivedSnapshots = new Queue<ItemUpdateData>();
-    private Dictionary<string, List<NetworkedItem>> CachedItems = new Dictionary<string, List<NetworkedItem>>();
-    private Dictionary<string, InventoryItemSpec> ItemPrefabs = new Dictionary<string, InventoryItemSpec>();
 
-    private bool ClientInitialised = false;
-
+    //Item ownership
     //private Dictionary<ushort, PlayerInventory> playerInventories = new Dictionary<ushort, PlayerInventory>();
     //private Dictionary<NetworkedItem, ushort> itemToPlayerMap = new Dictionary<NetworkedItem, ushort>();
 
+
+    /*
+     * Client
+     */
+
+    //cache for client-sided items & spawns
+    private Dictionary<string, List<NetworkedItem>> CachedItems = new Dictionary<string, List<NetworkedItem>>(); //Client cached items
+    private Dictionary<string, InventoryItemSpec> ItemPrefabs = new Dictionary<string, InventoryItemSpec>();     //Item prefabs
+    private bool ClientInitialised = false;
+
+
+    /* 
+     * Common
+     */
+    private Queue<Tuple<ItemUpdateData, ServerPlayer>> ReceivedSnapshots = new Queue<Tuple<ItemUpdateData, ServerPlayer>>();
+    
 
     protected override void Awake()
     {
@@ -38,6 +56,15 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
             return;
 
         NetworkLifecycle.Instance.Server.PlayerDisconnect += PlayerDisconnected;
+
+        try
+        {
+            MAX_REACH_DISTANCE = GrabberRaycasterDV.SPHERE_CAST_MAX_DIST + REACH_DISTANCE_BUFFER;
+        }
+        catch (Exception ex)
+        {
+            NetworkLifecycle.Instance.Server.LogWarning($"NatworkedItemManager.Awake() Failed to find GrabberRaycasterDV\r\n{ex.Message}");
+        }
     }
 
     private void PlayerDisconnected(uint netID)
@@ -75,17 +102,17 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
         }
     }
 
-    public void ReceiveSnapshots(List<ItemUpdateData> snapshots)
+    public void ReceiveSnapshots(List<ItemUpdateData> snapshots, ServerPlayer sender)
     {
         if (snapshots == null)
             return;
 
         foreach (var snapshot in snapshots)
         {
-            ReceivedSnapshots.Enqueue(snapshot);
+            ReceivedSnapshots.Enqueue(new (snapshot, sender));
         }
 
-        Multiplayer.LogDebug(() => $"ReceiveSnapshots: {ReceivedSnapshots.Count}");
+        Multiplayer.LogDebug(() => $"NetworkItemManager.ReceiveSnapshots() count: {ReceivedSnapshots.Count}, from: ");
     }
 
     #region Common
@@ -109,7 +136,8 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
     {
         while (ReceivedSnapshots.Count > 0)
         {
-            ItemUpdateData snapshot = ReceivedSnapshots.Dequeue();
+            var snapshotInfo = ReceivedSnapshots.Dequeue();
+            ItemUpdateData snapshot = snapshotInfo.Item1;
             try
             {
                 //Multiplayer.LogDebug(() => $"ProcessReceived: {snapshot.UpdateType}");
@@ -122,7 +150,7 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
 
                 if (NetworkLifecycle.Instance.IsHost())
                 {
-                    ProcessReceivedAsHost(snapshot);
+                    ProcessReceivedAsHost(snapshot, snapshotInfo.Item2);
                 }
                 else
                 {
@@ -251,7 +279,7 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
         DestroyedItems.Clear();
     }
 
-    private void ProcessReceivedAsHost(ItemUpdateData snapshot)
+    private void ProcessReceivedAsHost(ItemUpdateData snapshot, ServerPlayer player)
     {
         if (snapshot.UpdateType == ItemUpdateData.ItemUpdateType.Create)
         {
@@ -261,7 +289,7 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
 
         if (NetworkedItem.TryGet(snapshot.ItemNetId, out NetworkedItem netItem))
         {
-            if (ValidatePlayerAction(snapshot)) //Ensure the player can do this
+            if (ValidatePlayerAction(snapshot, player)) //Ensure the player can do this
             {
                 NetworkLifecycle.Instance.Server.LogWarning($"NetworkedItemManager.ProcessReceivedAsHost() ItemNetId: {snapshot.ItemNetId}, snapshot type: {snapshot.UpdateType}");
                 netItem.ReceiveSnapshot(snapshot);
@@ -277,11 +305,51 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
         }
     }
 
-    private bool ValidatePlayerAction(ItemUpdateData snapshot)
+    private bool ValidatePlayerAction(ItemUpdateData snapshot, ServerPlayer player)
     {
-        return true; // Placeholder
+        return true;
+        // Must have valid item
+        if (!NetworkedItem.TryGet(snapshot.ItemNetId, out NetworkedItem networkedItem))
+            return false;
+
+        Multiplayer.LogDebug(() => $"ValidatePlayerAction() ItemId: {snapshot.ItemNetId}, name: {networkedItem.name} Update Type: {snapshot.UpdateType}, Item State: {snapshot.ItemState}, Player: {player.Username}");
+
+        switch (snapshot.ItemState)
+        {
+            case ItemState.InHand:
+            case ItemState.InInventory:
+                // Check if someone else owns it
+                GetItemOwner(snapshot.ItemNetId, out ServerPlayer currentOwner);
+                Multiplayer.LogDebug(() => $"ValidatePlayerAction() ItemId: {snapshot.ItemNetId}, name: {networkedItem.name} Update Type: {snapshot.UpdateType}, Item State: {snapshot.ItemState}, Player: {player?.Username}, Current Owner: {currentOwner?.Username}");
+
+                if (currentOwner != null && currentOwner != player)
+                    return false;
+
+                // Check pickup distance
+                float distance = Vector3.Distance(player.WorldPosition, networkedItem.transform.position);
+                if (distance > MAX_REACH_DISTANCE)
+                    return false;
+
+                Multiplayer.LogDebug(() => $"ValidatePlayerAction() ItemId: {snapshot.ItemNetId}, name: {networkedItem.name} Update Type: {snapshot.UpdateType}, Item State: {snapshot.ItemState}, Player: {player.Username}, Distance check: {distance}");
+                break;
+
+            case ItemState.Dropped:
+            case ItemState.Thrown:
+            case ItemState.Attached: //needs additional checks for distance to coupler
+                // Only owner can drop/throw
+                if (!player.OwnsItem(snapshot.ItemNetId))
+                    return false;
+                break;
+        }
+
+        return true;
     }
 
+    private bool GetItemOwner(ushort itemNetId, out ServerPlayer owner)
+    {
+        owner = NetworkLifecycle.Instance.Server.ServerPlayers.FirstOrDefault(p => p.OwnsItem(itemNetId));
+        return owner != null;
+    }
     #endregion
 
     #region Client
@@ -429,8 +497,6 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
         string prefabName = netItem?.Item?.InventorySpecs?.itemPrefabName;
 
         NetworkLifecycle.Instance.Client.LogDebug(() => $"Caching Spawned Item: {prefabName ?? ""}");
-
-        netItem.BlockSync = true;
 
         netItem.gameObject.SetActive(false);
         RespawnOnDrop respawn = netItem.Item.GetComponent<RespawnOnDrop>();
