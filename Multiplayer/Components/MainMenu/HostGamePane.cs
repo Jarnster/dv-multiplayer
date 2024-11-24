@@ -35,7 +35,7 @@ public class HostGamePane : MonoBehaviour
     TMP_InputField details;
     TextMeshProUGUI serverDetails;
 
-    Slider maxPlayers;
+    SliderDV maxPlayers;
 
     Toggle gamePublic;
 
@@ -116,7 +116,7 @@ public class HostGamePane : MonoBehaviour
             return;
         }
 
-        GameObject sliderPrefab = goMMC.FindChildByName("SliderLimitSession");
+        GameObject sliderPrefab = goMMC.FindChildByName("Field Of View").gameObject;
         if (sliderPrefab == null)
         {
             Multiplayer.LogError("SliderLimitSession not found!");
@@ -253,6 +253,7 @@ public class HostGamePane : MonoBehaviour
         go.ResetTooltip();
         go.FindChildByName("[text label]").GetComponent<Localize>().UpdateLocalization();
         maxPlayers = go.GetComponent<SliderDV>();
+        maxPlayers.stepIncrement = 1;
         maxPlayers.minValue = MIN_PLAYERS;
         maxPlayers.maxValue = MAX_PLAYERS;
         maxPlayers.value = Mathf.Clamp(Multiplayer.Settings.MaxPlayers,MIN_PLAYERS,MAX_PLAYERS);

@@ -14,13 +14,17 @@ public static class HoseAndCock_SetCock_Patch
         if (UnloadWatcher.isUnloading || NetworkLifecycle.Instance.IsProcessingPacket)
             return;
 
-        Coupler coupler = NetworkedTrainCar.GetCoupler(__instance);
+        if(!NetworkedTrainCar.TryGetCoupler(__instance, out Coupler coupler))
+        {
+            Multiplayer.LogError($"HoseAndCock.SetCock() Coupler not found! - Cars may be getting destroyed on load?");
+        }
 
         if (coupler == null || !coupler.train.TryNetworked(out NetworkedTrainCar networkedTrainCar))
             return;
 
         if (networkedTrainCar.IsDestroying)
             return;
+
         NetworkLifecycle.Instance.Client?.SendCockState(networkedTrainCar.NetId, coupler, open);
     }
 }

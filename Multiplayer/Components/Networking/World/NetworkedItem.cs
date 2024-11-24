@@ -64,7 +64,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
     public ItemBase Item { get; private set; }
     private GrabHandlerItem grabHandler;
-    private SnappableOnCoupler snappableOnCoupler;
+    private SnappableItem snappableItem;
     private Component trackedItem;
     private List<object> trackedValues = new List<object>();
     public bool UsefulItem { get; private set; } = false;
@@ -169,7 +169,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
             //Find special interaction components
             TryGetComponent<GrabHandlerItem>(out grabHandler);
-            TryGetComponent<SnappableOnCoupler>(out snappableOnCoupler);
+            TryGetComponent<SnappableItem>(out snappableItem);
 
             lastState = GetItemState();
             stateDirty = false;
@@ -423,7 +423,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
 
         if(lastState == ItemState.Attached)
         {
-            ItemSnapPointCoupler itemSnapPointCoupler = snappableOnCoupler.SnappedTo as ItemSnapPointCoupler;
+            ItemSnapPointCoupler itemSnapPointCoupler = snappableItem.SnappedTo as ItemSnapPointCoupler;
 
             if (itemSnapPointCoupler != null)
             {
@@ -472,7 +472,7 @@ public class NetworkedItem : IdMonoBehaviour<ushort, NetworkedItem>
         if (Inventory.Instance.Contains(this.gameObject, false))
             return ItemState.InInventory;
 
-        if(snappableOnCoupler != null && snappableOnCoupler.IsSnapped)
+        if(snappableItem != null && snappableItem.IsSnapped)
         {
             Multiplayer.LogDebug(() => $"GetItemState() NetId: {NetId}, {name}, snapped! {this.transform.parent}");
             return ItemState.Attached;

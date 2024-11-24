@@ -42,6 +42,10 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     {
         return hoseToCoupler[hoseAndCock];
     }
+    public static bool TryGetCoupler(HoseAndCock hoseAndCock, out Coupler coupler)
+    {
+        return hoseToCoupler.TryGetValue(hoseAndCock, out coupler);
+    }
 
     public static bool GetFromTrainId(string carId, out NetworkedTrainCar networkedTrainCar)
     {
@@ -184,6 +188,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
     {
         if (UnloadWatcher.isQuitting)
             return;
+
         NetworkLifecycle.Instance.OnTick -= Common_OnTick;
         NetworkLifecycle.Instance.OnTick -= Server_OnTick;
         if (UnloadWatcher.isUnloading)
@@ -205,16 +210,21 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
             firebox.fireboxIgnitionPort.ValueUpdatedInternally -= Client_OnIgnite;      //Player igniting firebox
         }
 
-        brakeSystem.HandbrakePositionChanged -= Common_OnHandbrakePositionChanged;
-        brakeSystem.BrakeCylinderReleased -= Common_OnBrakeCylinderReleased;
+        if (brakeSystem != null)
+        {
+            brakeSystem.HandbrakePositionChanged -= Common_OnHandbrakePositionChanged;
+            brakeSystem.BrakeCylinderReleased -= Common_OnBrakeCylinderReleased;
+        }
 
         if (NetworkLifecycle.Instance.IsHost())
         {
             bogie1.TrackChanged -= Server_BogieTrackChanged;
             bogie2.TrackChanged -= Server_BogieTrackChanged;
+
             TrainCar.CarDamage.CarEffectiveHealthStateUpdate -= Server_CarHealthUpdate;
 
-            brakeSystem.MainResPressureChanged -= Server_MainResUpdate;
+            if(brakeSystem != null)
+                brakeSystem.MainResPressureChanged -= Server_MainResUpdate;
 
             if (firebox != null)
             {
@@ -374,7 +384,7 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         if (!mainResPressureDirty)
             return;
         mainResPressureDirty = false;
-        NetworkLifecycle.Instance.Server.SendBrakePressures(NetId, brakeSystem.mainReservoirPressure, brakeSystem.independentPipePressure, brakeSystem.brakePipePressure, brakeSystem.brakeCylinderPressure);
+        //B99 review need / mod NetworkLifecycle.Instance.Server.SendBrakePressures(NetId, brakeSystem.mainReservoirPressure, brakeSystem.independentPipePressure, brakeSystem.brakePipePressure, brakeSystem.brakeCylinderPressure);
     }
 
     private void Server_SendFireBoxState()
@@ -391,6 +401,12 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         if (!sendCouplers)
             return;
         sendCouplers = false;
+
+        if(TrainCar.frontCoupler.IsCoupled())
+            NetworkLifecycle.Instance.Client.SendTrainCouple(TrainCar.frontCoupler,TrainCar.frontCoupler.coupledTo,false, false);
+
+        if(TrainCar.rearCoupler.IsCoupled())
+            NetworkLifecycle.Instance.Client.SendTrainCouple(TrainCar.rearCoupler,TrainCar.rearCoupler.coupledTo,false, false);
 
         if (TrainCar.frontCoupler.hoseAndCock.IsHoseConnected)
             NetworkLifecycle.Instance.Client.SendHoseConnected(TrainCar.frontCoupler, TrainCar.frontCoupler.coupledTo, false);
@@ -680,8 +696,8 @@ public class NetworkedTrainCar : IdMonoBehaviour<ushort, NetworkedTrainCar>
         if (!hasSimFlow)
             return;
 
-        brakeSystem.ForceIndependentPipePressure(independentPipePressure);
-        brakeSystem.ForceTargetIndBrakeCylinderPressure(brakeCylinderPressure);
+        //B99 review need / mod brakeSystem.ForceIndependentPipePressure(independentPipePressure);
+        //B99 review need / mod brakeSystem.ForceTargetIndBrakeCylinderPressure(brakeCylinderPressure);
         brakeSystem.SetMainReservoirPressure(mainReservoirPressure);
 
         brakeSystem.brakePipePressure = brakePipePressure;

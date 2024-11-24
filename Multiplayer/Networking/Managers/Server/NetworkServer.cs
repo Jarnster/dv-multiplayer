@@ -977,11 +977,11 @@ public class NetworkServer : NetworkManager
         ChatManager.ProcessMessage(packet.message,peer);
     }
     #endregion
-
+    
     #region Unconnected Packet Handling
     private void OnUnconnectedPingPacket(UnconnectedPingPacket packet, IPEndPoint endPoint)
     {
-        Multiplayer.Log($"OnUnconnectedPingPacket({endPoint.Address})");
+        //Multiplayer.Log($"OnUnconnectedPingPacket({endPoint.Address})");
         SendUnconnectedPacket(packet, endPoint.Address.ToString(),endPoint.Port);
     }
 
@@ -1021,7 +1021,7 @@ public class NetworkServer : NetworkManager
 
         );
         
-        NetworkedItemManager.Instance.ReceiveSnapshots(packet.Items, player);
+        //NetworkedItemManager.Instance.ReceiveSnapshots(packet.Items, player);
     }
     #endregion
 }

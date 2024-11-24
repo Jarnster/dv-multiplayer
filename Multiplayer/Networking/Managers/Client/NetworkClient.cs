@@ -516,7 +516,7 @@ public class NetworkClient : NetworkManager
         Coupler coupler = packet.IsFrontCoupler ? trainCar.frontCoupler : trainCar.rearCoupler;
         Coupler otherCoupler = packet.OtherCarIsFrontCoupler ? otherTrainCar.frontCoupler : otherTrainCar.rearCoupler;
 
-        coupler.CoupleTo(otherCoupler, packet.PlayAudio, packet.ViaChainInteraction);
+        coupler.CoupleTo(otherCoupler, packet.PlayAudio, false/*B99 packet.ViaChainInteraction*/);
     }
 
     private void OnCommonTrainUncouplePacket(CommonTrainUncouplePacket packet)
@@ -526,7 +526,7 @@ public class NetworkClient : NetworkManager
 
         Coupler coupler = packet.IsFrontCoupler ? trainCar.frontCoupler : trainCar.rearCoupler;
 
-        coupler.Uncouple(packet.PlayAudio, false, packet.DueToBrokenCouple, packet.ViaChainInteraction);
+        coupler.Uncouple(packet.PlayAudio, false, packet.DueToBrokenCouple, false/*B99 packet.ViaChainInteraction*/);
     }
 
     private void OnCommonHoseConnectedPacket(CommonHoseConnectedPacket packet)
@@ -723,7 +723,7 @@ public class NetworkClient : NetworkManager
             LicenseManager.Instance.AcquireGeneralLicense(Globals.G.Types.generalLicenses.Find(l => l.id == packet.Id));
 
         foreach (CareerManagerLicensesScreen screen in Object.FindObjectsOfType<CareerManagerLicensesScreen>())
-            screen.PopulateLicensesTextsFromIndex(screen.indexOfFirstDisplayedLicense);
+            screen.PopulateTextsFromIndex(screen.IndexOfFirstDisplayedEntry); //B99
     }
 
     private void OnClientboundGarageUnlockPacket(ClientboundGarageUnlockPacket packet)
@@ -820,7 +820,7 @@ public class NetworkClient : NetworkManager
             return debug;
         });
 
-        NetworkedItemManager.Instance.ReceiveSnapshots(packet.Items, null);
+        //NetworkedItemManager.Instance.ReceiveSnapshots(packet.Items, null);
     }
 
     #endregion
@@ -904,7 +904,9 @@ public class NetworkClient : NetworkManager
         {
             NetId = couplerNetId, //coupler.train.GetNetId(),
             IsFrontCoupler = coupler.isFrontCoupler,
+            State = (byte)coupler.state,
             OtherNetId = otherCouplerNetId, //otherCoupler.train.GetNetId(),
+            OtherState = (byte)otherCoupler.state,
             OtherCarIsFrontCoupler = otherCoupler.isFrontCoupler,
             PlayAudio = playAudio,
             ViaChainInteraction = viaChainInteraction

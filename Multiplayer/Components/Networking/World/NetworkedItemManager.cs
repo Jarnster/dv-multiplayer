@@ -55,11 +55,11 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
         if (!NetworkLifecycle.Instance.IsHost())
             return;
 
-        NetworkLifecycle.Instance.Server.PlayerDisconnect += PlayerDisconnected;
+        //B99 temporary patch NetworkLifecycle.Instance.Server.PlayerDisconnect += PlayerDisconnected;
 
         try
         {
-            MAX_REACH_DISTANCE = GrabberRaycasterDV.SPHERE_CAST_MAX_DIST + REACH_DISTANCE_BUFFER;
+            MAX_REACH_DISTANCE = GrabberRaycasterDV.RAYCAST_MAX_DIST + REACH_DISTANCE_BUFFER;
         }
         catch (Exception ex)
         {
@@ -452,6 +452,8 @@ public class NetworkedItemManager : SingletonBehaviour<NetworkedItemManager>
     }
     public void CacheWorldItems()
     {
+        //B99 temporary patch
+        return;
         if (NetworkLifecycle.Instance.IsHost())
             return;
 

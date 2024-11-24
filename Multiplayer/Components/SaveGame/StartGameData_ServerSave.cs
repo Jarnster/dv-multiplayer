@@ -21,6 +21,8 @@ public class StartGameData_ServerSave : AStartGameData
 
     private ClientboundSaveGameDataPacket packet;
 
+    public override bool IsStartingNewSession => false;
+
     public void SetFromPacket(ClientboundSaveGameDataPacket packet)
     {
         this.packet = packet.Clone();

@@ -1,21 +1,20 @@
+using DV;
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
 
 namespace Multiplayer.Components.Networking.Player;
 
-public class NetworkedWorldMap : MonoBehaviour
+public class NetworkedMapMarkersController : MonoBehaviour
 {
-    private WorldMap worldMap;
     private MapMarkersController markersController;
     private GameObject textPrefab;
     private readonly Dictionary<byte, WorldMapIndicatorRefs> playerIndicators = new();
 
     private void Awake()
     {
-        worldMap = GetComponent<WorldMap>();
         markersController = GetComponent<MapMarkersController>();
-        textPrefab = worldMap.GetComponentInChildren<TMP_Text>().gameObject;
+        textPrefab = markersController.GetComponentInChildren<TMP_Text>().gameObject;
         foreach (NetworkedPlayer networkedPlayer in NetworkLifecycle.Instance.Client.ClientPlayerManager.Players)
             OnPlayerConnected(networkedPlayer.Id, networkedPlayer);
         NetworkLifecycle.Instance.Client.ClientPlayerManager.OnPlayerConnected += OnPlayerConnected;
@@ -36,16 +35,16 @@ public class NetworkedWorldMap : MonoBehaviour
 
     private void OnPlayerConnected(byte id, NetworkedPlayer player)
     {
-        Transform root = new GameObject($"{player.Username}'s Indicator") {
+        Transform root = new GameObject($"MapMarkerPlayer({player.Username})") {
             transform = {
-                parent = worldMap.playerIndicator.parent,
+                parent = this.transform,
                 localPosition = Vector3.zero,
                 localEulerAngles = Vector3.zero
             }
         }.transform;
         WorldMapIndicatorRefs refs = root.gameObject.AddComponent<WorldMapIndicatorRefs>();
 
-        GameObject indicator = Instantiate(worldMap.playerIndicator.gameObject, root);
+        GameObject indicator = Instantiate(markersController.playerMarkerPrefab.gameObject, root);
         indicator.transform.localPosition = Vector3.zero;
         refs.indicator = indicator.transform;
 
@@ -54,6 +53,8 @@ public class NetworkedWorldMap : MonoBehaviour
         textGo.transform.localEulerAngles = new Vector3(90f, 0, 0);
         refs.text = textGo.GetComponent<RectTransform>();
         TMP_Text text = textGo.GetComponent<TMP_Text>();
+
+        text.name = "Player Name";
         text.text = player.Username;
         text.alignment = TextAlignmentOptions.Center;
         text.fontSize /= 1.25f;
@@ -74,7 +75,7 @@ public class NetworkedWorldMap : MonoBehaviour
 
     private void OnTick(uint obj)
     {
-        if (!worldMap.initialized || UnloadWatcher.isUnloading)
+        if (markersController == null || UnloadWatcher.isUnloading)
             return;
         UpdatePlayers();
     }
@@ -92,7 +93,7 @@ public class NetworkedWorldMap : MonoBehaviour
 
             WorldMapIndicatorRefs refs = kvp.Value;
 
-            bool active = worldMap.gameParams.PlayerMarkerDisplayed;
+            bool active = Globals.G.gameParams.PlayerMarkerDisplayed;
             if (refs.gameObject.activeSelf != active)
                 refs.gameObject.SetActive(active);
             if (!active)
@@ -104,7 +105,7 @@ public class NetworkedWorldMap : MonoBehaviour
             if (normalized != Vector3.zero)
                 refs.indicator.localRotation = Quaternion.LookRotation(normalized);
 
-            Vector3 position = markersController.GetMapPosition(playerTransform.position - WorldMover.currentMove, worldMap.triggerExtentsXZ);
+            Vector3 position = markersController.GetMapPosition(playerTransform.position - WorldMover.currentMove, true);
             refs.indicator.localPosition = position;
             refs.text.localPosition = position with { y = position.y + 0.025f };
         }

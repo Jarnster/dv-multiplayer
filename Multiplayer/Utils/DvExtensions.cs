@@ -141,5 +141,14 @@ public static class DvExtensions
         */
         return result;
     }
+
+    public static Vector3 GetWorldAbsolutePosition(this GameObject go)
+    {
+        return go.transform.GetWorldAbsolutePosition();
+    }
+    public static Vector3 GetWorldAbsolutePosition(this Transform transform)
+    {
+        return transform.position - WorldMover.currentMove;
+    }
     #endregion
 }
