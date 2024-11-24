@@ -21,6 +21,8 @@ namespace Multiplayer
         private const string PREFIX_CAREER_MANAGER = $"{PREFIX}carman";
         private const string PREFIX_PLAYER_LIST = $"{PREFIX}plist";
         private const string PREFIX_LOADING_INFO = $"{PREFIX}linfo";
+        private const string PREFIX_CHAT_INFO = $"{PREFIX}chat";
+        private const string PREFIX_PAUSE_MENU = $"{PREFIX}pm";
 
         #region Main Menu
         public static string MAIN_MENU__JOIN_SERVER => Get(MAIN_MENU__JOIN_SERVER_KEY);
@@ -124,6 +126,17 @@ namespace Multiplayer
 
         public static string LOADING_INFO__SYNC_WORLD_STATE => Get(LOADING_INFO__SYNC_WORLD_STATE_KEY);
         private const string LOADING_INFO__SYNC_WORLD_STATE_KEY = $"{PREFIX_LOADING_INFO}/sync_world_state";
+        #endregion
+
+        #region Chat
+        #endregion
+
+        #region Pause Menu
+        public static string PAUSE_MENU_DISCONNECT => Get(PAUSE_MENU_DISCONNECT_KEY);
+        public const string PAUSE_MENU_DISCONNECT_KEY = $"{PREFIX_PAUSE_MENU}/disconnect_msg";
+
+        public static string PAUSE_MENU_QUIT => Get(PAUSE_MENU_QUIT_KEY);
+        public const string PAUSE_MENU_QUIT_KEY = $"{PREFIX_PAUSE_MENU}/quit_msg";
         #endregion
 
         private static bool initializeAttempted;
