@@ -66,6 +66,10 @@ namespace Multiplayer
         private const string SERVER_BROWSER__NO_KEY = $"{PREFIX_SERVER_BROWSER}/no";
         public static string SERVER_BROWSER__NO_SERVERS => Get(SERVER_BROWSER__NO_SERVERS_KEY);
         public const string SERVER_BROWSER__NO_SERVERS_KEY = $"{PREFIX_SERVER_BROWSER}/no_servers";
+        public static string SERVER_BROWSER__INFO_TITLE => Get(SERVER_BROWSER__INFO_TITLE_KEY);
+        public const string SERVER_BROWSER__INFO_TITLE_KEY = $"{PREFIX_SERVER_BROWSER}/info/title";
+        public static string SERVER_BROWSER__INFO_CONTENT => Get(SERVER_BROWSER__INFO_CONTENT_KEY);
+        public const string SERVER_BROWSER__INFO_CONTENT_KEY = $"{PREFIX_SERVER_BROWSER}/info/content";
         #endregion
 
         #region Server Host
@@ -83,6 +87,16 @@ namespace Multiplayer
         public const string SERVER_HOST_MAX_PLAYERS_KEY = $"{PREFIX_SERVER_HOST}/max_players";
         public static string SERVER_HOST_START => Get(SERVER_HOST_START_KEY);
         public const string SERVER_HOST_START_KEY = $"{PREFIX_SERVER_HOST}/start";
+
+        public static string SERVER_HOST__INSTRUCTIONS_FIRST => Get(SERVER_HOST__INSTRUCTIONS_FIRST_KEY);
+        public const string SERVER_HOST__INSTRUCTIONS_FIRST_KEY = $"{PREFIX_SERVER_HOST}/instructions/first";
+        public static string SERVER_HOST__MOD_WARNING => Get(SERVER_HOST__MOD_WARNING_KEY);
+
+        public const string SERVER_HOST__MOD_WARNING_KEY = $"{PREFIX_SERVER_HOST}/instructions/mod_warning";
+        public static string SERVER_HOST__RECOMMEND => Get(SERVER_HOST__RECOMMEND_KEY);
+        public const string SERVER_HOST__RECOMMEND_KEY = $"{PREFIX_SERVER_HOST}/instructions/recommend";
+        public static string SERVER_HOST__SIGNOFF => Get(SERVER_HOST__SIGNOFF_KEY);
+        public const string SERVER_HOST__SIGNOFF_KEY = $"{PREFIX_SERVER_HOST}/instructions/signoff";
 
 
 

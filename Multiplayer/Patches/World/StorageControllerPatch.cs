@@ -6,7 +6,7 @@ using System;
 using UnityEngine;
 
 namespace Multiplayer.Patches.World.Items;
-
+/*
 [HarmonyPatch(typeof(StorageController))]
 public static class StorageControllerPatch
 {
@@ -78,5 +78,5 @@ public static class StorageControllerPatch
         });
     }
 
-
 }
+*/

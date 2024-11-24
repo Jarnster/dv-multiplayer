@@ -157,12 +157,16 @@ public class HostGamePane : MonoBehaviour
         serverWindowGO.name = "Host Details";
         serverDetails = serverDetailsGO.GetComponent<TextMeshProUGUI>();
         serverDetails.textWrappingMode = TextWrappingModes.Normal;
-        serverDetails.text = "First time hosts, please see the <link=\"https://github.com/AMacro/dv-multiplayer/wiki/Hosting\">Hosting</link> section of our Wiki.<br><br><br>" +
+        serverDetails.text = Locale.Get(Locale.SERVER_HOST__INSTRUCTIONS_FIRST_KEY, ["<link=\"https://github.com/AMacro/dv-multiplayer/wiki/Hosting\">", "</link>"]) + "<br><br><br>" +
+                             Locale.Get(Locale.SERVER_HOST__MOD_WARNING_KEY, ["<link=\"https://github.com/AMacro/dv-multiplayer/wiki/Mod-Compatibility\">", "</link>"]) + "<br><br>" +
+                             Locale.SERVER_HOST__RECOMMEND + "<br><br>" +
+                             Locale.SERVER_HOST__SIGNOFF;
+                             /*"First time hosts, please see the <link=\"https://github.com/AMacro/dv-multiplayer/wiki/Hosting\">Hosting</link> section of our Wiki.<br><br><br>" +
 
                              "Using other mods may cause unexpected behaviour including de-syncs. See <link=\"https://github.com/AMacro/dv-multiplayer/wiki/Mod-Compatibility\">Mod Compatibility</link> for more info.<br><br>" +
                              "It is recommended that other mods are disabled and Derail Valley restarted prior to playing in multiplayer.<br><br>" +
 
-                             "We hope to have your favourite mods compatible with multiplayer in the future.";
+                             "We hope to have your favourite mods compatible with multiplayer in the future.";*/
 
 
         //Find scrolling viewport

@@ -287,7 +287,7 @@ namespace Multiplayer.Components.MainMenu
             serverName.alignment = TextAlignmentOptions.Center;
             serverName.textWrappingMode = TextWrappingModes.Normal;
             serverName.fontSize = 22;
-            serverName.text = "Server Browser Info";
+            serverName.text = Locale.SERVER_BROWSER__INFO_TITLE;// "Server Browser Info";
 
             /* 
              * Setup server details
@@ -341,7 +341,7 @@ namespace Multiplayer.Components.MainMenu
             detailsPane = textGO.GetComponent<TextMeshProUGUI>();
             detailsPane.textWrappingMode = TextWrappingModes.Normal;
             detailsPane.fontSize = 18;
-            detailsPane.text = "Welcome to Derail Valley Multiplayer Mod!<br><br>The server list refreshes automatically every 30 seconds, but you can refresh manually once every 10 seconds.";
+            detailsPane.text = Locale.Get(Locale.SERVER_BROWSER__INFO_CONTENT_KEY, [AUTO_REFRESH_TIME, REFRESH_MIN_TIME]);// "Welcome to Derail Valley Multiplayer Mod!<br><br>The server list refreshes automatically every 30 seconds, but you can refresh manually once every 10 seconds.";
 
             // Adjust text RectTransform to fit content
             RectTransform textRT = textGO.GetComponent<RectTransform>();
